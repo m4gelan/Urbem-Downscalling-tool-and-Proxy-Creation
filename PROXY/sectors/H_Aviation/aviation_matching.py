@@ -50,7 +50,24 @@ def _norm_name(name: object) -> str:
     return str(name).strip().lower()
 
 
-def _haversine_km(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+def _scalar_text(val: object) -> str:
+    """Normalize GPKG/pandas cell values: NaN / NA → empty string."""
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except TypeError:
+        pass
+    if isinstance(val, float) and math.isnan(val):
+        return ""
+    return str(val).strip()
+
+
+def _airport_code_field(row: Any, tags: dict[str, str], key: str) -> str | None:
+    """ICAO/IATA from row column or OSM tags; empty / NaN → None."""
+    s = (_scalar_text(row.get(key)) or _scalar_text(tags.get(key))).upper()
+    return s if s else None
     r = 6371.0
     lon1r, lat1r, lon2r, lat2r = map(math.radians, (lon1, lat1, lon2, lat2))
     dlon = lon2r - lon1r
@@ -203,10 +220,10 @@ def build_aviation_facility_candidates(
         match_ll = gdiag.geometry.iloc[0]
         cen_ll = gdiag.geometry.iloc[1]
 
-        icao = (row.get("icao") or tags.get("icao") or "").strip().upper() or None
-        iata = (row.get("iata") or tags.get("iata") or "").strip().upper() or None
-        name = str(row.get("name") or tags.get("name") or "").strip() or "aerodrome"
-        etype = str(row.get("osm_element_type") or "way")
+        icao = _airport_code_field(row, tags, "icao")
+        iata = _airport_code_field(row, tags, "iata")
+        name = _scalar_text(row.get("name")) or _scalar_text(tags.get("name")) or "aerodrome"
+        etype = _scalar_text(row.get("osm_element_type")) or "way"
         eid = row.get("osm_element_id")
         if pd.isna(eid) or eid is None:
             eid = int(idx)
@@ -267,8 +284,8 @@ def build_aviation_facility_candidates(
                         continue
                     if _tag_nonempty(tags, "military"):
                         continue
-                    icao_n = (tags.get("icao") or nrow.get("icao") or "").strip().upper() or None
-                    name_n = str(nrow.get("name") or tags.get("name") or "").strip() or "aerodrome"
+                    icao_n = _airport_code_field(nrow, tags, "icao")
+                    name_n = _scalar_text(nrow.get("name")) or _scalar_text(tags.get("name")) or "aerodrome"
                     nn = _norm_name(name_n)
                     if icao_n and icao_n in poly_icoes:
                         continue
@@ -285,7 +302,7 @@ def build_aviation_facility_candidates(
                                 break
                     if skip:
                         continue
-                    etype = str(nrow.get("osm_element_type") or "node")
+                    etype = _scalar_text(nrow.get("osm_element_type")) or "node"
                     eid = nrow.get("osm_element_id")
                     if pd.isna(eid) or eid is None:
                         continue
@@ -302,7 +319,7 @@ def build_aviation_facility_candidates(
                             "reporting_year": int(pm.get("reference_year", 2019)),
                             "_registry": "OSM_AVIATION_NODE",
                             "icao": icao_n or "",
-                            "iata": (tags.get("iata") or nrow.get("iata") or "").strip().upper() or "",
+                            "iata": (_scalar_text(tags.get("iata")) or _scalar_text(nrow.get("iata"))).upper(),
                             "osm_source": "node_buffer",
                             "area_km2": float(buf_area_km2),
                             "polygon_centroid_lon": float(lon_n),
