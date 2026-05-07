@@ -6,12 +6,8 @@ output_filename: offroad_areasource.tif
 pad_m: 5000.0
 cams_country_iso3: GRC
 
-# Multiband GeoTIFF: one band per pollutant. Each band is CAMS-cell–normalized weights
-# combining OSM rail (1A3c), OSM pipeline (1A3ei), and CORINE-only agri+ind non-road (1A3eii),
-# mixed using national CEIP-style shares from the workbook below.
-#
-# OSM rail lifecycle filters (tram/subway are included when present in the extract)
-# live in paths.yaml under ``proxy_rules.osm_railway``.
+# Multiband GeoTIFF: OSM rail (1A3c), pipeline+compressors (1A3ei), CORINE non-road (1A3eii),
+# blended with CEIP triple shares (with optional reference-country alpha pool for weak reporters).
 
 area_proxy:
   source_type_index: 1
@@ -26,38 +22,78 @@ area_proxy:
     GR: GRC
 
   defaults:
-    # Triple-leg shares use every year-sheet in the workbook: per-year (1A3c,1A3ei,1A3eii)
-    # shares are averaged across years (``ceip_year`` is not used for I_Offroad).
+    # Triple-leg shares use every workbook sheet; ceip_year is not used for I_Offroad.
     fallback_country_iso3: GRC
     default_shares_rail: 0.34
     default_shares_pipe: 0.33
     default_shares_nonroad: 0.33
-
+    
   pollutants:
-    - nox
-    - pm2_5
-    - nh3
+    - ch4
     - co
-    - nm_voc
-    - so2
+    - nh3
+    - nmvoc
+    - nox
+    - pm10
+    - pm2_5
+    - sox
 
   ceip_pollutant_aliases:
-    NOX: nox
-    PM25: pm2_5
-    PM2.5: pm2_5
-    PM2_5: pm2_5
-    NMVOC: nm_voc
-    SOX: so2
-    SO2: so2
-
+    PM25: PM2_5
+    PM2.5: PM2_5
+    NOX: NOX
+    NMVOC: NMVOC
+    SO2: SOX
+    SOX: SOX
+    CH4: CH4
+    CO: CO
+    NH3: NH3
+    
   facilities_tif: null
 
+
+  # When national NFR splits are unreliable (e.g. EL), overwrite CEIP triple with the mean
+  # of reference countries that report full sub-sector detail (ISO3 codes).
+  alpha_fallback:
+    enabled: true
+    target_countries_iso3:
+      - GRC
+    reference_countries_iso3:
+      - FRA
+      - DEU
+      - AUT
+      - NLD
+      - GBR
+    pollutants: all
+
   proxy:
-    rail_buffer_m: 150
+    # --- Rail (1A3c)
+    rail_buffer_m: 75
+    w_rail_diesel: 1.0
+    w_rail_electric: 0.15
+    w_rail_yard: 1.0
+    rail_exclude_service_siding: false
+
+    # --- Pipeline (1A3ei): lines + compressor facilities (Gaussian sigma default 500 m)
     pipeline_buffer_m: 75
+    pipeline_facility_raster_mode: gaussian
+    pipeline_facility_sigma_m: 500
+    pipeline_facility_disc_radius_m: 1000
+    w_pipeline_lines_in_proxy: 0.30
+    w_pipeline_facilities_in_proxy: 0.70
+
     osm_subdivide: 4
     pipe_fac_weight: 0.8
     pipe_raw_weight: 0.2
+
+    # --- Non-road (1A3eii): CORINE residual weights (sum normalised internally)
+    nonroad_corine_weights:
+      123: 0.40
+      121: 0.35
+      124: 0.15
+      131: 0.10
+
+    # Legacy agri/ind blend (only used if ``nonroad_corine_weights`` is omitted)
     w_agri: 0.5
     w_ind: 0.35
     corine_agri_codes:
@@ -78,8 +114,7 @@ area_proxy:
     corine_ind_optional:
       - 123
 
-  visualization_weight_band: 1
-  visualization_pollutant: null
+  visualization_pollutant: "NOx, PM2_5, NMVOC"
 
   corine_viz_layers:
     agriculture:

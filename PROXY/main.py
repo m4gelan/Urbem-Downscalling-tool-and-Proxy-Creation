@@ -316,6 +316,46 @@ def _match_points_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _aviation_area_cmd(args: argparse.Namespace) -> int:
+    """GNFR H area-source proxy + downscaling (binary aerodrome raster, CAMS area rows)."""
+    _configure_logging(getattr(args, "log_level", "INFO"))
+    _ensure_gtiff_srs_source_epsg()
+    cfg = load_path_config(Path(args.config))
+    root = Path(__file__).resolve().parents[1]
+    cams_nc = discover_cams_emissions(root, Path(cfg.require("emissions", "cams_2019_nc")))
+    path_resolved = dict(cfg.resolved)
+    em = dict(path_resolved.get("emissions") or {})
+    em["cams_2019_nc"] = str(cams_nc)
+    path_resolved["emissions"] = em
+
+    sectors_data = load_yaml(root / "PROXY" / "config" / "sectors.yaml")
+    entry = next((e for e in (sectors_data.get("sectors") or []) if str(e.get("key")) == args.sector), None)
+    if entry is None:
+        raise SystemExit(f"[aviation-area] Unknown sector {args.sector!r}")
+    sector_cfg = load_yaml(root / str(entry["config"]))
+
+    out_rel = Path(str(sector_cfg.get("output_dir", "OUTPUT/Proxy_weights/H_Aviation")))
+    out_dir = out_rel if out_rel.is_absolute() else root / out_rel
+    log_path: Path | None = None
+    if not getattr(args, "no_run_log", False):
+        iso_tag = (args.cams_iso3 or "").strip().upper() or "CAMS"
+        log_path = out_dir / f"aviation_area_run_{iso_tag}_{args.year}.log"
+
+    from PROXY.sectors.H_Aviation.aviation_area import run_aviation_area_proxy_pipeline
+
+    result = run_aviation_area_proxy_pipeline(
+        repo_root=root,
+        path_cfg=path_resolved,
+        sector_cfg=sector_cfg,
+        nuts_country=str(args.country),
+        year=int(args.year),
+        cams_iso3=args.cams_iso3,
+        log_file=log_path,
+    )
+    print(f"[aviation-area] status={result.get('status')} detail={result}", flush=True)
+    return 0
+
+
 def _resolve_under_root(path: Path, root: Path) -> Path:
     return path if path.is_absolute() else root / path
 
@@ -921,6 +961,35 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_match.set_defaults(func=_match_points_cmd)
+
+    p_av_area = sub.add_parser(
+        "aviation-area",
+        help="GNFR H aviation area-source proxy (CAMS area rows + OSM aerodrome binary raster).",
+    )
+    p_av_area.add_argument("--sector", default="H_Aviation", help="Sector key (default H_Aviation).")
+    p_av_area.add_argument(
+        "--country",
+        default="EL",
+        help="NUTS domain country (e.g. EL or GRC maps to EL for NUTS CNTR_CODE).",
+    )
+    p_av_area.add_argument("--year", type=int, default=2019, help="Year label for output filenames.")
+    p_av_area.add_argument(
+        "--cams-iso3",
+        default=None,
+        help="CAMS country_id ISO3 (defaults from sector point_matching.cams_country_iso3).",
+    )
+    p_av_area.add_argument(
+        "--no-run-log",
+        action="store_true",
+        help="Do not write aviation_area_run_<ISO3>_<year>.log under the sector output directory.",
+    )
+    p_av_area.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        help="Root logging level.",
+    )
+    p_av_area.set_defaults(func=_aviation_area_cmd)
 
     p_vis = sub.add_parser("visualize", help="Render proxy output previews.")
     p_vis.add_argument(

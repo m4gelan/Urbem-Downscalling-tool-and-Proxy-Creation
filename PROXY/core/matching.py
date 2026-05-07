@@ -941,13 +941,11 @@ def run_matching(
         pass
 
     link_geotiff: str | None = None
-    if (
-        link_ref_weights_tif is not None
-        and link_ref_weights_tif.is_file()
-        and not out_df.empty
-        and {"facility_longitude", "facility_latitude"}.issubset(out_df.columns)
-    ):
-        from PROXY.core.point_link_geotiff import write_cams_facility_link_geotiff
+    if not out_df.empty and {"facility_longitude", "facility_latitude"}.issubset(out_df.columns):
+        from PROXY.core.point_link_geotiff import (
+            write_cams_facility_link_geotiff,
+            write_cams_facility_link_geotiff_match_extent,
+        )
 
         link_fn = pm.get("link_geotiff_filename")
         link_path = (
@@ -955,14 +953,29 @@ def run_matching(
             if link_fn
             else output_dir / f"{request.sector}_cams_facility_link_{request.year}.tif"
         )
+        use_extent = bool(pm.get("link_grid_match_extent"))
+        ref_ok = link_ref_weights_tif is not None and Path(link_ref_weights_tif).is_file()
         try:
-            write_cams_facility_link_geotiff(
-                matches_df=out_df,
-                ref_weights_tif=link_ref_weights_tif,
-                out_tif=link_path,
-            )
-            link_geotiff = str(link_path)
-        except Exception:
+            if use_extent or not ref_ok:
+                write_cams_facility_link_geotiff_match_extent(
+                    matches_df=out_df,
+                    out_tif=link_path,
+                    resolution_m=float(pm.get("link_grid_resolution_m", 1000.0)),
+                    pad_m=float(pm.get("link_grid_pad_m", 15000.0)),
+                    crs=str(pm.get("link_grid_crs", "EPSG:3035")),
+                )
+            else:
+                write_cams_facility_link_geotiff(
+                    matches_df=out_df,
+                    ref_weights_tif=Path(link_ref_weights_tif),
+                    out_tif=link_path,
+                )
+            link_geotiff = str(link_path.resolve())
+        except Exception as exc:
+            import traceback
+
+            print(f"[match-points] link GeoTIFF failed: {exc}", flush=True)
+            traceback.print_exc()
             link_geotiff = None
 
     out: dict[str, Any] = {

@@ -29,6 +29,11 @@ point_matching:
   nearest_candidates: 25
   reference_year: 2019
   link_geotiff_filename: aviation_pointsource.tif
+  # Full EU CORINE is far too large to rasterize point masses into; use a tight bbox grid.
+  link_grid_match_extent: true
+  link_grid_resolution_m: 1000
+  link_grid_pad_m: 15000
+  link_grid_crs: EPSG:3035
   max_match_distance_km: 10.0
   # Optional layers (same GPKG or ``aviation_terminal_apron_gpkg``): apron/terminal polygons
   # intersecting each aerodrome; union centroid clipped to aerodrome boundary for match_location.
@@ -44,3 +49,22 @@ cams:
     - area
     - point
   domain_bbox_wgs84: null
+
+# Area-source downscaling (CAMS ``source_type_index == 1`` rows). Run:
+# ``python -m PROXY.main aviation-area --country EL --year 2019 --cams-iso3 GRC``
+area_source:
+  enabled: true
+  gnfr: H
+  resolution_m: 100
+  pad_m: 5000.0
+  proxy_weight_floor: 1.0e-6
+  # CAMS NetCDF variable names (see dataset); ``co2_total`` sums ``co2_ff`` + ``co2_bf``.
+  pollutants:
+    - pm2_5
+    - pm10
+    - nox
+    - nh3
+    - sox
+    - co
+    - nm_voc
+    - co2_total

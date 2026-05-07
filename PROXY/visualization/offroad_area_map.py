@@ -12,7 +12,11 @@ import xarray as xr
 from PROXY.sectors.I_Offroad.proxy_rules import osm_railway_line_filter_sets
 from PROXY.sectors.I_Offroad.cams_area_mask import offroad_union_area_mask
 from PROXY.sectors.I_Offroad.offroad_area_weights import parse_offroad_subsector_activity
-from PROXY.sectors.I_Offroad.pipeline_osm import load_pipeline_union
+from PROXY.sectors.I_Offroad.pipeline_osm import (
+    load_pipeline_facilities,
+    load_pipeline_lines,
+    load_pipeline_union,
+)
 from PROXY.sectors.I_Offroad.rail_osm import filter_rail_lines
 from PROXY.visualization._legend import (
     LegendSection,
@@ -41,9 +45,86 @@ from PROXY.visualization._multipollutant import (
 from PROXY.visualization.corine_rgba import corine_clc_overlay_rgba
 from PROXY.visualization.overlay_utils import read_corine_clc_wgs84_on_weight_grid
 
+
+def _expand_level2_highlights_for_clc_grid(
+    clc_i: np.ndarray,
+    level2_codes: tuple[int, ...],
+) -> tuple[int, ...]:
+    """Map YAML Level-2 codes to legend codes in ``clc_i`` (CLC 1–44 vs Level-2), same as proxy."""
+    if not level2_codes:
+        return ()
+    from PROXY.core.osm_corine_proxy import adapt_corine_classes_for_grid
+
+    # Engine uses -9999 nodata; viz grid uses -1 — align so max/classification match CORINE legend.
+    clc_adapt = np.where(np.asarray(clc_i) >= 0, clc_i, -9999).astype(np.int32)
+    expanded: list[int] = []
+    for c in level2_codes:
+        codes, _ = adapt_corine_classes_for_grid(clc_adapt, [int(c)])
+        for x in codes:
+            expanded.append(int(x))
+    out = tuple(sorted(set(expanded)))
+    if not out:
+        return tuple(int(x) for x in level2_codes)
+    return out
+
 _OFFROAD_COLOR_NONROAD = (106, 27, 154)
 _OFFROAD_COLOR_PIPELINE = (183, 28, 28)
+_OFFROAD_COLOR_PIPELINE_FACILITY = (230, 81, 0)
 _OFFROAD_COLOR_RAILWAY = (13, 71, 161)
+
+# Non-road residual CLC L2 codes (1A3eii weights) — distinct RGB for per-layer previews.
+_NONROAD_CLC_LAYER_RGB: dict[int, tuple[int, int, int]] = {
+    121: (183, 28, 28),
+    123: (230, 81, 0),
+    124: (0, 151, 167),
+    131: (121, 85, 72),
+}
+_NONROAD_CLC_TITLES: dict[int, str] = {
+    121: "industrial / commercial",
+    123: "port areas",
+    124: "airports",
+    131: "mineral extraction",
+}
+
+
+def _nonroad_clc_weight_label(area_proxy: dict[str, Any], code: int) -> str:
+    p = area_proxy.get("proxy") or {}
+    nw = p.get("nonroad_corine_weights") or {}
+    for k, v in nw.items():
+        try:
+            if int(k) == int(code):
+                return f"w={float(v):.2f}"
+        except (TypeError, ValueError):
+            continue
+    return ""
+
+
+def _split_facilities_points_other(gdf: Any) -> tuple[Any, Any]:
+    """Compressors as points vs lines/polygons for separate map styling."""
+    if gdf is None or getattr(gdf, "empty", True):
+        return None, None
+    gt = gdf.geometry.geom_type
+    m_pt = gt.isin(["Point", "MultiPoint"])
+    pts = gdf.loc[m_pt].copy()
+    other = gdf.loc[~m_pt].copy()
+    return (pts if not pts.empty else None, other if not other.empty else None)
+
+
+def _iter_point_latlon(gdf: Any) -> Any:
+    """Yield (lat, lon) for Point / MultiPoint rows for Folium markers."""
+    if gdf is None or getattr(gdf, "empty", True):
+        return
+    for _, row in gdf.iterrows():
+        g = row.geometry
+        if g is None or g.is_empty:
+            continue
+        if g.geom_type == "Point":
+            yield float(g.y), float(g.x)
+        elif g.geom_type == "MultiPoint":
+            for p in g.geoms:
+                if p.is_empty:
+                    continue
+                yield float(p.y), float(p.x)
 
 
 def _rasterize_lines_on_view(
@@ -144,11 +225,40 @@ def _emission_indices_from_area_proxy(area_proxy: dict[str, Any]) -> tuple[int, 
 
 def _nonroad_corine_codes_from_proxy(area_proxy: dict[str, Any]) -> tuple[int, ...]:
     p = area_proxy.get("proxy") or {}
+    nw = p.get("nonroad_corine_weights") or {}
+    if nw:
+        try:
+            return tuple(sorted({int(k) for k in nw.keys()}))
+        except (TypeError, ValueError):
+            pass
     codes: list[int] = []
     for k in ("corine_agri_codes", "corine_agri_optional", "corine_ind_codes", "corine_ind_optional"):
         for x in (p.get(k) or []):
             codes.append(int(x))
     return tuple(sorted(set(codes)))
+
+
+def _osm_layer_feature_count(path: Path, layer: str) -> int | None:
+    """Fast feature count from GeoPackage (pyogrio); ``None`` if unavailable."""
+    try:
+        import pyogrio as pg
+
+        meta = pg.read_info(str(path), layer=layer)
+        return int(meta.get("features", 0))
+    except Exception:
+        return None
+
+
+def _full_osm_geojson_wgs84(gdf: Any, *, max_features: int = 120_000) -> dict[str, Any] | None:
+    """Whole layer as GeoJSON in WGS84 (no map bbox clip)."""
+    import geopandas as gpd
+
+    if gdf is None or getattr(gdf, "empty", True):
+        return None
+    g4326 = gdf.to_crs(4326)
+    if len(g4326) > max_features:
+        g4326 = g4326.iloc[:max_features].copy()
+    return json.loads(g4326.to_json())
 
 
 def _clip_osm_lines_geojson(
@@ -272,47 +382,191 @@ def write_offroad_area_html(
         ok = ok & (clc_raw != float(clc_nd))
     clc_i[ok] = np.rint(clc_raw[ok]).astype(np.int32)
 
-    rgba_nr = corine_clc_overlay_rgba(
+    highlight_union = _expand_level2_highlights_for_clc_grid(
         clc_i,
-        highlight_codes=nonroad_codes,
-        rgb=(106, 27, 154),
+        tuple(int(x) for x in nonroad_codes),
     )
 
     fmap = create_folium_map_with_tiles(view, zoom_start=8)
 
+    rgba_nr_union = corine_clc_overlay_rgba(
+        clc_i,
+        highlight_codes=highlight_union,
+        rgb=(106, 27, 154),
+    )
     add_raster_overlay(
         fmap,
-        rgba_nr,
+        rgba_nr_union,
         view,
-        name="Non-road proxy (CORINE agri + ind, CLC codes in legend)",
+        name="Non-road — all residual CLC codes (union)",
         opacity=context_opacity,
-        show=False,
+        show=True,
     )
 
+    for code in sorted(set(nonroad_codes)):
+        icode = int(code)
+        rgb_c = _NONROAD_CLC_LAYER_RGB.get(icode, (106, 27, 154))
+        title = _NONROAD_CLC_TITLES.get(icode, "")
+        wl = _nonroad_clc_weight_label(area_proxy, icode)
+        suffix = f", {wl}" if wl else ""
+        subt = f" ({title})" if title else ""
+        exp_c = _expand_level2_highlights_for_clc_grid(clc_i, (icode,))
+        rgba_c = corine_clc_overlay_rgba(
+            clc_i,
+            highlight_codes=exp_c,
+            rgb=rgb_c,
+        )
+        add_raster_overlay(
+            fmap,
+            rgba_c,
+            view,
+            name=f"Non-road CLC {icode}{subt}{suffix}",
+            opacity=context_opacity,
+            show=False,
+        )
+
+    pipeline_lines_gdf: Any = None
+    pipeline_facilities_gdf: Any = None
     pipeline_gdf: Any = None
     railway_gdf: Any = None
     rules = osm_railway_line_filter_sets(path_cfg or {})
     osm_rel = (path_cfg or {}).get("osm", {}).get("offroad") if path_cfg else None
+    if not osm_rel:
+        print("[I_Offroad viz] WARN: path_cfg has no osm.offroad — pipeline/rail OSM layers skipped", flush=True)
     if osm_rel:
         osm_path = Path(str(osm_rel))
         if not osm_path.is_absolute():
             osm_path = root / osm_path
-        if osm_path.is_file():
+        if not osm_path.is_file():
+            print(f"[I_Offroad viz] WARN: OSM GPKG not found: {osm_path.resolve()}", flush=True)
+        elif osm_path.is_file():
+            n_gpkg_ln = _osm_layer_feature_count(osm_path, "osm_offroad_pipeline_lines")
+            n_gpkg_fac = _osm_layer_feature_count(osm_path, "osm_offroad_pipeline_facilities")
+            print(f"[I_Offroad viz] OSM GPKG: {osm_path.resolve()}", flush=True)
+            print(
+                f"[I_Offroad viz] GPKG counts — pipeline_lines={n_gpkg_ln}, "
+                f"pipeline_facilities={n_gpkg_fac}",
+                flush=True,
+            )
+            print(
+                f"[I_Offroad viz] focus map bbox W,S,E,N (deg): "
+                f"{view.west:.4f},{view.south:.4f},{view.east:.4f},{view.north:.4f}",
+                flush=True,
+            )
+
             try:
-                pipeline_gdf = load_pipeline_union(osm_path, root)
-                gj_p = _clip_osm_lines_geojson(pipeline_gdf, bbox_wgs84)
-                if gj_p and gj_p.get("features"):
-                    fg_pl = folium.FeatureGroup(name="Pipelines (OSM)", show=False)
+                pipeline_lines_gdf = load_pipeline_lines(osm_path)
+                if getattr(pipeline_lines_gdf, "empty", True):
+                    uni_try = load_pipeline_union(osm_path, root)
+                    if uni_try is not None and not uni_try.empty:
+                        mgeom = uni_try.geometry.geom_type.isin(
+                            ["LineString", "MultiLineString"],
+                        )
+                        pipeline_lines_gdf = uni_try.loc[mgeom].copy()
+                n_loaded = len(pipeline_lines_gdf) if pipeline_lines_gdf is not None else 0
+                print(f"[I_Offroad viz] pipeline line geometries loaded for viz: {n_loaded}", flush=True)
+
+                gj_ln = _clip_osm_lines_geojson(pipeline_lines_gdf, bbox_wgs84)
+                n_clip = len(gj_ln.get("features", [])) if gj_ln else 0
+                print(f"[I_Offroad viz] pipeline lines after bbox clip: {n_clip} features", flush=True)
+
+                used_national_fallback = False
+                if (not gj_ln or not gj_ln.get("features")) and n_loaded > 0:
+                    tb = pipeline_lines_gdf.to_crs(4326).total_bounds
+                    print(
+                        "[I_Offroad viz] hint: 0 pipeline lines inside the preview bbox but "
+                        f"{n_loaded} in GPKG — bounds WGS84 (minx,miny,maxx,maxy): "
+                        f"{tuple(round(x, 4) for x in tb)}",
+                        flush=True,
+                    )
+                    print(
+                        "[I_Offroad viz] adding national pipeline GeoJSON (toggle layer; zoom out / pan). "
+                        "Or rerun with  --region country  or  --bbox W,S,E,N",
+                        flush=True,
+                    )
+                    gj_ln = _full_osm_geojson_wgs84(pipeline_lines_gdf)
+                    used_national_fallback = bool(gj_ln and gj_ln.get("features"))
+
+                if gj_ln and gj_ln.get("features"):
+                    pl_name = (
+                        "Pipeline lines — hydrocarbon (OSM, full extract — zoom out)"
+                        if used_national_fallback
+                        else "Pipeline lines — hydrocarbon (OSM)"
+                    )
+                    fg_ln = folium.FeatureGroup(name=pl_name, show=True)
                     folium.GeoJson(
-                        gj_p,
+                        gj_ln,
                         style_function=lambda _f: {
                             "color": "#b71c1c",
                             "weight": 2,
                             "opacity": 0.85,
                         },
-                    ).add_to(fg_pl)
-                    fg_pl.add_to(fmap)
-            except Exception:
+                    ).add_to(fg_ln)
+                    fg_ln.add_to(fmap)
+            except Exception as exc:
+                print(f"[I_Offroad viz] ERROR pipeline lines layer: {exc!r}", flush=True)
+                pipeline_lines_gdf = None
+
+            try:
+                pipeline_facilities_gdf = load_pipeline_facilities(osm_path)
+                nf = len(pipeline_facilities_gdf) if pipeline_facilities_gdf is not None else 0
+                print(f"[I_Offroad viz] pipeline facilities geometries loaded: {nf}", flush=True)
+                fac_pts, fac_other = _split_facilities_points_other(pipeline_facilities_gdf)
+                if fac_other is not None:
+                    gj_o = _clip_osm_lines_geojson(fac_other, bbox_wgs84)
+                    nfo = len(gj_o.get("features", [])) if gj_o else 0
+                    print(f"[I_Offroad viz] pipeline facility footprints/lines after clip: {nfo}", flush=True)
+                    if gj_o and gj_o.get("features"):
+                        fg_fo = folium.FeatureGroup(
+                            name="Pipeline facilities — footprints / lines (OSM)",
+                            show=True,
+                        )
+                        folium.GeoJson(
+                            gj_o,
+                            style_function=lambda _f: {
+                                "color": "#e65100",
+                                "weight": 2,
+                                "opacity": 0.9,
+                                "fillColor": "#ffe0b2",
+                                "fillOpacity": 0.35,
+                            },
+                        ).add_to(fg_fo)
+                        fg_fo.add_to(fmap)
+                    elif nf > 0:
+                        print(
+                            "[I_Offroad viz] hint: facility polygons/lines exist but none inside preview bbox",
+                            flush=True,
+                        )
+                if fac_pts is not None:
+                    fac_wgs = fac_pts.to_crs(4326)
+                    fac_clip = gpd.clip(fac_wgs, bbox_wgs84)
+                    fg_fp = folium.FeatureGroup(
+                        name="Pipeline facilities — compressor points (OSM)",
+                        show=True,
+                    )
+                    n_mark = 0
+                    for lat, lon in _iter_point_latlon(fac_clip):
+                        folium.CircleMarker(
+                            location=(lat, lon),
+                            radius=6,
+                            color="#e65100",
+                            weight=2,
+                            fill=True,
+                            fill_color="#ffcc80",
+                            fill_opacity=0.9,
+                        ).add_to(fg_fp)
+                        n_mark += 1
+                    print(f"[I_Offroad viz] compressor points after bbox clip: {n_mark}", flush=True)
+                    if n_mark > 0:
+                        fg_fp.add_to(fmap)
+            except Exception as exc:
+                print(f"[I_Offroad viz] ERROR pipeline facilities: {exc!r}", flush=True)
+                pipeline_facilities_gdf = None
+
+            try:
+                pipeline_gdf = load_pipeline_union(osm_path, root)
+            except Exception as exc:
+                print(f"[I_Offroad viz] WARN load_pipeline_union: {exc!r}", flush=True)
                 pipeline_gdf = None
 
             try:
@@ -325,7 +579,7 @@ def write_offroad_area_html(
                 railway_gdf = rlines
                 gj_r = _clip_osm_lines_geojson(rlines, bbox_wgs84)
                 if gj_r and gj_r.get("features"):
-                    fg_rl = folium.FeatureGroup(name="Railways (OSM)", show=False)
+                    fg_rl = folium.FeatureGroup(name="Railways (OSM)", show=True)
                     folium.GeoJson(
                         gj_r,
                         style_function=lambda _f: {
@@ -339,9 +593,18 @@ def write_offroad_area_html(
                 railway_gdf = None
 
     nonroad_mask = np.zeros((view.gh, view.gw), dtype=bool)
-    if nonroad_codes:
-        nonroad_mask = np.isin(clc_i, np.asarray(nonroad_codes, dtype=np.int32))
-    pipeline_mask = _rasterize_lines_on_view(pipeline_gdf, view, dilate_px=1)
+    if highlight_union:
+        nonroad_mask = np.isin(clc_i, np.asarray(highlight_union, dtype=np.int32))
+    pm_ln = _rasterize_lines_on_view(pipeline_lines_gdf, view, dilate_px=1)
+    pm_fac = _rasterize_lines_on_view(pipeline_facilities_gdf, view, dilate_px=3)
+    if pm_ln is not None and pm_fac is not None:
+        pipeline_mask = np.logical_or(pm_ln, pm_fac)
+    elif pm_ln is not None:
+        pipeline_mask = pm_ln
+    elif pm_fac is not None:
+        pipeline_mask = pm_fac
+    else:
+        pipeline_mask = _rasterize_lines_on_view(pipeline_gdf, view, dilate_px=1)
     railway_mask = _rasterize_lines_on_view(railway_gdf, view, dilate_px=1)
 
     combined_sources_present = False
@@ -377,6 +640,7 @@ def write_offroad_area_html(
         clip_alpha_to_cams=has_cams,
         pollutant_priority=_ppri,
         exclusive_pollutant_panel=_pexc,
+        max_bands=3,
     )
     if has_cams and ds_handle is not None:
         enrich_cams_grid_with_popups(
@@ -411,9 +675,10 @@ def write_offroad_area_html(
                 "<p class=\"pl-meta\">Weight raster: <code>"
                 + wt.name
                 + f"</code> (band {int(weight_band)} - <b>{pol_label}</b>)</p>"
-                "<p class=\"pl-hint\">GNFR I / 12 off-road area proxies: CORINE agri + industrial "
-                "classes (non-road base), OSM pipelines (red) and railways (blue), final weights on top. "
-                "Good reference for lines; use <code>--region</code> for dense urban areas.</p>"
+                "<p class=\"pl-hint\">Toggle <b>CLC non-road</b> layers (per class), "
+                "<b>pipeline lines</b>, <b>compressor points</b>, <b>railways</b>, and "
+                "<b>weight</b> bands in the layer control. Pollutant weights follow "
+                "<code>area_proxy.visualization_pollutant</code> when set (exclusive panel).</p>"
             ),
             open=True,
         ),
@@ -433,15 +698,13 @@ def write_offroad_area_html(
             LegendSection(
                 title="Off-road sources (combined)",
                 html=(
-                    "<p class=\"pl-hint\">Single categorical layer; line sources are "
-                    "drawn on top of the CORINE base (1-pixel dilation to keep them "
-                    "visible at map scale). Non-road CORINE CLC codes: <code>"
-                    + nr_label
-                    + "</code>. Individual layers remain toggleable below.</p>"
+                    "<p class=\"pl-hint\">Raster overview: purple non-road CORINE mask; red pipeline geometry; "
+                    "blue railways. Same palette as split layers above.</p>"
                     + categorical_swatch_html([
-                        ("Non-road CORINE (agri + ind)", "#6a1b9a"),
-                        ("Pipelines (OSM)", "#b71c1c"),
-                        ("Railways (OSM)", "#0d47a1"),
+                        ("Non-road CLC (union)", "#6a1b9a"),
+                        ("Pipeline lines", "#b71c1c"),
+                        ("Compressor facilities", "#e65100"),
+                        ("Railways", "#0d47a1"),
                     ])
                 ),
                 open=True,

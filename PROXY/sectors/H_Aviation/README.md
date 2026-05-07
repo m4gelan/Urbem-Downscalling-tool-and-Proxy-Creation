@@ -39,12 +39,14 @@ Each retained node gets `osm_source = node_buffer`, **match_location** = node co
 
 The **match table and QA** only need CAMS + OSM; they do **not** require a sector area GeoTIFF.
 
-The **2-band link raster** (`aviation_pointsource.tif`) must burn masses onto *some* grid. It uses, in order:
+The **2-band link raster** (`aviation_pointsource.tif`) snaps masses to pixels. By default **`link_grid_match_extent: true`** builds a **small EPSG:3035 grid** around all CAMS + match locations (padding + resolution in YAML). That avoids using full EU **CORINE** as the reference, which would allocate a gigantic array and stall or exhaust RAM.
+
+If you set **`link_grid_match_extent: false`**, the writer falls back to a reference GeoTIFF in this order:
 
 1. `python -m PROXY.main match-points --sector H_Aviation --link-ref-tif <path/to/ref.tif>`
 2. `point_matching.link_ref_weights_tif` in this sector YAML
 3. The sector **area** weight GeoTIFF if it exists (`output_dir` + `output_filename`)
-4. **`paths.yaml` → `proxy_common.corine_tif`**, then **`population_tif`**
+4. **`paths.yaml` → `proxy_common.corine_tif`**, then **`population_tif`** (refused if larger than ~50M pixels unless you use match-extent).
 
 | Artifact | Description |
 |----------|-------------|
@@ -68,3 +70,39 @@ python -m PROXY.main visualize --point-link-only --point-link --sector H_Aviatio
 ```
 
 (`H_Aviation` has no area-context HTML preview in the generic visualize flow; use `--point-link-only` so the CLI does not require `_AREA_PREVIEW_SECTORS`.)
+
+## Area-source downscaling (GNFR H)
+
+CAMS can split GNFR **H** mass between **area** (`source_type_index == 1`) and **point** (`source_type_index == 2`) rows. **Point** allocation is handled by `match-points`; **area** allocation uses `PROXY/sectors/H_Aviation/aviation_area.py` when enabled in `config/sectors/aviation.yaml` under `area_source`.
+
+### Area vs point preflight
+
+For each configured pollutant (CAMS NetCDF variable, or `co2_total` = `co2_ff` + `co2_bf`), the pipeline sums area-row and point-row totals for the chosen **CAMS ISO3** country and GNFR **H**. If **area sum is zero**, that pollutant is **skipped** (all mass is treated as point-only). A CSV summary `aviation_area_summary_<ISO3>_<year>.csv` is written first listing **process** vs **skip** with reasons.
+
+### Binary aerodrome proxy
+
+The fine grid is **EPSG:3035** at **`area_source.resolution_m`** (default **100 m**) over the **NUTS-2 country union** plus padding. The proxy rasterizes **OSM aerodrome polygons** from `build_aviation_aerodrome_pool_gdf` (same rules as point matching: families, military exclusion, ≥0.5 km², apron/terminal centroid, optional **node + buffer** with `osm_source = node_buffer`). Values are **0/1** (uniform inside each polygon). Between CAMS cells, relative allocation is unchanged; **within** each CAMS cell the proxy is normalised to sum to 1 before multiplying by the cell’s area-source mass.
+
+### Background floor
+
+If a CAMS cell has non-zero **area** mass but **no** airport pixels inside that cell on the fine grid, each pixel in the cell receives a tiny weight **`proxy_weight_floor`** (default `1e-6`) before normalisation so the cell mass is preserved and spread almost uniformly. A warning is logged with the cell centre and mass. If the reference window omits a CAMS cell entirely, that mass is reported as lost in QA/metadata.
+
+### Runnable example
+
+Paths resolve from `PROXY/config/paths.yaml` (`emissions.cams_2019_nc`, `osm.aviation`, `proxy_common.nuts_gpkg`). Outputs go to `OUTPUT/Proxy_weights/H_Aviation/` (or `output_dir` in the sector YAML).
+
+```bash
+python -m PROXY.main aviation-area --country EL --year 2019 --cams-iso3 GRC
+```
+
+Artifacts:
+
+| File | Role |
+|------|------|
+| `aviation_area_summary_<ISO3>_<year>.csv` | Per-pollutant area/point totals and process/skip |
+| `aviation_area_proxy_<ISO3>_<year>.tif` | Binary aerodrome field (float32, GDAL nodata 0) |
+| `aviation_area_<pollutant>_<ISO3>_<year>.tif` | Downscaled area emissions (units from CAMS variable metadata) |
+| `aviation_area_qa_<ISO3>_<year>.csv` | Per-cell QA (mass, pixel counts, floor flag) |
+| `aviation_area_meta_<ISO3>_<year>.json` | Mass balance and roll-ups |
+| `aviation_area_aerodrome_pool_<ISO3>_<year>.gpkg` | Clipped aerodrome pool for QA |
+| `aviation_area_run_<ISO3>_<year>.log` | Run log (omit with `--no-run-log`) |

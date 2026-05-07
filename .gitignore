@@ -12,7 +12,9 @@ venv/
 
 # Data / datasets (keep local; usually large or licensed)
 data/
-INPUT/
+INPUT/Emissions/
+INPUT/Proxy/
+INPUT/Preprocess/OSM/_source
 Output/
 OLD CODES/
 report/

@@ -10,7 +10,40 @@ import re
 from typing import Any
 
 
-ISO2_TO_ISO3_CEIP: dict[str, str] = {"EL": "GRC", "GR": "GRC"}
+ISO2_TO_ISO3_CEIP: dict[str, str] = {
+    # Greece (legacy workbook quirks)
+    "EL": "GRC",
+    "GR": "GRC",
+    # EU / common CEIP ``COUNTRY`` two-letter codes → ISO3 for share tables
+    "FR": "FRA",
+    "DE": "DEU",
+    "AT": "AUT",
+    "NL": "NLD",
+    "GB": "GBR",
+    "UK": "GBR",
+    "BE": "BEL",
+    "IT": "ITA",
+    "ES": "ESP",
+    "PL": "POL",
+    "PT": "PRT",
+    "SE": "SWE",
+    "DK": "DNK",
+    "FI": "FIN",
+    "IE": "IRL",
+    "CZ": "CZE",
+    "SK": "SVK",
+    "HU": "HUN",
+    "RO": "ROU",
+    "BG": "BGR",
+    "HR": "HRV",
+    "SI": "SVN",
+    "EE": "EST",
+    "LV": "LVA",
+    "LT": "LTU",
+    "LU": "LUX",
+    "MT": "MLT",
+    "CY": "CYP",
+}
 
 
 def _norm_pol(s: Any) -> str:

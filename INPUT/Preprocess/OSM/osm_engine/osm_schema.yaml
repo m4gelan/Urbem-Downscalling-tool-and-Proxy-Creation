@@ -1,0 +1,184 @@
+# Unified OSM sector rules (``mode: rules``). Industry / fugitive use Python plugins.
+version: 2
+
+global:
+  target_crs: EPSG:3035
+  min_polygon_area_m2: 10.0
+
+sectors:
+  waste:
+    mode: rules
+    augment_family: waste
+    row_tags: [name, landuse, amenity, man_made]
+    strategies: { nodes: first, lines: first, areas: first }
+    layer_order: [osm_waste_polygons, osm_waste_points]
+    rules:
+      nodes:
+        - match: { tag: { key: amenity, in: [waste_disposal, recycling] } }
+          layers: [osm_waste_points]
+      areas:
+        - match: { tag: { key: landuse, equals: landfill } }
+          layers: [osm_waste_polygons]
+        - match: { tag: { key: amenity, in: [waste_disposal, recycling] } }
+          layers: [osm_waste_polygons]
+        - match: { tag: { key: man_made, equals: wastewater_plant } }
+          layers: [osm_waste_polygons]
+          when: include_wastewater_plant
+
+  solvents:
+    mode: rules
+    augment_family: solvent
+    strategies: { nodes: first, lines: first, areas: multi }
+    layer_order: [osm_roads, osm_landuse, osm_buildings, osm_aeroway, osm_man_made_works, osm_poi_polygons, osm_poi_points]
+    rules:
+      lines:
+        - match: { tag: { key: highway, exists: true } }
+          layers: [osm_roads]
+      nodes:
+        - match:
+            any_of:
+              - { tag: { key: shop, exists: true } }
+              - { tag: { key: amenity, exists: true } }
+          layers: [osm_poi_points]
+          when: with_optional
+      areas:
+        - match: { tag: { key: landuse, in: [residential, commercial, retail, industrial, port] } }
+          layers: [osm_landuse]
+        - match: { tag: { key: building, in: [residential, commercial, industrial] } }
+          layers: [osm_buildings]
+        - match: { tag: { key: aeroway, exists: true } }
+          layers: [osm_aeroway]
+        - match: { tag: { key: man_made, equals: works } }
+          layers: [osm_man_made_works]
+          when: with_optional
+        - match:
+            any_of:
+              - { tag: { key: shop, exists: true } }
+              - { tag: { key: amenity, exists: true } }
+          layers: [osm_poi_polygons]
+          when: with_optional
+
+  offroad:
+    mode: rules
+    augment_family: offroad
+    # Rail 1A3c + pipeline 1A3ei (lines, yards, compressor POIs / footprints).
+    row_tags: [name, landuse, railway, man_made, industrial, electrified, substance, substation, pipeline]
+    strategies: { nodes: first, lines: first, areas: first }
+    layer_order: [osm_offroad_rail_lines, osm_offroad_pipeline_lines, osm_offroad_pipeline_facilities, osm_offroad_areas]
+    offroad_sets:
+      railway_line_values: [rail, narrow_gauge, light_rail, subway, tram, monorail]
+      landuse_polygon_values: []
+      railway_depot_yard: []
+      landuse_rail: [railway]
+      man_made_line_or_area: [pipeline]
+      man_made_works: []
+      industrial_value: []
+    rules:
+      lines:
+        # ---------- RAIL (1A3c) ----------
+        # railway IN (operational types); values abandoned / disused / … are excluded by not selecting them.
+        # Electric traction: electrified in OSM contact_line / yes / rail.
+        - match:
+            all_of:
+              - tag: { key: railway, in: [rail, narrow_gauge, light_rail, subway, tram, monorail] }
+              - any_of:
+                  - { tag: { key: electrified, in: [contact_line, yes, rail] } }
+          layers: [osm_offroad_rail_lines]
+          extra_fields: { rail_propulsion: electric }
+        # Diesel (and any other non-electric tagging, including missing electrified).
+        - match:
+            all_of:
+              - tag: { key: railway, in: [rail, narrow_gauge, light_rail, subway, tram, monorail] }
+              - not:
+                  any_of:
+                    - { tag: { key: electrified, in: [contact_line, yes, rail] } }
+          layers: [osm_offroad_rail_lines]
+          extra_fields: { rail_propulsion: diesel }
+        # ---------- PIPELINE (1A3ei) ----------
+        # man_made=pipeline and hydrocarbon substance only (water / heat lines omitted).
+        - match:
+            all_of:
+              - tag: { key: man_made, equals: pipeline }
+              - tag: { key: substance, in: [gas, natural_gas, oil, petroleum] }
+          layers: [osm_offroad_pipeline_lines]
+      # Rail yard footprints + pipeline ancillary (compressors); areas strategy is ``first``.
+      nodes:
+        - match:
+            any_of:
+              - all_of:
+                  - { tag: { key: pipeline, equals: substation } }
+                  - { tag: { key: substation, equals: compression } }
+              - { tag: { key: man_made, in: [compressor, compressor_station] } }
+          layers: [osm_offroad_pipeline_facilities]
+      areas:
+        - match: { tag: { key: landuse, equals: railway } }
+          layers: [osm_offroad_areas]
+        - match:
+            any_of:
+              - all_of:
+                  - { tag: { key: pipeline, equals: substation } }
+                  - { tag: { key: substation, equals: compression } }
+              - { tag: { key: man_made, in: [compressor, compressor_station] } }
+          layers: [osm_offroad_pipeline_facilities]
+
+  shipping:
+    mode: rules
+    augment_family: shipping
+    strategies: { nodes: first, lines: first, areas: first }
+    layer_order: [osm_shipping_high, osm_shipping_medium]
+    row_tags: [name, landuse, harbour, natural, industrial, man_made]
+    rules:
+      nodes:
+        - match: { tag: { key: harbour, equals: "yes" } }
+          layers: [osm_shipping_high]
+          extra_fields: { shipping_priority: high }
+      lines:
+        - match:
+            any_of:
+              - { tag: { key: landuse, equals: port } }
+              - { tag: { key: harbour, equals: "yes" } }
+              - { tag: { key: natural, equals: harbour } }
+          layers: [osm_shipping_high]
+          extra_fields: { shipping_priority: high }
+        - match: { tag: { key: man_made, in: [pier, quay, breakwater] } }
+          layers: [osm_shipping_medium]
+          extra_fields: { shipping_priority: medium }
+      areas:
+        - match:
+            any_of:
+              - { tag: { key: landuse, equals: port } }
+              - { tag: { key: harbour, equals: "yes" } }
+              - { tag: { key: natural, equals: harbour } }
+          layers: [osm_shipping_high]
+          extra_fields: { shipping_priority: high }
+        - match: { tag: { key: man_made, in: [pier, quay, breakwater] } }
+          layers: [osm_shipping_medium]
+          extra_fields: { shipping_priority: medium }
+
+  industry:
+    mode: plugin
+    plugin: industry_v1
+
+  fugitive:
+    mode: plugin
+    plugin: fugitive_v1
+
+  # Airport ground footprints only (closed ways + multipolygon relations). No runway centre-lines,
+  # aprons alone, or POI nodes — those are excluded so the GPKG stays a clean area proxy input.
+  aviation:
+    mode: rules
+    augment_family: aviation
+    strategies: { nodes: first, lines: first, areas: first }
+    layer_order: [osm_aviation_airport_polygons]
+    row_tags: [name, aeroway, iata, icao, operator, military, landuse]
+    rules:
+      areas:
+        # Primary civil / mixed airports (multipolygons and closed ways mapped as areas).
+        - match: { tag: { key: aeroway, equals: aerodrome } }
+          layers: [osm_aviation_airport_polygons]
+        # Alternate / legacy footprint tagging (still common in some regions).
+        - match: { tag: { key: landuse, equals: aerodrome } }
+          layers: [osm_aviation_airport_polygons]
+        # Military airfields often lack aeroway=aerodrome on the outer polygon.
+        - match: { tag: { key: military, equals: airfield } }
+          layers: [osm_aviation_airport_polygons]

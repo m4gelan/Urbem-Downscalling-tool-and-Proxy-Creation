@@ -68,6 +68,9 @@ def _airport_code_field(row: Any, tags: dict[str, str], key: str) -> str | None:
     """ICAO/IATA from row column or OSM tags; empty / NaN → None."""
     s = (_scalar_text(row.get(key)) or _scalar_text(tags.get(key))).upper()
     return s if s else None
+
+
+def _haversine_km(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     r = 6371.0
     lon1r, lat1r, lon2r, lat2r = map(math.radians, (lon1, lat1, lon2, lat2))
     dlon = lon2r - lon1r
@@ -129,25 +132,23 @@ def _collect_apron_terminal_union(
         return None
 
 
-def build_aviation_facility_candidates(
+def build_aviation_aerodrome_pool_gdf(
     *,
     repo_root: Path,
     paths_resolved: dict[str, Any],
     sector_cfg: dict[str, Any],
-) -> tuple[pd.DataFrame, str]:
-    """Return ``(facilities_df, resolved_source_gpkg)`` for :func:`load_facility_candidates_for_sector`.
+) -> tuple[gpd.GeoDataFrame, Path]:
+    """Filtered aerodrome **polygons** (EPSG:3035) for area proxy + QA.
 
-    Columns align with :func:`PROXY.core.matching.run_matching` expectations, plus diagnostics
-    ``icao``, ``iata``, ``osm_source``, ``area_km2``, ``polygon_centroid_lon``, ``polygon_centroid_lat``,
-    ``osm_element_type``, ``osm_numeric_id``.
+    Same inclusion rules as :func:`build_aviation_facility_candidates` (family, military,
+    0.5 km², apron centroid stored as WGS84 match_lon/lat; node buffers 1 km).
     """
     pm = sector_cfg.get("point_matching") if isinstance(sector_cfg.get("point_matching"), dict) else {}
     osm_block = paths_resolved.get("osm") or {}
     rel = pm.get("aviation_gpkg") or osm_block.get("aviation")
     if not rel:
         raise ValueError(
-            "point_matching.facility_pool=aviation requires paths.yaml ``osm.aviation`` "
-            "or sector ``point_matching.aviation_gpkg``."
+            "Aviation pool requires paths.yaml ``osm.aviation`` or sector ``point_matching.aviation_gpkg``."
         )
     gpkg = Path(str(rel)) if Path(str(rel)).is_absolute() else repo_root / str(rel)
     if not gpkg.is_file():
@@ -163,21 +164,22 @@ def build_aviation_facility_candidates(
         ) from exc
 
     if gdf.empty:
-        return (
-            pd.DataFrame(
-                columns=[
-                    "facility_id",
-                    "facility_name",
-                    "eprtr_sector_code",
-                    "pollutant",
-                    "longitude",
-                    "latitude",
-                    "reporting_year",
-                    "_registry",
-                ]
-            ),
-            str(gpkg.resolve()),
-        )
+        return gpd.GeoDataFrame(
+            columns=[
+                "geometry",
+                "osm_id",
+                "icao",
+                "iata",
+                "name",
+                "area_km2",
+                "osm_source",
+                "match_lon",
+                "match_lat",
+                "osm_element_type",
+                "osm_numeric_id",
+            ],
+            crs="EPSG:3035",
+        ), gpkg.resolve()
 
     if gdf.crs is None:
         gdf = gdf.set_crs("EPSG:4326")
@@ -193,7 +195,7 @@ def build_aviation_facility_candidates(
         aux_gpkg = gpkg
     apron_layers = list(pm.get("aviation_terminal_apron_layers") or [])
 
-    rows: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     poly_meta_for_dedupe: list[dict[str, Any]] = []
 
     for idx, row in gdf.iterrows():
@@ -218,7 +220,6 @@ def build_aviation_facility_candidates(
             crs=gdf.crs,
         ).to_crs("EPSG:4326")
         match_ll = gdiag.geometry.iloc[0]
-        cen_ll = gdiag.geometry.iloc[1]
 
         icao = _airport_code_field(row, tags, "icao")
         iata = _airport_code_field(row, tags, "iata")
@@ -230,22 +231,17 @@ def build_aviation_facility_candidates(
         eid_i = int(eid)
         fac_id = f"osm:{etype}:{eid_i}"
 
-        rows.append(
+        records.append(
             {
-                "facility_id": fac_id,
-                "facility_name": name,
-                "eprtr_sector_code": 0,
-                "pollutant": "CO2",
-                "longitude": float(match_ll.x),
-                "latitude": float(match_ll.y),
-                "reporting_year": int(pm.get("reference_year", 2019)),
-                "_registry": "OSM_AVIATION_POLY",
+                "geometry": geom,
+                "osm_id": fac_id,
                 "icao": icao or "",
                 "iata": iata or "",
-                "osm_source": "polygon",
+                "name": name,
                 "area_km2": area_km2,
-                "polygon_centroid_lon": float(cen_ll.x),
-                "polygon_centroid_lat": float(cen_ll.y),
+                "osm_source": "polygon",
+                "match_lon": float(match_ll.x),
+                "match_lat": float(match_ll.y),
                 "osm_element_type": etype,
                 "osm_numeric_id": eid_i,
             }
@@ -289,9 +285,9 @@ def build_aviation_facility_candidates(
                     nn = _norm_name(name_n)
                     if icao_n and icao_n in poly_icoes:
                         continue
-                    pt_ll = gpd.GeoDataFrame(geometry=[g0], crs=ndf.crs).to_crs(
-                        "EPSG:4326"
-                    ).geometry.iloc[0]
+                    pt_ll = gpd.GeoDataFrame(geometry=[g0], crs=ndf.crs).to_crs("EPSG:4326").geometry.iloc[
+                        0
+                    ]
                     lon_n = float(pt_ll.x)
                     lat_n = float(pt_ll.y)
                     skip = False
@@ -307,23 +303,19 @@ def build_aviation_facility_candidates(
                     if pd.isna(eid) or eid is None:
                         continue
                     eid_i = int(eid)
-                    buf_area_km2 = math.pi * (node_buf_m / 1000.0) ** 2
-                    rows.append(
+                    buf_geom = g0.buffer(float(node_buf_m))
+                    buf_area_km2 = float(buf_geom.area) / 1e6
+                    records.append(
                         {
-                            "facility_id": f"osm:{etype}:{eid_i}",
-                            "facility_name": name_n,
-                            "eprtr_sector_code": 0,
-                            "pollutant": "CO2",
-                            "longitude": float(lon_n),
-                            "latitude": float(lat_n),
-                            "reporting_year": int(pm.get("reference_year", 2019)),
-                            "_registry": "OSM_AVIATION_NODE",
+                            "geometry": buf_geom,
+                            "osm_id": f"osm:{etype}:{eid_i}",
                             "icao": icao_n or "",
                             "iata": (_scalar_text(tags.get("iata")) or _scalar_text(nrow.get("iata"))).upper(),
+                            "name": name_n,
+                            "area_km2": buf_area_km2,
                             "osm_source": "node_buffer",
-                            "area_km2": float(buf_area_km2),
-                            "polygon_centroid_lon": float(lon_n),
-                            "polygon_centroid_lat": float(lat_n),
+                            "match_lon": lon_n,
+                            "match_lat": lat_n,
                             "osm_element_type": etype,
                             "osm_numeric_id": eid_i,
                         }
@@ -331,7 +323,54 @@ def build_aviation_facility_candidates(
         else:
             warnings.warn(f"aviation_aerodrome_nodes_gpkg not found: {ng_path}", stacklevel=1)
 
-    if not rows:
+    if not records:
+        return (
+            gpd.GeoDataFrame(
+                columns=[
+                    "geometry",
+                    "osm_id",
+                    "icao",
+                    "iata",
+                    "name",
+                    "area_km2",
+                    "osm_source",
+                    "match_lon",
+                    "match_lat",
+                    "osm_element_type",
+                    "osm_numeric_id",
+                ],
+                crs="EPSG:3035",
+            ),
+            gpkg.resolve(),
+        )
+
+    out_gdf = gpd.GeoDataFrame(records, crs="EPSG:3035")
+    return out_gdf, gpkg.resolve()
+
+
+def build_aviation_facility_candidates(
+    *,
+    repo_root: Path,
+    paths_resolved: dict[str, Any],
+    sector_cfg: dict[str, Any],
+) -> tuple[pd.DataFrame, str]:
+    """Return ``(facilities_df, resolved_source_gpkg)`` for :func:`load_facility_candidates_for_sector`.
+
+    Columns align with :func:`PROXY.core.matching.run_matching` expectations, plus diagnostics
+    ``icao``, ``iata``, ``osm_source``, ``area_km2``, ``polygon_centroid_lon``, ``polygon_centroid_lat``,
+    ``osm_element_type``, ``osm_numeric_id``.
+
+    Built from :func:`build_aviation_aerodrome_pool_gdf` so point matching and area proxy share one pool.
+    """
+    pm = sector_cfg.get("point_matching") if isinstance(sector_cfg.get("point_matching"), dict) else {}
+    pool_gdf, gpkg_resolved = build_aviation_aerodrome_pool_gdf(
+        repo_root=repo_root,
+        paths_resolved=paths_resolved,
+        sector_cfg=sector_cfg,
+    )
+    ref_year = int(pm.get("reference_year", 2019))
+
+    if pool_gdf.empty:
         return (
             pd.DataFrame(
                 columns=[
@@ -345,11 +384,39 @@ def build_aviation_facility_candidates(
                     "_registry",
                 ]
             ),
-            str(gpkg.resolve()),
+            str(gpkg_resolved),
         )
 
-    out = pd.DataFrame(rows)
-    return out, str(gpkg.resolve())
+    rows: list[dict[str, Any]] = []
+    for _, r in pool_gdf.iterrows():
+        geom = r.geometry
+        cen_ll = gpd.GeoDataFrame(geometry=[geom.centroid], crs=pool_gdf.crs).to_crs(
+            "EPSG:4326"
+        ).geometry.iloc[0]
+        osrc = str(r.get("osm_source", "polygon"))
+        reg = "OSM_AVIATION_POLY" if osrc == "polygon" else "OSM_AVIATION_NODE"
+        rows.append(
+            {
+                "facility_id": str(r["osm_id"]),
+                "facility_name": str(r.get("name") or "aerodrome"),
+                "eprtr_sector_code": 0,
+                "pollutant": "CO2",
+                "longitude": float(r["match_lon"]),
+                "latitude": float(r["match_lat"]),
+                "reporting_year": ref_year,
+                "_registry": reg,
+                "icao": str(r.get("icao") or ""),
+                "iata": str(r.get("iata") or ""),
+                "osm_source": osrc,
+                "area_km2": float(r["area_km2"]),
+                "polygon_centroid_lon": float(cen_ll.x),
+                "polygon_centroid_lat": float(cen_ll.y),
+                "osm_element_type": str(r.get("osm_element_type") or ""),
+                "osm_numeric_id": int(r["osm_numeric_id"]),
+            }
+        )
+
+    return pd.DataFrame(rows), str(gpkg_resolved)
 
 
 def write_aviation_match_diagnostic_png(

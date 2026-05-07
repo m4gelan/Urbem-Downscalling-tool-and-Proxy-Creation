@@ -1,4 +1,4 @@
-"""Non-road (1A3eii): CORINE agricultural + industrial classes only (no population / OSM industrial)."""
+"""Non-road (1A3eii): CORINE class weights (1A3eii residual), no OSM construction."""
 
 from __future__ import annotations
 
@@ -6,9 +6,8 @@ from typing import Any
 
 import numpy as np
 
-from PROXY.core.osm_corine_proxy import z_score
-
 from PROXY.core.corine.raster import corine_binary_mask, corine_binary_mask_adapted
+from PROXY.core.osm_corine_proxy import clc_weighted_class_score, z_score
 
 
 def build_nonroad_corine_proxy(
@@ -17,11 +16,28 @@ def build_nonroad_corine_proxy(
     proxy_cfg: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Build ``p_nr`` from CORINE agri + industrial masks only.
+    Build ``p_nr`` from CORINE classes and configured weights, then :func:`z_score`.
 
-    ``proxy_cfg`` expects: w_agri, w_ind, corine_agri_codes, corine_agri_optional,
-    corine_ind_codes, corine_ind_optional.
+    If ``nonroad_corine_weights`` is set, it is a ``{clc_code: weight}`` mapping
+    (sum need not be 1; it is renormalised in :func:`clc_weighted_class_score`).
+
+    Legacy: ``w_agri`` / ``w_ind`` with agri / ind code lists (unchanged if no new block).
     """
+    nw = proxy_cfg.get("nonroad_corine_weights")
+    if nw:
+        weights = {}
+        for k, v in dict(nw).items():
+            try:
+                weights[int(k)] = float(v)
+            except (TypeError, ValueError):
+                continue
+        raw = clc_weighted_class_score(clc_nn, weights).astype(np.float64)
+        p_nr = z_score(raw)
+        return {
+            "p_nr": p_nr,
+            "nonroad_corine_raw": raw.astype(np.float32),
+        }
+
     w_agri = float(proxy_cfg.get("w_agri", 0.5))
     w_ind = float(proxy_cfg.get("w_ind", 0.35))
 
@@ -29,6 +45,8 @@ def build_nonroad_corine_proxy(
     agri_codes += [int(x) for x in (proxy_cfg.get("corine_agri_optional") or [])]
     ind_codes = [int(x) for x in (proxy_cfg.get("corine_ind_codes") or [])]
     ind_codes += [int(x) for x in (proxy_cfg.get("corine_ind_optional") or [])]
+
+    from PROXY.core.corine.raster import corine_binary_mask, corine_binary_mask_adapted
 
     agri_mask = corine_binary_mask(clc_nn, agri_codes)
     if float(np.max(agri_mask)) <= 0 and agri_codes:

@@ -66,6 +66,90 @@ def _pollutant_aliases(area_cfg: dict[str, Any]) -> dict[str, str]:
     return aliases
 
 
+def _country_token_to_iso3_upper(token: str) -> str:
+    """Resolve YAML country tokens (ISO3 or common ISO2 / CEIP quirks) for CEIP dict keys."""
+    t = str(token).strip().upper()
+    if len(t) == 3 and t.isalpha():
+        return t
+    iso2 = {
+        "FR": "FRA",
+        "DE": "DEU",
+        "GE": "DEU",
+        "AT": "AUT",
+        "AU": "AUT",
+        "NL": "NLD",
+        "UK": "GBR",
+        "GB": "GBR",
+        "EL": "GRC",
+        "GR": "GRC",
+    }
+    return iso2.get(t, t)
+
+
+def apply_offroad_ceip_reference_pool(
+    share_dict: dict[str, dict[str, tuple[float, float, float]]],
+    *,
+    area_proxy: dict[str, Any],
+    pollutants: list[str],
+    fallback_iso: str,
+    logger: logging.Logger | None = None,
+) -> None:
+    """When enabled, replace target-country triples with the mean of reference ISO3 triples from CEIP."""
+    fb = area_proxy.get("alpha_fallback") or {}
+    if not bool(fb.get("enabled")):
+        return
+    targets = {_country_token_to_iso3_upper(str(x)) for x in (fb.get("target_countries_iso3") or [])}
+    refs_raw = list(
+        fb.get("reference_countries_iso3")
+        or fb.get("reference_countries")
+        or [],
+    )
+    refs = [_country_token_to_iso3_upper(str(x)) for x in refs_raw]
+    refs = [r for r in refs if len(r) == 3 and r.isalpha()]
+    iso_target = _country_token_to_iso3_upper(fallback_iso)
+    if iso_target not in targets:
+        return
+    pol_spec = fb.get("pollutants", "all")
+    if pol_spec not in (None, "all") and isinstance(pol_spec, (list, tuple)):
+        wanted = {norm_pollutant_key(str(x)) for x in pol_spec}
+    else:
+        wanted = {norm_pollutant_key(str(x)) for x in pollutants}
+
+    for pol in pollutants:
+        pk = norm_pollutant_key(str(pol))
+        if pk not in wanted:
+            continue
+        table = share_dict.setdefault(pk, {})
+        trips: list[tuple[float, float, float]] = []
+        for r_iso in refs:
+            t = table.get(r_iso)
+            if t is not None and len(t) == 3:
+                trips.append(tuple(float(x) for x in t))
+        if not trips:
+            if logger:
+                logger.warning(
+                    "I_Offroad alpha_fallback: no CEIP triple for pollutant %s among refs %s",
+                    pk,
+                    refs,
+                )
+            continue
+        m = tuple(sum(x[i] for x in trips) / len(trips) for i in range(3))
+        sm = sum(m)
+        if sm > 0:
+            m = tuple(x / sm for x in m)
+        table[iso_target] = m
+        if logger:
+            logger.info(
+                "I_Offroad alpha_fallback: %s %s triple <- mean(ref %s) = (%.4f, %.4f, %.4f)",
+                iso_target,
+                pk,
+                refs,
+                m[0],
+                m[1],
+                m[2],
+            )
+
+
 def merge_offroad_pipeline_cfg(
     root: Path,
     path_cfg: dict[str, Any],
@@ -190,10 +274,11 @@ def run_offroad_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any]:
     _, z_rail = build_rail_coverage_and_z(
         Path(paths["osm_gpkg"]),
         ref,
-        rail_buffer_m=float(proxy_cfg.get("rail_buffer_m", 150)),
+        rail_buffer_m=float(proxy_cfg.get("rail_buffer_m", 75)),
         osm_subdivide=int(proxy_cfg.get("osm_subdivide", 4)),
         bad_line_types=bad_rail,
         lifecycle_disallow=life_rail,
+        proxy_cfg=proxy_cfg,
     )
     _log_raster_stats("z_rail", z_rail)
 
@@ -218,6 +303,14 @@ def run_offroad_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any]:
         cntr_code_to_iso3=dict(country_cfg.get("cntr_code_to_iso3") or {}),
         default_triple=default_triple,
         ceip_year=ceip_cfg.get("year"),
+    )
+
+    apply_offroad_ceip_reference_pool(
+        share_dict,
+        area_proxy=dict(cfg.get("area_proxy") or {}),
+        pollutants=pollutants,
+        fallback_iso=fallback_iso,
+        logger=logger,
     )
 
     logger.info(
