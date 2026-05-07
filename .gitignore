@@ -35,9 +35,6 @@ Output/
 *.grib
 *.grb
 *.nc
-*.png
-*.jpg
-*.html
 
 # Archives
 *.zip
