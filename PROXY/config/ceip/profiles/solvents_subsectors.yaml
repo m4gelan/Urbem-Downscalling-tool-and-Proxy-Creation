@@ -1,0 +1,26 @@
+# NFR / LRTAP sector tokens (normalized, alphanumeric uppercase) -> canonical
+# 2.D.3 subsector keys. Longer / more specific tokens should be listed first in
+# ``ceip_sectors`` lists so prefix matching can prefer them (builder sorts by length).
+#
+# Archetype weights, beta splits, OSM rules, and CAMS pollutant name mapping live in
+# ``solvents_pipeline.yaml`` (merged with ``sectors/solvents.yaml`` under ``solvents:``).
+
+subsectors:
+  d3a_domestic:
+    ceip_sectors: ["2D3A", "2D3A1", "2D3A2", "2D3A3", "2D3A4", "2D3"]
+  d3b_road_paving:
+    ceip_sectors: ["2D3B", "2D3B1", "2D3B2"]
+  d3c_asphalt_roofing:
+    ceip_sectors: ["2D3C", "2D3C1", "2D3C2", "2D3C3", "2D3C4"]
+  d3d_coating:
+    ceip_sectors: ["2D3D", "2D3D1", "2D3D2", "2D3D3", "2D3D4"]
+  d3e_degreasing:
+    ceip_sectors: ["2D3E", "2D3E1", "2D3E2", "2D3E3", "2D3E4", "2D3E5"]
+  d3f_dry_cleaning:
+    ceip_sectors: ["2D3F", "2D3F1", "2D3F2", "2D3F3"]
+  d3g_chemical_products:
+    ceip_sectors: ["2D3G", "2D3G1", "2D3G2", "2D3G3", "2D3G4"]
+  d3h_printing:
+    ceip_sectors: ["2D3H", "2D3H1", "2D3H2", "2D3H3", "2D3H4", "2D3H5"]
+  d3i_other:
+    ceip_sectors: ["2D3I", "2D3I1", "2D3I2", "2G", "2D3J", "2D3"]

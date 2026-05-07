@@ -1,0 +1,294 @@
+c21_census_field_map:
+  _description: Maps logical livestock species keys to Eurostat C21 GeoPackage layer
+    names and head-count column names. Layer/column names match data/Agriculture/C21.gpkg
+    (see data/Agriculture/C21.explore_head.json for Bovine layer sample rows).
+  nuts2_column: nuts2
+  species_columns:
+    bovine:
+      layer: Bovine
+      count_column: Bovine
+    goats:
+      layer: Goats
+      count_column: Goats
+    pigs:
+      layer: Pigs
+      count_column: A3100
+    poultry:
+      layer: Poultry
+      count_column: Poultry
+    sheep:
+      layer: Sheep
+      count_column: Sheep
+ipcc_defaults:
+  _description: IPCC default emission factors and N-excretion rates used by the agriculture
+    CH4 / manure-N NUTS-2 proxies (parse of Eurostat livestock spreadsheets).
+  _source: IPCC 2006 Guidelines, Volume 4 (Agriculture, Forestry and Other Land Use),
+    chapter 10 tables. Sheep / goat values are population-weighted blends of 65/45
+    and 50/28 kg liveweight classes consistent with Sutton et al. 1999.
+  _notes:
+  - Phase 1.5 extraction from PROXY/sectors/K_Agriculture/core/io.py (EF_* and N_*
+    module-level constants).
+  - Values are identical to the historical Python constants.
+  - CH4 EFs are kg CH4 per head per year; manure-N factors are kg N excreted per head
+    per year (thousand-head input scaling happens in the Python caller).
+  _version: 1
+  ch4_enteric_ef_kg_per_head_per_year:
+    dairy_cow: 138.0
+    other_cattle: 52.0
+    pig_light: 1.0
+    pig_heavy: 1.5
+    sheep_blend: 7.363636363636363
+    goat_blend: 7.564102564102564
+  manure_n_kg_per_head_per_year:
+    dairy_cow: 0.48
+    other_cattle: 0.33
+    swine: 0.5
+    sheep: 0.85
+    goat: 1.28
+livestock_housing_nh3:
+  _description: Stage-1 NH3 livestock-housing proxy tiers used by source_relevance/livestock_housing.py.
+    Values are dimensionless scores in [0, 1] — NOT emission factors in kg/ha. The
+    emission factor per species is loaded separately from livestock_housing_factors.json.
+  _source: Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/livestock_housing.py
+    (values identical to the historical Python constants).
+  _version: 1
+  _notes:
+  - tiers.u120_mixed_livestock is intentionally omitted here because it is configured
+    via PROXY/config/agriculture/lu1_lc1_mapping.yaml (see Phase 1.3).
+  - 'missing_grazing_damping (MISSING_G in the module): applied to any tier when SURVEY_GRAZING
+    is missing.'
+  - The tier lookup logic (LU1/LC1 classifiers, ley exclusion, etc.) remains in Python;
+    this file only holds the numeric constants.
+  pollutant: NH3
+  tiers:
+    u111_building:
+      score: 1.0
+      condition: LU1 == U111 and LC1 in {A11, A12}
+    u111_grassland:
+      score: 0.55
+      condition: LU1 == U111 and LC1 startswith E
+    u111_cropland_generic:
+      score: 0.2
+      condition: LU1 == U111 and LC1 startswith B and LC1 != B55
+    u111_ley:
+      score: 0.3
+      condition: LU1 == U111 and LC1 == B55
+    u112_fallow:
+      score: 0.2
+      condition: LU1 == U112
+  missing_grazing_damping: 0.4
+  grazing_observed_score: 0.0
+  excluded_lu1:
+  - U113
+manure_land_application:
+  _description: Stage-1 manure-management land-application weights per LUCAS LC1 crop
+    group. Values are dimensionless probabilities of likely manure application per
+    hectare, interpreted following Velthof et al. (2009) cropping-group tiers. NOT
+    emission factors in kg NH3/ha.
+  _source: Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/manure.py
+    (values identical to the historical Python constants).
+  _references:
+  - Velthof, G.L. et al. (2009). Integrated assessment of nitrogen losses from agriculture
+    in EU-27 using MITERRA-EUROPE. Journal of Environmental Quality.
+  - Oenema, O. et al. (2007). Nutrient losses from manure management in the European
+    Union.
+  _version: 1
+  crop_groups:
+    high_manure_exact:
+      lc1_codes:
+      - B11
+      - B13
+      - B32
+      weight: 0.8
+      description: High manure-use arable (Velthof 2009 high-input group).
+    high_manure_prefix:
+      lc1_prefix:
+      - B2
+      weight: 0.8
+      description: All oil crops (LUCAS B2*).
+    intermediate_manure:
+      lc1_codes:
+      - B12
+      - B14
+      - B15
+      - B16
+      - B17
+      - B18
+      - B19
+      - B31
+      weight: 0.6
+      description: Intermediate manure-use group.
+    residual_b_prefix:
+      lc1_prefix:
+      - B
+      weight: 0.1
+      description: Catch-all for any other B* LC1 code (Oenema 2007 low manure reception).
+    managed_grassland:
+      lc1_prefix:
+      - E
+      weight: 0.8
+      description: U111 + LC1 startswith E (managed grassland).
+    fallow:
+      lu1: U112
+      weight: 0.7
+      description: LU1 U112 (fallow land).
+    u111_other:
+      weight: 0.1
+      description: U111 + LC1 not in B* or E* (residual agricultural).
+    u113_other:
+      weight: 0.1
+      description: U113 kitchen-garden fallback when LC1 is not B* or E*.
+nmvoc_crop_ef:
+  _description: NMVOC emission factors for crop production per LUCAS LC1 code (kg
+    NMVOC per hectare per year).
+  _source: EMEP/EEA air pollutant emission inventory guidebook 2023, Table 3-3. Assignment
+    of generic EFs (wheat / rape / grass) to specific LUCAS LC1 codes follows Thunen
+    NIR.
+  _notes:
+  - Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/agricultural_soils.py
+    (NMVOC_EF dict).
+  - Values are identical to the historical Python constants.
+  - Used by source_relevance/agricultural_soils.py (NFR 3.D / GNFR L).
+  _version: 1
+  pollutant: NMVOC
+  units: kg ha^-1 yr^-1
+  lc1_ef:
+    B11: 0.32
+    B12: 0.32
+    B13: 1.03
+    B14: 0.32
+    B15: 0.32
+    B16: 0.32
+    B17: 0.32
+    B18: 0.32
+    B19: 0.32
+    B21: 0.32
+    B22: 0.32
+    B23: 0.32
+    B32: 1.34
+    B41: 0.32
+    B51: 0.41
+    B52: 0.41
+    B53: 0.41
+    B54: 0.41
+    B55: 0.41
+    E10: 0.41
+    E20: 0.41
+residue_ratios:
+  _description: Crop residue production ratios per LUCAS LC1 code (kg dry residue
+    per kg grain yield). Used by biomass-burning proxy as a multiplicative weight
+    on per-pixel agricultural DM burned.
+  _source: EMEP/EEA air pollutant emission inventory guidebook 2023, Table 3-2.
+  _notes:
+  - Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/biomass_burning.py
+    (RESIDUE_RATIOS dict).
+  - Values are identical to the historical Python constants.
+  - Only LUCAS codes flagged as NFR 4.F eligible are listed.
+  _version: 1
+  units: kg residue / kg grain
+  lc1_ratio:
+    B11: 1.3
+    B12: 1.3
+    B13: 1.2
+    B14: 1.6
+    B15: 1.3
+    B16: 1.0
+    B17: 1.4
+    B18: 1.2
+    B19: 1.2
+    B33: 2.1
+    B41: 1.7
+enteric_fermentation_factors:
+  _description: 'Enteric fermentation CH4 emission factors per animal head per year.
+    Source: IPCC 2006 Guidelines for National Greenhouse Gas Inventories, Volume 4
+    (Agriculture), Tables 10.11 and 10.10. Default values for Western Europe.'
+  _units: kg CH4 per head per year
+  _source: IPCC 2006 Vol.4 Ch.10 Tables 10.11 and 10.01
+  _note: Only ruminants contribute meaningfully to enteric CH4. Pigs and poultry are
+    monogastric and are excluded from this source. Goats use Table 10.01 Tier 1 default.
+  species_factors:
+    bovine:
+      ch4_per_head_per_year_kg: 116
+      ipcc_table: '10.11'
+      animal_category: dairy cattle, Western Europe default
+      included_in_enteric: true
+    sheep:
+      ch4_per_head_per_year_kg: 8
+      ipcc_table: '10.11'
+      animal_category: sheep, Western Europe default
+      included_in_enteric: true
+    goats:
+      ch4_per_head_per_year_kg: 5
+      ipcc_table: '10.01'
+      animal_category: goats, Tier 1 default
+      included_in_enteric: true
+    pigs:
+      ch4_per_head_per_year_kg: 1.5
+      ipcc_table: '10.11'
+      animal_category: swine
+      included_in_enteric: false
+      exclusion_reason: Monogastric — negligible enteric CH4
+    poultry:
+      ch4_per_head_per_year_kg: 0
+      included_in_enteric: false
+      exclusion_reason: Monogastric — no enteric CH4
+  intensity_weight_params:
+    normalisation: EU-wide median of ruminant_intensity_nc
+    cap_low: 0.05
+    cap_high: 5.0
+    missing_data_fallback: 1.0
+livestock_housing_factors:
+  _description: 'NH3 emission factors for livestock housing (confined animals), expressed
+    as gN per livestock unit per day, converted to gN per head per day using standard
+    liveweight assumptions. Primary source: T.H. Misselbrook et al. (2000) Ammonia
+    emission factors for UK agriculture, Atmospheric Environment. DOI: 10.1016/S1352-2310(99)00350-7'
+  _units_raw: gN per livestock unit (LU) per day, where 1 LU = 500 kg liveweight
+  _units_converted: gN per head per day
+  _liveweight_source: Standard EU livestock liveweight assumptions consistent with
+    Sutton et al. 1999 and IPCC 2006 Guidelines
+  _note: Sheep and goats are reported together in T.H. Misselbrook et al. (2000) at
+    3 gN/LU/day. Separate per-head values derived using the IPCC V4 2006 guidelines,
+    tables 10A.2 and 10A.9
+  species_factors:
+    bovine:
+      gN_per_LU_per_day: 34.3
+      liveweight_kg: 600
+      LU_per_head: 1.2
+      gN_per_head_per_day: 41.16
+      source_table: Sutton et al. 1999, housing stage, IPCC 2006 T10A-4
+      included_in_housing: true
+    pigs:
+      gN_per_LU_per_day: 80.0
+      liveweight_kg: 50
+      LU_per_head: 0.1
+      gN_per_head_per_day: 8.0
+      source_table: Sutton et al. 1999, housing stage, IPCC 2006 T10A-7
+      included_in_housing: true
+    poultry:
+      gN_per_LU_per_day: 150.0
+      liveweight_kg: 1.8
+      LU_per_head: 0.0036
+      gN_per_head_per_day: 0.54
+      source_table: Sutton et al. 1999, housing stage IPCC 2006 T10A-9
+      included_in_housing: true
+      note: Low per-head factor compensated by very high stocking densities in intensive
+        operations
+    sheep:
+      gN_per_LU_per_day: 3.0
+      liveweight_kg: 48.5
+      LU_per_head: 0.097
+      gN_per_head_per_day: 0.291
+      source_table: Sutton et al. 1999, sheep+goats IPCC 2006 T10A-9
+      included_in_housing: true
+    goats:
+      gN_per_LU_per_day: 3.0
+      liveweight_kg: 38.5
+      LU_per_head: 0.077
+      gN_per_head_per_day: 0.231
+      source_table: Sutton et al. 1999, IPCC 2006 T10A-9
+      included_in_housing: true
+  intensity_weight_params:
+    normalisation: EU-wide median of housing_intensity_nc
+    cap_low: 0.05
+    cap_high: 5.0
+    missing_data_fallback: 1.0

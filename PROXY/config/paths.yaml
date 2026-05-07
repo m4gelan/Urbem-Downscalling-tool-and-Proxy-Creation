@@ -1,0 +1,72 @@
+version: 1
+
+roots:
+  input: INPUT
+  output: OUTPUT
+  proxy_package: PROXY
+
+emissions:
+  cams_2019_nc: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+
+proxy_common:
+  alpha_workbook: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+  nuts_gpkg: INPUT/Proxy/Boundaries/NUTS_RG_20M_2021_3035.gpkg
+  corine_tif: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  population_tif: INPUT/Proxy/Population/JRC-ESTAT_Census_Population_2021_100m.tif
+
+eprtr:
+  facilities: INPUT/Proxy/EPRTR/F1_4_Air_Releases_Facilities.csv
+  directory: INPUT/Proxy/EPRTR
+
+# Cross-sector proxy parameters (non-path values are not deep-resolved as files).
+proxy_rules:
+  osm_railway:
+    # Line types are fixed in ``osm_schema.yaml`` (offroad sector); keep this empty.
+    bad_line_types: []
+    lifecycle_disallow_railway_tag_values:
+      - abandoned
+      - disused
+      - razed
+      - proposed
+      - construction
+      - dismantled
+
+osm:
+  offroad: INPUT/Proxy/OSM/offroad_layers.gpkg
+  shipping: INPUT/Proxy/OSM/shipping_layers.gpkg
+  waste: INPUT/Proxy/OSM/waste_layers.gpkg
+  solvents: INPUT/Proxy/OSM/solvents_layers.gpkg
+  industry: INPUT/Proxy/OSM/industry_layers.gpkg
+  fugitive: INPUT/Proxy/OSM/fugitive_layers.gpkg
+  aviation: INPUT/Proxy/OSM/aviation_layers.gpkg
+
+proxy_specific:
+  root: INPUT/Proxy/ProxySpecific
+  shipping:
+    vessel_density_tif: INPUT/Proxy/ProxySpecific/Shipping/vesseldensity_all_2019.tif
+    shipping_lanes_shp: INPUT/Proxy/ProxySpecific/Shipping/Shipping-Lanes-v1.shp
+  public_power:
+    units_csv: INPUT/Proxy/ProxySpecific/PublicPower/JRC_OPEN_UNITS.csv
+    linkages_csv: INPUT/Proxy/ProxySpecific/PublicPower/JRC_OPEN_LINKAGES.csv
+    performance_csv: INPUT/Proxy/ProxySpecific/PublicPower/JRC_OPEN_PERFORMANCE.csv
+    temporal_csv: INPUT/Proxy/ProxySpecific/PublicPower/JRC_OPEN_TEMPORAL.csv
+  waste:
+    agglomerations_gpkg: INPUT/Proxy/ProxySpecific/Waste/UWWTD_Agglomerations.gpkg
+    treatment_plants_gpkg: INPUT/Proxy/ProxySpecific/Waste/UWWTD_TreatmentPlants.gpkg
+    impervious_tif: INPUT/Proxy/ProxySpecific/Waste/greece_imp_100m_mosaic.tif
+    ghsl_smod_tif: INPUT/Proxy/ProxySpecific/Waste/GHS_SMOD_E2030_GLOBE_R2023A_54009_1000_V2_0.tif
+  other_combustion:
+    gains_dir: INPUT/Proxy/ProxySpecific/OtherCombustion/GAINS
+    hotmaps_dir: INPUT/Proxy/ProxySpecific/OtherCombustion/Hotmaps
+    # Deprecated: Eurostat XLSX scraping removed; use eurostat.enabled + API cache (PROXY/cache/eurostat/).
+    eurostat_xlsx: null
+  agriculture:
+    c21_gpkg: INPUT/Proxy/ProxySpecific/Agriculture/C21.gpkg
+    synthetic_n_rate: PROXY/config/agriculture/synthetic_N_rate.yaml
+    eu_lucas_2022_csv: INPUT/Proxy/ProxySpecific/Agriculture/EU_LUCAS_2022.csv
+    gfed4_dir: INPUT/Proxy/ProxySpecific/Agriculture/GFED4
+    lucas_soil_2018_dir: INPUT/Proxy/ProxySpecific/Agriculture/LUCAS-SOIL-2018-v2
+    gfed41s_agri_dm_mean_npy: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_agri_dm_mean.npy
+    gfed41s_grid_area_npy: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_grid_area.npy
+    gfed41s_nuts2_lookup_parquet: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_nuts2_lookup.parquet
+

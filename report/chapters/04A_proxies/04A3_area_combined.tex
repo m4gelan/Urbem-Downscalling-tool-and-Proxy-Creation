@@ -1,0 +1,515 @@
+\subsection{Combined-dataset area-source proxies}
+\label{sec:combined-area-proxies}
+
+The generic proxies described above are sufficient when one spatial
+driver dominates the area-source component. Several GNFR sectors,
+however, combine source types that are physically distinct but still
+reported together in the atmospheric inventory. Waste emissions include
+solid-waste handling, wastewater treatment, and residual diffuse sources.
+Industrial and fugitive emissions combine many production branches whose
+spatial supports differ. Offroad transport includes railways, pipeline
+transport, and non-road mobile machinery. For these sectors, a single
+land-cover or population layer would obscure the process structure that
+is already present in the reported inventory.
+
+The combined-dataset method therefore first builds one spatial indicator
+for each interpretable source family. These indicators are then combined
+with country- and pollutant-specific allocation coefficients derived from
+reported emissions. For a source family $g$, these coefficients are
+computed from the reported subgroup emissions as
+\begin{equation}
+  \alpha_{g,p,c} =
+  \frac{\displaystyle\sum_{s \in g} E_{s,p,c}^{\mathrm{rep}}}
+       {\displaystyle\sum_{g'}\sum_{s \in g'} E_{s,p,c}^{\mathrm{rep}}},
+  \label{eq:combined-alpha-aggregation}
+\end{equation}
+where $E_{s,p,c}^{\mathrm{rep}}$ is the reported emission of subgroup
+$s$, pollutant $p$, and country $c$. This sector-family recombination is
+introduced here as part of the upgraded proxy workflow. It builds on the
+established foundation of high-resolution emission downscaling, in which
+inventory totals are preserved while ancillary spatial data are used to
+redistribute emissions within the coarse grid
+\citep{UrbEm2021,NAEI2024Spatial}. In the present workflow, the final
+step always remains the CAMS-cell normalisation introduced in
+Section~\ref{sec:class-extent}; the combined proxy changes only the
+within-cell pattern, not the CAMS-cell emission total.
+
+For a sector with source families $g$, the raw score for pollutant $p$ is
+written as
+\begin{equation}
+  S_{p,j} =
+  \sum_g \alpha_{g,p,c(j)} P_{g,j},
+  \label{eq:combined-sector-score}
+\end{equation}
+where $P_{g,j}$ is the spatial indicator for family $g$ at fine-grid
+cell $j$, and $\alpha_{g,p,c(j)}$ is the reported contribution of that
+family to pollutant $p$ in the country $c$ containing cell $j$, computed
+as in Equation~\ref{eq:combined-alpha-aggregation}. The final weight is then
+\begin{equation}
+  W_{p,j \mid C} =
+  \frac{S_{p,j}}{\sum_{k \in C} S_{p,k}},
+  \qquad j \in C ,
+  \label{eq:combined-sector-normalisation}
+\end{equation}
+with a uniform fallback only when all candidate indicators are zero in a
+CAMS cell. This structure keeps the sectoral mass balance explicit while
+allowing different pollutants to follow different spatial patterns when
+their reported source composition differs.
+
+\subsubsection{Waste}
+\label{sec:combined-waste}
+
+Waste is treated as a combined proxy because the sector brings together
+solid-waste disposal, wastewater treatment, and residual sources that do
+not share the same spatial footprint. This separation is important for
+methane and nitrous oxide: wastewater emissions depend on collection,
+treatment technology, treatment objectives, and plant size, while
+solid-waste emissions are tied to disposal and handling sites
+\citep{moore_naturewater2025,Song2024WastewaterNetZero}. The proxy
+therefore uses three families: solid waste, wastewater, and residual
+diffuse waste.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial evidence used for the combined waste area-source proxy.}
+  \label{tab:waste-spatial-rules}
+  \scriptsize
+  \begin{tabular}{p{0.18\textwidth} p{0.25\textwidth} p{0.45\textwidth}}
+    \toprule
+    Family & Spatial weighting & Retained evidence \\
+    \midrule
+    Solid waste &
+    $1.00$ dump-site support, $0.35$ industrial or commercial support, and $0.50$ mapped solid-waste support. &
+    CORINE 132 dump sites; CORINE 121 industrial or commercial units; OSM landfill, waste\_disposal, recycling, and other solid-waste-related mapped polygons or buffered points. \\
+    Wastewater &
+    $0.45$ agglomeration cover, $0.35$ treatment-plant support, $0.35$ population, $0.25$ imperviousness, and $0.08$ industrial context. &
+    Reported wastewater agglomeration polygons; reported treatment-plant points buffered around facilities; population density; impervious surface; CORINE 131 mineral extraction, 132 dump sites, and 133 construction sites as industrial context. \\
+    Residual diffuse waste &
+    $0.50$ population, $0.35$ rural settlement support, and $0.15$ imperviousness. &
+    Population density; rural settlement classes from the settlement model; impervious surface as a settlement support indicator. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Each family proxy is constructed from the spatial evidence listed in
+Table~\ref{tab:waste-spatial-rules} after quantile-based scaling of the
+input indicators. Treatment plants are buffered and slightly smoothed so
+that wastewater treatment is represented as a local treatment zone rather
+than as a single fine-grid cell.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Waste source families used for pollutant-specific allocation coefficients.\tablefootnote{Reported source-group definitions follow the EMEP/EEA air pollutant emission inventory guidebook \citep{EMEP_EEA}.}}
+  \label{tab:waste-alpha-groups}
+  \scriptsize
+  \begin{tabular}{p{0.18\textwidth} p{0.18\textwidth} p{0.30\textwidth} p{0.26\textwidth}}
+    \toprule
+    Proxy family & Reported codes & Reported source groups represented & Interpretation in the area proxy \\
+    \midrule
+    Solid waste &
+    5A; 5B1; 5B2 &
+    Solid-waste disposal on land and biological treatment of waste. &
+    Emissions are allocated to dump sites, waste-management land, recycling or disposal features, and related mapped waste facilities. \\
+    Wastewater &
+    5D1; 5D2; 5D3 &
+    Domestic wastewater handling, industrial wastewater handling, and other wastewater-related releases. &
+    Emissions are allocated to wastewater agglomerations, treatment plants, and the serviced urban population context. \\
+    Residual diffuse waste &
+    5C2; 5E &
+    Small combustion of waste, other waste handling, and waste activities not represented by the two facility-oriented families. &
+    Emissions are allocated more diffusely using population, rural settlement, and impervious-surface indicators. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Waste incineration codes 5C1a and 5C1b are excluded from the area-source
+family recombination because they are not treated as diffuse residual
+waste in this proxy.
+
+For each pollutant, the three waste families are combined as
+\begin{equation}
+  S_{\mathrm{waste},p,j} =
+  \alpha_{\mathrm{solid},p,c(j)} P_{\mathrm{solid},j}
+  + \alpha_{\mathrm{ww},p,c(j)} P_{\mathrm{ww},j}
+  + \alpha_{\mathrm{res},p,c(j)} P_{\mathrm{res},j}.
+  \label{eq:waste-composite}
+\end{equation}
+If one family has no local support in a given fine cell, its coefficient
+is not allowed to create emissions there. The active family coefficients
+are renormalised locally before the CAMS-cell normalisation in
+Equation~\ref{eq:combined-sector-normalisation}. This avoids suppressing
+the proxy when, for example, wastewater facilities are absent in a rural
+cell but the residual waste component remains plausible.
+
+
+The detailed visual workflow for the waste proxy construction is given
+in Appendix~\ref{app:ceip-weights}, 
+\subsubsection{Industry}
+\label{sec:combined-industry}
+Industrial area emissions are represented through four source families, each targeting
+a distinct production environment: refineries and petroleum handling \textit{G1}, general
+manufacturing combustion and residual industry \textit{G2}, mineral products \textit{G3}, and
+chemicals and metals \textit{G4}.  The four-group decomposition is introduced here because the pollutant
+composition and spatial footprint of these activities differ substantially. Refinery
+stacks and petroleum storage are geographically concentrated and emit a profile
+dominated by $\text{SO}_x$ and VOCs, whereas general manufacturing combustion produces a
+broader $\text{NO}_x$ and PM mixture distributed across generic industrial zones. Mineral
+production --- cement, lime, glass, and quarrying --- generates process PM and $\text{SO}_x$
+from sites that are spatially distinct from general industry, and is therefore supported
+by CORINE class~131 (mineral extraction sites) combined with OSM quarry and works
+features. Chemical manufacturing and primary metal production are strong point-like
+sources of $\text{SO}_x$, heavy metals, and reactive nitrogen whose spatial concentration
+differs markedly from both general manufacturing and mineral sites
+\citep{EMEP_EEA, CAMS-REG-v4}. Treating all four families under a single generic
+industrial proxy would misallocate these contrasted emission profiles across the grid.
+Each group is assigned country- and pollutant-specific coefficients
+$\alpha_{g,p,c}$ derived from CEIP-reported subgroup emissions following
+Eq.~\ref{eq:combined-alpha-aggregation}. G1 through G4 represent the residual
+area mass, which for petroleum handling likely corresponds to smaller storage and
+distribution infrastructure not individually reported at high spatial precision
+\citep{Crippa2016, CAMS-REG-v4}.
+For each industrial group $g$, the raw spatial indicator is constructed from a
+group-specific OSM component, a group-specific CORINE component, and a weak population
+fallback:
+%
+\begin{equation}
+  p_{g,j} =
+  \begin{cases}
+    w_{g,\mathrm{sec}}
+    \bigl(
+      w_{g,\mathrm{osm}}\, \mathcal{Z}(O_{g,j})
+      + w_{g,\mathrm{clc}}\, \mathcal{Z}(C_{g,j})
+    \bigr)
+    + w_{g,\mathrm{pop}}\, P_j
+    & \text{if } O_{g,j} + C_{g,j} > 0, \\[6pt]
+    P_j
+    & \text{otherwise,}
+  \end{cases}
+  \label{eq:industry-group-proxy}
+\end{equation}
+%
+where $O_{g,j}$ and $C_{g,j}$ are respectively the OSM coverage fraction and the
+CORINE score for group $g$ at pixel $j$, $P_j$ is the population proxy raster,
+$\mathcal{Z}(\cdot)$ is a standardisation operator that places both inputs on a
+comparable scale, and $w_{g,\mathrm{sec}} = 1 - w_{g,\mathrm{pop}}$. When no
+industrial evidence is present in a pixel, the proxy falls back entirely to population,
+consistent with the residual mass allocation used in \mbox{CAMS-REG-ANT} itself. The
+resulting $p_{g,j}$ is subsequently normalised within each CAMS cell to obtain the
+final redistribution weights.
+
+The OSM component concentrates emissions around explicitly mapped industrial
+infrastructure, while the CORINE component provides areal support where OSM tagging is
+incomplete. The population term is not interpreted as a direct driver of industrial
+activity; it serves only as a spatial fallback for diffuse residual emissions whose
+facility evidence is locally absent. Group-specific weights are summarised in
+Table~\ref{tab:industry-spatial-rules}.
+
+For G1, the spatial indicator combines OSM features tagged as oil or fuel works,
+refineries, and fuel storage tanks ($w_{\mathrm{osm}} = 0.82$) with CORINE class~121
+($w_{\mathrm{clc}} = 0.15$) and a minimal population fallback
+($w_{\mathrm{pop}} = 0.03$). Refineries are strongly point-like facilities; the
+population term is retained only to cover residual storage and distribution
+infrastructure not individually mapped. For G2, generic OSM industrial landuse,
+factory and warehouse buildings, and fossil-fuel power plant features
+($w_{\mathrm{osm}} = 0.55$) are combined with CORINE~121 ($w_{\mathrm{clc}} = 0.35$)
+and a population fallback ($w_{\mathrm{pop}} = 0.10$); this group acts as a catch-all
+for the heterogeneous residual of manufacturing combustion and ancillary industrial
+processes (NFR~2D--2L), where diffuse emissions justify a larger population share. For
+G3, OSM quarry, mineshaft, and mineral works features ($w_{\mathrm{osm}} = 0.65$) are
+combined with CORINE~131 mineral extraction sites ($w_{\mathrm{clc}} = 0.30$) and a
+small population fallback ($w_{\mathrm{pop}} = 0.05$); quarrying and mineral
+processing are predominantly rural activities with low residential co-location. For G4,
+OSM chemical, pharmaceutical, petrochemical, and metal works features
+($w_{\mathrm{osm}} = 0.75$) are combined with CORINE~121 ($w_{\mathrm{clc}} = 0.20$)
+and a minimal population fallback ($w_{\mathrm{pop}} = 0.05$); heavy industry and
+primary metal production are strongly concentrated and poorly correlated with
+population density.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial evidence and weights used for the industry area-source proxy.
+           $w_{\mathrm{sec}} = 1 - w_{\mathrm{pop}}$ in all cases.}
+  \label{tab:industry-spatial-rules}
+  \scriptsize
+  \begin{tabular}{p{0.18\textwidth} p{0.24\textwidth} p{0.46\textwidth}}
+    \toprule
+    Group & Weights & Retained spatial evidence \\
+    \midrule
+    G1 --- Refineries and petroleum handling &
+    $w_{\mathrm{osm}}=0.82$,\newline
+    $w_{\mathrm{clc}}=0.15$,\newline
+    $w_{\mathrm{pop}}=0.03$ &
+    OSM: petroleum works, refineries, oil and fuel industrial sites, storage tanks,
+    depots.\newline
+    CORINE: 121 industrial or commercial units. \\[4pt]
+    G2 --- Manufacturing combustion and residual industry &
+    $w_{\mathrm{osm}}=0.55$,\newline
+    $w_{\mathrm{clc}}=0.35$,\newline
+    $w_{\mathrm{pop}}=0.10$ &
+    OSM: industrial land, factories, warehouses, works, manufacturing, textile, food,
+    sawmill, engineering, machine-shop, gas, oil, and biomass plant features.\newline
+    CORINE: 121 industrial or commercial units. \\[4pt]
+    G3 --- Mineral products &
+    $w_{\mathrm{osm}}=0.65$,\newline
+    $w_{\mathrm{clc}}=0.30$,\newline
+    $w_{\mathrm{pop}}=0.05$ &
+    OSM: quarries, mineshafts, cement, lime, glass, ceramic, and brick works.\newline
+    CORINE: 131 mineral extraction sites. \\[4pt]
+    G4 --- Chemicals and metals &
+    $w_{\mathrm{osm}}=0.75$,\newline
+    $w_{\mathrm{clc}}=0.20$,\newline
+    $w_{\mathrm{pop}}=0.05$ &
+    OSM: chemical, pharmaceutical, fertiliser, petrochemical, plastic, steel, iron,
+    aluminium, copper, zinc, metal, foundry, smelting, and rolling-mill features.\newline
+    CORINE: 121 industrial or commercial units. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\begin{table}[htbp]
+  \centering
+  \caption{Industry source groups used for pollutant-specific allocation coefficients.}
+  \label{tab:industry-alpha-groups}
+  \scriptsize
+  \begin{tabular}{p{0.18\textwidth} p{0.22\textwidth} p{0.28\textwidth} p{0.24\textwidth}}
+    \toprule
+    Proxy group & Reported codes & Reported source groups represented & Interpretation in the area proxy \\
+    \midrule
+    Refineries and petroleum handling &
+    1A1b; 1A1c; 1B1b; 1B2a5; 1B2a6; 1B2b5; 2C1b &
+    Petroleum refining, petroleum storage, fuel depots, and related refinery or petroleum handling sources. &
+    Allocates petroleum-related process and handling emissions to refinery, storage, depot, and industrial land supports. \\
+    Manufacturing combustion and residual industry &
+    1A2a--1A2f; 1A2gvii; 1A2gviii; 2D1; 2D2; 2D3a; 2D3b; 2G; 2H1--2H3; 2I--2L &
+    Manufacturing combustion, machinery, food, textiles, wood, paper, product use, and residual industrial activities. &
+    Allocates residual industrial combustion and diffuse manufacturing-process emissions to general industrial supports. \\
+    Mineral products &
+    2A1; 2A2; 2A3; 2A4a--2A4d; 2A5a--2A5c; 2A6 &
+    Cement, lime, glass, ceramics, quarrying, construction products, and other mineral processes. &
+    Allocates process emissions toward mineral extraction, cement, construction, and industrial land. \\
+    Chemicals and metals &
+    2B1--2B7; 2B8a--2B8f; 2B9a; 2B9b; 2B10a; 2B10b; 2C1--2C6; 2C7a--2C7d &
+    Chemical industry, pharmaceutical and fertiliser production, iron and steel, non-ferrous metals, and foundries. &
+    Allocates emissions to chemical and metal-production supports. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.88\textwidth}{\centering
+  Placeholder for the industry proxy figure: panels for refineries and
+  petroleum handling, manufacturing combustion and residual industry,
+  mineral products, chemicals and metals, and final selected-pollutant
+  weight.}}
+  \caption{Suggested diagnostic figure for the combined industry proxy.
+  The figure should show the difference between petroleum, manufacturing,
+  mineral, and chemical or metal supports before
+  pollutant-specific recombination.}
+  \label{fig:industry-combined-proxy-placeholder}
+\end{figure}
+
+\subsubsection{Fugitive emissions}
+\label{sec:combined-fugitive}
+
+Fugitive emissions are highly process-dependent. Methane releases from
+fuel extraction, handling, and transmission can be concentrated around
+energy infrastructure, while some downstream and residual activities are
+more diffuse. Satellite-based studies confirm that fossil-fuel methane
+emissions are spatially heterogeneous and often dominated by production
+basins, coal activities, and high-emitting infrastructure
+\citep{Lu2023FuelMethane}. The fugitive proxy therefore separates coal
+and solid fuels, oil transport and upstream handling, storage or refining
+and distribution, and gas flaring or residual fuel losses before
+pollutant-specific recombination.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial evidence used for the fugitive-emissions area-source proxy.}
+  \label{tab:fugitive-spatial-rules}
+  \scriptsize
+  \begin{tabular}{p{0.20\textwidth} p{0.23\textwidth} p{0.45\textwidth}}
+    \toprule
+    Group & Spatial weighting & Retained evidence \\
+    \midrule
+    Coal and solid fuels &
+    $\lambda_{\mathrm{OSM}}=0.60$, $\lambda_{\mathrm{CLC}}=0.40$; final group score $0.80$ sector signal and $0.20$ population. &
+    Coal, mine, quarry, and industrial-land features; CORINE 131 mineral extraction and 121 industrial or commercial units. \\
+    Oil transport and upstream handling &
+    $\lambda_{\mathrm{OSM}}=0.60$, $\lambda_{\mathrm{CLC}}=0.40$; final group score $0.80$ sector signal and $0.20$ population. &
+    Pipeline, port, depot, and oil-industrial features; CORINE 123 port areas and 121 industrial or commercial units. \\
+    Storage, refining, and distribution &
+    $\lambda_{\mathrm{OSM}}=0.60$, $\lambda_{\mathrm{CLC}}=0.40$; final group score $0.80$ sector signal and $0.20$ population. &
+    Refineries, storage tanks, fuel storage, depots, and fuel-service features; CORINE 121 industrial or commercial units and 122 road or rail networks and associated land. \\
+    Gas flaring and residual losses &
+    $\lambda_{\mathrm{OSM}}=0.60$, $\lambda_{\mathrm{CLC}}=0.40$; final group score $0.80$ sector signal and $0.20$ population. &
+    Flares, chimneys, power plants, generators, substations, gas-industrial features, and gas-resource features; CORINE 121 industrial or commercial units and 131 mineral extraction. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The spatial construction mirrors the industry workflow, but the retained
+features are selected to represent fuel-related activities:
+\begin{equation}
+  P_{g,j}^{\mathrm{fug}} =
+  \mathcal{N}
+  \left(
+    \lambda_{g,\mathrm{osm}} O_{g,j}^{\mathrm{fug}}
+    + \lambda_{g,\mathrm{clc}} C_{g,j}^{\mathrm{fug}}
+    + \lambda_{g,\mathrm{pop}} P_{\mathrm{pop},j}
+  \right).
+  \label{eq:fugitive-group-proxy}
+\end{equation}
+The population component is kept weak and is used only where a reported
+group cannot be represented fully by mapped infrastructure.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Fugitive-emission groups used for pollutant-specific allocation coefficients.}
+  \label{tab:fugitive-alpha-groups}
+  \scriptsize
+  \begin{tabular}{p{0.19\textwidth} p{0.18\textwidth} p{0.31\textwidth} p{0.24\textwidth}}
+    \toprule
+    Proxy group & Reported codes & Reported source groups represented & Interpretation in the area proxy \\
+    \midrule
+    Coal and solid fuels &
+    1B1A; 1B1B; 1B1C &
+    Coal mining, post-mining handling, and solid-fuel losses. &
+    Allocates emissions toward extraction land and coal-related industrial features. \\
+    Oil transport and upstream handling &
+    1B2AI &
+    Oil transport, upstream oil handling, port transfer, and depot activity. &
+    Allocates emissions to pipeline, port, depot, and oil-industrial supports. \\
+    Storage, refining, and distribution &
+    1B2AIV; 1B2AV &
+    Petroleum storage, refineries, distribution depots, and fuel handling. &
+    Allocates emissions to storage tanks, refineries, depots, and transport-associated land. \\
+    Gas flaring and residual losses &
+    1B2B; 1B2C; 1B2D &
+    Gas flaring, venting, residual fuel losses, and associated energy infrastructure. &
+    Allocates emissions to flares, chimneys, energy facilities, gas infrastructure, and industrial land. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The combined fugitive score is
+\begin{equation}
+  S_{\mathrm{fug},p,j} =
+  \sum_g
+  \alpha_{g,p,c(j)} P_{g,j}^{\mathrm{fug}} .
+  \label{eq:fugitive-composite}
+\end{equation}
+This is especially relevant for CH$_4$, for which oil, gas, and coal
+families can dominate the reported mass, but the same framework is kept
+for all pollutants in order to preserve a consistent multiband output.
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.88\textwidth}{\centering
+  Placeholder for the fugitive-emissions proxy figure: panels for coal
+  and solid fuels, oil transport and upstream handling, storage or
+  refining and distribution, gas flaring or residual losses, and final
+  CH$_4$ weight.}}
+  \caption{Suggested diagnostic figure for the fugitive-emissions proxy.
+  The CH$_4$ panel is the most important diagnostic because methane is the
+  dominant pollutant for many fuel-related fugitive sources.}
+  \label{fig:fugitive-combined-proxy-placeholder}
+\end{figure}
+
+\subsubsection{Offroad transport}
+\label{sec:combined-offroad}
+
+The offroad transport sector is constructed from three separate activity
+families: railways, pipeline transport, and non-road mobile machinery.
+These families are combined because they are reported together in the
+inventory category, but their spatial evidence is fundamentally
+different. Rail emissions follow railway infrastructure, pipeline
+transport follows pipeline corridors and associated facilities, and
+non-road machinery is linked to land uses where mobile equipment is
+expected to operate. National spatial-emission methodologies commonly use
+such infrastructure and land-use information to allocate non-road and
+rail-related emissions when direct activity data are unavailable
+\citep{NAEI2024Spatial}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial evidence used for the offroad transport area-source proxy.}
+  \label{tab:offroad-spatial-rules}
+  \scriptsize
+  \begin{tabular}{p{0.20\textwidth} p{0.25\textwidth} p{0.43\textwidth}}
+    \toprule
+    Family & Spatial weighting & Retained evidence \\
+    \midrule
+    Rail transport &
+    Railway-line coverage buffered by 150 m; activity share given by $\alpha_{\mathrm{rail},p,c}$. &
+    Active railway lines and railway land-use polygons; inactive or unsuitable railway values such as abandoned, disused, razed, and proposed are excluded. \\
+    Pipeline transport &
+    Pipeline coverage buffered by 75 m; the present setup uses the line proxy directly. If a facility raster is supplied, the blend is $0.80$ line signal and $0.20$ facility signal. &
+    Pipeline lines, pipeline-related areas, and associated pipeline facilities where available. \\
+    Non-road mobile machinery &
+    $0.50$ agricultural support and $0.35$ industrial support before pollutant-specific recombination. &
+    CORINE agricultural classes 211--213 and 241--243, optional permanent crops 221--223, industrial and extraction classes 121, 131, 133, and optional port areas 123. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The rail and pipeline components are built as buffered infrastructure
+coverage scores, while the non-road component is a CORINE-only activity
+support. The pollutant-specific score is
+\begin{equation}
+  S_{\mathrm{off},p,j} =
+  \alpha_{\mathrm{rail},p,c(j)} Z_{\mathrm{rail},j}
+  + \alpha_{\mathrm{pipe},p,c(j)} Z_{\mathrm{pipe},j}
+  + \alpha_{\mathrm{nonroad},p,c(j)} P_{\mathrm{nonroad},j}.
+  \label{eq:offroad-composite}
+\end{equation}
+Here, $Z_{\mathrm{rail}}$ and $Z_{\mathrm{pipe}}$ are standardised
+infrastructure-coverage scores, and $P_{\mathrm{nonroad}}$ is the
+land-cover machinery proxy. The coefficients are pollutant-specific
+because the relative contribution of railway engines, pipeline transport,
+and non-road machinery differs between pollutants.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Offroad transport source families used for pollutant-specific allocation coefficients.}
+  \label{tab:offroad-alpha-groups}
+  \scriptsize
+  \begin{tabular}{p{0.20\textwidth} p{0.16\textwidth} p{0.32\textwidth} p{0.24\textwidth}}
+    \toprule
+    Proxy family & Reported code & Reported source groups represented & Interpretation in the area proxy \\
+    \midrule
+    Rail transport &
+    1A3c &
+    Railway transport emissions. &
+    Allocates emissions to active railway corridors and railway land. \\
+    Pipeline transport &
+    1A3ei &
+    Pipeline transport and compressor or distribution-related pipeline activity. &
+    Allocates emissions to pipeline corridors and related mapped infrastructure. \\
+    Non-road mobile machinery &
+    1A3eii &
+    Mobile machinery used outside road transport, including agricultural, industrial, construction, and service equipment. &
+    Allocates emissions to land-cover classes where machinery use is plausible. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+After construction of $S_{\mathrm{off},p,j}$, the score is normalised
+within each CAMS cell with Equation~\ref{eq:combined-sector-normalisation}.
+The output is pollutant-specific because each band receives the reported
+rail, pipeline, and non-road shares for that pollutant.
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.88\textwidth}{\centering
+  Placeholder for the offroad proxy figure: panels for rail coverage,
+  pipeline coverage, non-road land-cover support, and the final selected
+  pollutant weight.}}
+  \caption{Suggested diagnostic figure for the offroad proxy. The figure
+  should make clear that rail and pipeline families follow infrastructure
+  corridors, while non-road machinery is represented through land-cover
+  support.}
+  \label{fig:offroad-combined-proxy-placeholder}
+\end{figure}

@@ -1,0 +1,74 @@
+{
+  "_comment": "Maps E-PRTR Annex I sector/subsector codes to SNAP proxy flags. Derived from eprtr_AnnexIActivity parsed to (Sector, SubSector). Each entry sets the named flag column to 1 in the E-PRTR GeoDataFrame.",
+  "_proxy_rasters": "Only Snap1, Snap34, and Snap9 generate proxy raster files (lu_snap1.tif, lu_snap34.tif, lu_waste.tif). Snap6 and Snap10 flags are assigned but no proxy raster is generated from them in the current implementation.",
+
+  "Snap1": [
+    { "sector": "1", "subsector": "a", "description": "Mineral oil and gas refineries" },
+    { "sector": "1", "subsector": "b", "description": "Gasification and liquefaction" },
+    { "sector": "1", "subsector": "c", "description": "Thermal power stations and other combustion installations" },
+    { "sector": "1", "subsector": "e", "description": "Coal rolling mills" },
+    { "sector": "1", "subsector": "f", "description": "Manufacture of coal products and solid smokeless fuel" }
+  ],
+
+  "Snap34": [
+    { "sector": "1", "subsector": "d", "description": "Coke ovens" },
+    { "sector": "2", "subsector": "a", "description": "Metal ore roasting or sintering" },
+    { "sector": "2", "subsector": "b", "description": "Pig iron or steel production" },
+    { "sector": "2", "subsector": "c", "description": "Processing of ferrous metals" },
+    { "sector": "2", "subsector": "d", "description": "Ferrous metal foundries" },
+    { "sector": "2", "subsector": "e", "description": "Non-ferrous crude metals production / smelting" },
+    { "sector": "2", "subsector": "f", "description": "Surface treatment of metals and plastics" },
+    { "sector": "3", "subsector": "a", "description": "Underground mining and related operations" },
+    { "sector": "3", "subsector": "b", "description": "Opencast mining and quarrying" },
+    { "sector": "3", "subsector": "c", "description": "Production of cement clinker or lime" },
+    { "sector": "3", "subsector": "d", "description": "Asbestos manufacture" },
+    { "sector": "3", "subsector": "e", "description": "Manufacture of glass including glass fibre" },
+    { "sector": "3", "subsector": "f", "description": "Melting mineral substances / mineral fibres" },
+    { "sector": "3", "subsector": "g", "description": "Manufacture of ceramic products" },
+    { "sector": "4", "subsector": "a", "description": "Production of basic organic chemicals" },
+    { "sector": "4", "subsector": "b", "description": "Production of basic inorganic chemicals" },
+    { "sector": "4", "subsector": "c", "description": "Production of phosphorous/nitrogen/potassium fertilizers" },
+    { "sector": "4", "subsector": "d", "description": "Production of plant health products and biocides" },
+    { "sector": "4", "subsector": "e", "description": "Production of basic pharmaceutical products" },
+    { "sector": "4", "subsector": "f", "description": "Production of explosives and pyrotechnic products" },
+    { "sector": "6", "subsector": "a", "description": "Production of pulp from timber or similar fibrous materials" },
+    { "sector": "6", "subsector": "b", "description": "Production of paper, board and other primary wood products" },
+    { "sector": "6", "subsector": "c", "description": "Preservation of wood and wood products with chemicals" },
+    { "sector": "8", "subsector": "a", "description": "Slaughterhouses" },
+    { "sector": "8", "subsector": "b", "description": "Treatment and processing of animal and vegetable materials" },
+    { "sector": "8", "subsector": "c", "description": "Treatment and processing of milk" }
+  ],
+
+  "Snap9": [
+    { "sector": "5", "subsector": "a", "description": "Installation and recovery or disposal of hazardous waste" },
+    { "sector": "5", "subsector": "b", "description": "Incineration of non-hazardous waste" },
+    { "sector": "5", "subsector": "c", "description": "Disposal of non-hazardous waste" },
+    { "sector": "5", "subsector": "d", "description": "Landfills" },
+    { "sector": "5", "subsector": "e", "description": "Disposal or recycling of animal carcasses and animal waste" },
+    { "sector": "5", "subsector": "f", "description": "Urban waste-water treatment plants" },
+    { "sector": "5", "subsector": "g", "description": "Independently operated industrial waste-water treatment plants" }
+  ],
+
+  "Snap6": [
+    { "sector": "9", "subsector": "a", "description": "Pretreatment or dyeing of fibres or textiles" },
+    { "sector": "9", "subsector": "b", "description": "Tanning of hides and skins" },
+    { "sector": "9", "subsector": "c", "description": "Surface treatment using organic solvents" },
+    { "sector": "9", "subsector": "d", "description": "Production of carbon or electro-graphite by incineration or graphitization" },
+    { "sector": "9", "subsector": "e", "description": "Building, painting or removal of paint from ships" }
+  ],
+
+  "Snap10": [
+    { "sector": "7", "subsector": "a", "description": "Intensive rearing of poultry or pigs" },
+    { "sector": "7", "subsector": "b", "description": "Intensive aquaculture" }
+  ],
+
+  "corine_fallback": {
+    "_note": "3-digit CORINE Code_18 values from the GDB vector layer used as fallback when no E-PRTR point falls inside a polygon. Agriculture codes fill snap9; industrial/construction codes fill snap34 and snap1. Matches lines 1677-1687 of the original proxies script. Keys must be lowercase to match the column names assigned by _assign_snap_to_corine (snap9, snap34, snap1).",
+    "omit_snap9_agriculture_fallback": false,
+    "_snap9_supplement_note": "When omit_snap9_agriculture_fallback is true (or build uses --eprtr-waste-plus-corine-no-ag), snap9 is not filled from the agriculture snap9 list; optional non-ag Code_18 list here instead.",
+    "snap9_supplement": [],
+    "snap9":  ["211","121"],
+    "snap34": ["121","131","132","133"],
+    "snap1":  ["121","131","132","133"]
+  }
+}

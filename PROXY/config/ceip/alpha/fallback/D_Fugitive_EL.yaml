@@ -1,0 +1,9 @@
+# Country-specific alpha fallback overrides for D_Fugitive / EL (Greece).
+#
+# See PROXY/config/ceip/alpha/fallback/defaults.yaml for schema details.
+# Leaving `groups` empty ({}) means: use the cross-country defaults, with the uniform
+# 1/n fallback as the final safety net.
+version: 1
+sector: D_Fugitive
+country: EL
+groups: {}

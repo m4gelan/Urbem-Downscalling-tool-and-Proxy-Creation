@@ -1,0 +1,48 @@
+{
+  "builder": "residential_gnfr_c",
+  "output_geotiff": "SourceProxies\\outputs\\EL\\Residential_sourcearea.tif",
+  "bands": [
+    {
+      "index": 1,
+      "pollutant": "nh3"
+    },
+    {
+      "index": 2,
+      "pollutant": "nox"
+    },
+    {
+      "index": 3,
+      "pollutant": "sox"
+    },
+    {
+      "index": 4,
+      "pollutant": "nmvoc"
+    },
+    {
+      "index": 5,
+      "pollutant": "pm2_5"
+    },
+    {
+      "index": 6,
+      "pollutant": "pm10"
+    },
+    {
+      "index": 7,
+      "pollutant": "co"
+    },
+    {
+      "index": 8,
+      "pollutant": "co2_total"
+    }
+  ],
+  "crs": "PROJCS[\"ETRS89-extended / LAEA Europe\",GEOGCS[\"ETRS89\",DATUM[\"Rete_Dinamica_Nazionale_2008\",SPHEROID[\"GRS 1980\",6378137,298.257222101004,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1132\"]],PRIMEM[\"Greenwich\",0],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4258\"]],PROJECTION[\"Lambert_Azimuthal_Equal_Area\"],PARAMETER[\"latitude_of_center\",52],PARAMETER[\"longitude_of_center\",10],PARAMETER[\"false_easting\",4321000],PARAMETER[\"false_northing\",3210000],UNIT[\"metre\",1],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"3035\"]]",
+  "width": 8146,
+  "height": 8015,
+  "domain_bbox_wgs84": [
+    18.989847169345992,
+    34.113259854807445,
+    29.675649791419286,
+    42.593486776977564
+  ],
+  "created_utc": "2026-04-13T15:45:02.826502+00:00"
+}

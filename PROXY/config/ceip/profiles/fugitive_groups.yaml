@@ -1,0 +1,100 @@
+# CEIP/NFR sector tokens (normalized: alphanumeric uppercase) -> group id G1..G4
+# 1B2b is assigned to G4 only (not G3).
+#
+# Spatial proxy: each group uses ``proxy_mixture`` (weights sum to 1) with z-scored
+# indicators. See PROXY.sectors.D_Fugitive.fugitive_proxy.
+
+groups:
+  G1:
+    name: coal_solid_fuels
+    ceip_sectors:
+      - "1B1A"
+      - "1B1B"
+      - "1B1C"
+    proxy_mixture:
+      - {kind: corine, weight: 0.40, classes: [131]}
+      - {kind: gcmt_coal, weight: 0.35}
+      - kind: osm
+        weight: 0.20
+        osm_rules:
+          any_of:
+            - {landuse: quarry}
+            - {resource: coal}
+            - {industrial: mine}
+      - {kind: corine, weight: 0.05, classes: [121]}
+
+  G2:
+    name: oil_transport_upstream
+    ceip_sectors:
+      - "1B2AI"
+    proxy_mixture:
+      - kind: osm
+        weight: 0.35
+        osm_rules:
+          any_of:
+            - {man_made: pipeline}
+            - {man_made: petroleum_well}
+      - {kind: goget_g2, weight: 0.30}
+      - kind: osm
+        weight: 0.15
+        osm_rules:
+          any_of:
+            - {landuse: port}
+            - {industrial: oil}
+            - {industrial: depot}
+      - {kind: corine, weight: 0.10, classes: [123]}
+      - {kind: corine, weight: 0.10, classes: [121]}
+
+  G3:
+    name: storage_refining_distribution
+    ceip_sectors:
+      - "1B2AIV"
+      - "1B2AV"
+    proxy_mixture:
+      - kind: osm
+        weight: 0.35
+        osm_rules:
+          any_of:
+            - {industrial: refinery}
+      - kind: osm
+        weight: 0.25
+        osm_rules:
+          any_of:
+            - {man_made: storage_tank}
+            - {man_made: tank}
+            - {industrial: fuel_storage}
+      - {kind: corine, weight: 0.15, classes: [121]}
+      - kind: osm
+        weight: 0.10
+        osm_rules:
+          any_of:
+            - {amenity: fuel}
+            - {industrial: depot}
+      - {kind: population, weight: 0.15}
+
+  G4:
+    name: gas_flaring_residual
+    ceip_sectors:
+      - "1B2B"
+      - "1B2C"
+      - "1B2D"
+    proxy_mixture:
+      - {kind: viirs_gaussian, weight: 0.45}
+      - {kind: goget_g4, weight: 0.2}
+      - kind: osm
+        weight: 0.1
+        osm_rules:
+          any_of:
+            - {man_made: flare}
+            - {man_made: chimney}
+      - kind: osm
+        weight: 0.15
+        osm_rules:
+          any_of:
+            - {power: plant}
+            - {power: generator}
+            - {power: substation}
+            - {industrial: gas}
+            - {resource: gas}
+      - {kind: corine, weight: 0.05, classes: [121]}
+      - {kind: corine, weight: 0.05, classes: [131]}

@@ -1,0 +1,17 @@
+{
+  "_comment": "Map CEIP / Sheet1 sector text (after strip+upper) to canonical 2.D.3 subsector keys.",
+  "aliases": {
+    "2D3A": "d3a_domestic",
+    "2D3B": "d3b_road_paving",
+    "2D3C": "d3c_asphalt_roofing",
+    "2D3D": "d3d_coating",
+    "2D3E": "d3e_degreasing",
+    "2D3F": "d3f_dry_cleaning",
+    "2D3G": "d3g_chemical_products",
+    "2D3H": "d3h_printing",
+    "2D3I": "d3i_other",
+    "2G": "d3i_other",
+    "23DA": "d3a_domestic",
+    "23DB": "d3b_road_paving"
+  }
+}

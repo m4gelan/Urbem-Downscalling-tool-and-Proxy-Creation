@@ -1,0 +1,154 @@
+\section{Public Power}
+\label{sec:publicpower}
+
+\subsection{Motivation}
+
+At first sight, Public Power appears to be the sector for which no real
+downscaling is needed. Public electricity and heat production is a classical
+\emph{point-source} activity: emissions originate from plants whose locations
+are physically defined. One would therefore expect the inventory coordinates to
+be sufficient, so that no additional spatial redistribution would be needed.
+
+Inspection of the CAMS-REG-ANT GNFR~A inventory and of the CAMS methodology
+showed that this assumption is only partly true. Two observations justify a
+dedicated proxy:
+\begin{itemize}
+  \item GNFR~A contains both point sources and area sources, so the sector is
+        not represented exclusively by explicit stacks.
+  \item Even where CAMS labels a source as a point, the reported coordinates
+        are not always precise enough for high-resolution allocation.
+\end{itemize}
+
+The area component is not an accident of the file structure. In the CAMS
+compilation logic, national totals for public electricity and heat production
+are compared against the emissions that can be assigned to known plants. The
+remaining difference is retained as residual \emph{area-source} mass and is
+distributed spatially using population as a first-order allocator
+\cite{CAMS_glob_ant_61}. Public Power is therefore a mixed spatial system: it
+is dominated by point sources, but it also contains a residual area component
+produced by the inventory construction itself.
+
+The upgraded workflow therefore creates two proxy layers:
+\begin{itemize}
+  \item a point-source localisation layer for the explicit plant component;
+  \item an area-source downscaling layer for the residual surface emissions.
+\end{itemize}
+
+\subsection{Point-source proxy: localisation of combustion units}
+
+\paragraph{Rationale.}
+For true power-plant emissions, no classical downscaling is required in the
+sense of spreading emissions over land-cover classes. What is required is a
+better localisation layer than the raw CAMS point coordinates. The upgraded
+method therefore treats point-source Public Power as a \emph{localisation}
+problem: identify the pixels that plausibly host thermal generation units and
+use that support to anchor the point component.
+
+The point layer is built from a European open power-plant register described
+in Appendix~\ref{app:powerplant_register}. Only combustion-based public-power
+units are retained, while hydro and other non-combustion generation types are
+excluded because the objective is to represent stack-related emissions.
+
+\paragraph{Proxy definition.}
+Let $g$ denote a pixel on the national CORINE reference grid and let
+$U_{\mathrm{comb}}$ be the set of retained combustion units. The point proxy is
+a binary support raster:
+\begin{equation}
+  \mu_{g}^{\mathrm{pp,point}} =
+  \begin{cases}
+    1, & \exists\,u \in U_{\mathrm{comb}} \text{ with } x_u \in g,\\
+    0, & \text{otherwise},
+  \end{cases}
+\end{equation}
+where $x_u$ is the location of unit $u$. In other words, a reference-grid
+pixel receives value one if at least one retained combustion unit falls inside
+it. The binary choice is deliberate: it expresses plant presence without
+letting a few large multi-unit sites dominate purely through registry
+granularity.
+
+\paragraph{Interpretation.}
+This layer should not be read as a full reconstruction of plant-level
+emissions. It is a spatial support surface answering a narrower question:
+where are public-power point emissions most plausibly located at fine
+resolution?
+
+\subsection{Area-source proxy: residual CAMS mass distributed over suitable land}
+
+\paragraph{Rationale.}
+The existence of CAMS GNFR~A area emissions means that a second proxy is
+necessary. Here a genuine downscaling problem does arise, because the residual
+public-power mass must be redistributed from coarse CAMS area cells to fine
+pixels. The chosen proxy follows the logic already embedded in the CAMS
+methodology: if the residual originates from the gap between national totals
+and explicitly reported plants, and CAMS distributes that gap using
+population, then a population-based area proxy is methodologically coherent
+rather than arbitrary.
+
+The area layer combines three ingredients: the CAMS area-source geometry, a
+CORINE-based suitability mask, and a gridded population field that controls
+the within-cell intensity gradient.
+
+\paragraph{Proxy definition.}
+Let $k$ denote a CAMS GNFR~A area cell and let $g \in k$ index fine pixels
+inside that cell on the reference grid. Define the CORINE eligibility flag
+\begin{equation}
+  I_g^{\mathrm{CLC}} =
+  \begin{cases}
+    1, & \mathrm{CLC}_g \in \mathcal{C}_{\mathrm{pp}},\\
+    0, & \text{otherwise},
+  \end{cases}
+\end{equation}
+and let $P_g$ be the LandScan population value resampled to pixel $g$. The raw
+within-cell score is
+\begin{equation}
+  \mu_{g,k}^{\mathrm{pp,area}} =
+  I_g^{\mathrm{CLC}} \cdot \max(P_g, P_0)^{\beta},
+\end{equation}
+where $P_g$ is the population value in pixel $g$. The
+normalised within-cell weight is then
+\begin{equation}
+  w_{g,k}^{\mathrm{pp,area}} =
+  \frac{\mu_{g,k}^{\mathrm{pp,area}}}
+       {\displaystyle\sum_{g' \in k} \mu_{g',k}^{\mathrm{pp,area}}},
+\end{equation}
+so that the weights inside each CAMS area cell sum to unity.
+
+This separates two roles clearly: land cover defines \emph{where} residual
+public-power emissions may be placed, while population defines \emph{how much}
+of the CAMS cell total each eligible pixel receives.
+
+\paragraph{Fallback logic.}
+Some CAMS area cells contain no pixels belonging to the selected CORINE
+classes. In that case, the implementation falls back first to
+population-only weighting over all valid pixels in the cell and, if necessary,
+to a uniform distribution over the valid cell footprint. This avoids losing
+area-source mass purely because the high-resolution land-cover layer does not
+intersect the coarse CAMS rectangle in the expected way.
+
+\subsection{How the point and area layers are used together}
+
+GNFR~A is represented by two complementary spatial products because the
+inventory itself contains two geometries. For area sources, pollutant $p$ from
+CAMS source $s$ is redistributed within its parent CAMS cell using
+\begin{equation}
+  e_{g,s,p}^{\mathrm{area}} = E_{s,p} \, w_{g,s}^{\mathrm{pp,area}}.
+\end{equation}
+For point sources, the role of the proxy is different: emissions are not
+spread across land-cover classes but constrained to pixels for which
+\(\mu_{g}^{\mathrm{pp,point}} > 0\), that is, pixels hosting at least one
+retained combustion unit.
+
+Public Power is therefore not treated as a single undifferentiated proxy.
+Instead, the method does two things at once: it \emph{relocates} the point
+component more credibly, and it \emph{downscales} the residual area component
+in a way consistent with the CAMS methodology.
+
+\subsection{Limitations and forward path}
+
+The main limitations are straightforward. The point layer is a binary plant
+presence raster rather than a one-to-one reconciliation of individual plant
+records. The plant register is also incomplete, so omission and location error
+remain possible. Finally, the area layer assumes that residual public-power
+emissions follow population once restricted to suitable land. That assumption
+is defensible because it mirrors the inventory logic, but it does not resolve
+the internal diversity of diffuse public-power activities.

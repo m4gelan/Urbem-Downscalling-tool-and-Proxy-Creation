@@ -1,0 +1,107 @@
+% ==============================================================================
+% main.tex — Master document for PDM thesis
+%
+% Compile with: pdflatex → bibtex → pdflatex → pdflatex
+% Or with latexmk: latexmk -pdf main.tex
+%
+% Overleaf: upload all files in this folder as a .zip, then set
+%   main.tex as the main document (Menu → Main document).
+% ==============================================================================
+
+\documentclass[11pt, a4paper, twoside, openright]{report}
+
+% Load all packages and custom commands
+\input{preamble}
+
+% ==============================================================================
+\begin{document}
+% ==============================================================================
+
+% --- Front matter (roman page numbering) -------------------------------------
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+% Title page (no header/footer)
+\pagestyle{empty}
+\input{titlepage}
+
+% Abstract
+\cleardoublepage
+\pagestyle{plain}
+\input{abstract}
+
+% Acknowledgements
+\cleardoublepage
+\input{acknowledgements}
+
+% Table of contents
+\cleardoublepage
+\tableofcontents
+
+% List of figures
+\cleardoublepage
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+
+% List of tables
+\cleardoublepage
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+
+% List of acronyms / abbreviations
+\cleardoublepage
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{tabbing}
+  \hspace{3cm} \= \kill
+  \textbf{AQ}     \> Air Quality \\
+  \textbf{CAMS}   \> Copernicus Atmospheric Monitoring Service \\
+  \textbf{CLC}    \> CORINE Land Cover \\
+  \textbf{CTM}    \> Chemistry Transport Model \\
+  \textbf{E-PRTR} \> European Pollutant Release and Transfer Register \\
+  \textbf{GHS}    \> Global Human Settlement (JRC) \\
+  \textbf{GNFR}   \> Gridded Nomenclature For Reporting \\
+  \textbf{HE}     \> Horizon Europe \\
+  \textbf{NOA}    \> National Observatory of Athens \\
+  \textbf{NOx}    \> Nitrogen oxides (NO + NO\textsubscript{2}) \\
+  \textbf{OSM}    \> OpenStreetMap \\
+  \textbf{OTM}    \> OpenTransportMap \\
+  \textbf{PM}     \> Particulate Matter \\
+  \textbf{PM\textsubscript{2.5}} \> Particulate Matter (diameter $<$ 2.5 \si{\micro\metre}) \\
+  \textbf{PM\textsubscript{10}}  \> Particulate Matter (diameter $<$ 10 \si{\micro\metre}) \\
+  \textbf{SNAP}   \> Selected Nomenclature for Air Pollution \\
+  \textbf{TPN}    \> Total Particle Number \\
+  \textbf{UFP}    \> Ultrafine Particles \\
+  \textbf{UrbEm}  \> Urban Emissions downscaling framework \\
+  \textbf{WHO}    \> World Health Organization \\
+\end{tabbing}
+
+% --- Main matter (arabic page numbering) -------------------------------------
+\cleardoublepage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+\input{chapters/01_introduction}
+\input{chapters/02_literature_review}
+\input{chapters/03_data_and_methods}
+\input{chapters/04_urbem_upgrade}
+\input{chapters/05_results_ioannina}
+\input{chapters/06_results_kozani}
+\input{chapters/07_discussion_conclusion}
+
+
+% --- Bibliography ------------------------------------------------------------
+\cleardoublepage
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliography{bibliography/references}
+
+% --- Appendices --------------------------------------------------------------
+\appendix
+\input{appendices/appendix_a}
+\input{appendices/appendix_b}
+\input{appendices/appendix_c}
+\input{appendices/appendix_d}
+% ==============================================================================
+\end{document}
+% ==============================================================================

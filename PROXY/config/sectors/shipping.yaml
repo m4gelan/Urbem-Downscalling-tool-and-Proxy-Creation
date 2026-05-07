@@ -1,0 +1,30 @@
+sector: G_Shipping
+enabled: true
+mode: area
+output_dir: OUTPUT/Proxy_weights/G_Shipping
+output_filename: shipping_areasource.tif
+pad_m: 5000.0
+vector_layers: [osm_shipping_high, osm_shipping_medium]
+cams_country_iso3: GRC
+cams_emission_category_indices: [10]
+
+cams:
+  gnfr: G
+  source_types:
+    - area
+  domain_bbox_wgs84: null
+
+visualization:
+  visualization_weight_band: 1
+
+# All GNFR G pollutants use the same spatial proxy (EMODnet + CORINE port + OSM); no CEIP alpha.
+shipping: {}
+
+subsectors:
+  shipping_high:
+    share: 1.0
+    vector_layer: osm_shipping_high
+  shipping_medium:
+    share: 1.0
+    vector_layer: osm_shipping_medium
+

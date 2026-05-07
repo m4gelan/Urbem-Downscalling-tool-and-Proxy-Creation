@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+.venv/
+venv/
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*_cache/
+cache/
+# Build
+dist/
+build/
+*.Rcheck/
+# IDE/OS
+.idea/
+.DS_Store
+
+cache/
+Athens/

@@ -1,0 +1,34 @@
+% ==============================================================================
+% abstract.tex
+% ==============================================================================
+
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\todo[inline]{Write abstract once the work is complete (recommended: 250--300 words).}
+
+Urban air quality management increasingly demands spatially resolved emission
+inventories that capture the heterogeneity of pollutant sources at the city
+scale. The \urbem{} tool provides a hybrid, automated framework to downscale
+pan-European \cams emission inventories ($\sim \qtyproduct[product-units=single]{6 x 6}{\km\squared}$)
+to a high-resolution grid of \qtyproduct[product-units=single]{1 x 1}{\km\squared}, using publicly
+available geospatial proxies (OpenStreetMap road network, CORINE Land Cover,
+Global Human Settlement population data, E-PRTR point sources).
+
+This master's thesis presents the upgrade of \urbem{} to ingest the latest
+\cams{} datasets produced in the RI-URBANS project (v6.1, base year 2019),
+incorporating improved road transport emissions (bottom-up COPERT methodology,
+updated spatial allocation via OpenTransportMap) and novel ultrafine particle
+(UFP) number inventories. The upgraded pipeline is applied over two \textit{Horizon
+Europe} Metronome Mission Cities in Greece — Ioannina and Kozani — to produce
+city-scale emission inputs for the \episode{} chemistry transport model.
+
+Model predictions are evaluated against in-situ observations, and the effects
+of the updated inventory on modelled concentration fields are quantified. The
+framework is further used to assess the co-benefits on air quality of urban
+climate mitigation scenarios targeting the building and road transport sectors.
+
+\bigskip
+\noindent\textbf{Keywords:} urban air quality, emission inventory, downscaling,
+CAMS-REG, UrbEm, ultrafine particles, EPISODE-CityChem, Ioannina, Kozani,
+Metronome project.

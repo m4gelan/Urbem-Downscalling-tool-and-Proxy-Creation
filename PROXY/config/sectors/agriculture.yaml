@@ -1,0 +1,22 @@
+sector: K_Agriculture
+enabled: true
+mode: area
+output_dir: OUTPUT/Proxy_weights/K_Agriculture
+output_filename: agriculture_areasource.tif
+pad_m: 5000.0
+# NUTS ``CNTR_CODE`` for reference window and tabular run (e.g. EL for Greece)
+nuts_cntr: EL
+cams_country_iso3: GRC
+# CAMS-REG emission_category_index for GNFR K=14, L=15 (area source_type=1 in raster)
+cams_emission_category_indices: [14, 15]
+# GeoTIFF bands: defaults to all pollutants in PROXY/config/agriculture/alpha.config.yaml
+# raster_pollutants: [CH4, NH3, NOx, CO2, NMVOC, CO, PM10, PM2.5]
+agriculture:
+  write_intermediates: false
+
+visualization:
+  # Match legacy SourceProxies agriculture preview (per-CAMS-cell 0–1 on plasma)
+  weight_display: per_cell
+  visualization_weight_band: 1
+  # visualization_pollutant: CH4
+  weight_opacity: 0.9

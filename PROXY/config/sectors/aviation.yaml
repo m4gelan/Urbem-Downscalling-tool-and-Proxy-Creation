@@ -1,0 +1,44 @@
+sector: H_Aviation
+enabled: true
+mode: mixed
+output_dir: OUTPUT/Proxy_weights/H_Aviation
+# Area proxy grid (reference for match-points link GeoTIFF); build before ``match-points``.
+output_filename: aviation_areasource.tif
+# Two-band CAMS vs match-location masses use ``point_matching.link_geotiff_filename``.
+output_filename_point: aviation_pointsource.tif
+pad_m: 5000.0
+lon_col: lon
+lat_col: lat
+weight_col:
+# GNFR H = emission_category_index 11 (1-based CAMS order).
+cams_emission_category_indices: [11]
+cams_source_type_indices: [2]
+# CAMS-REG: sum of fossil + bio CO2 for ranking (see matching._extract_cams_points).
+pollutant_var: co2_total
+pollutant_name: CO2
+
+point_matching:
+  enabled: true
+  facility_pool: aviation
+  cams_country_iso3: GRC
+  distance_only: true
+  single_match_stage: true
+  match_stage_label: aviation_single
+  nearest_candidates: 25
+  reference_year: 2019
+  link_geotiff_filename: aviation_pointsource.tif
+  max_match_distance_km: 10.0
+  # Optional layers (same GPKG or ``aviation_terminal_apron_gpkg``): apron/terminal polygons
+  # intersecting each aerodrome; union centroid clipped to aerodrome boundary for match_location.
+  aviation_terminal_apron_layers: []
+  # Optional aerodrome nodes GPKG + layer when preprocessing adds them (see README).
+  # aviation_aerodrome_nodes_gpkg: INPUT/Proxy/OSM/aviation_nodes.gpkg
+  # aviation_aerodrome_nodes_layer: osm_aviation_aerodrome_nodes
+  aviation_node_buffer_m: 1000.0
+
+cams:
+  gnfr: H
+  source_types:
+    - area
+    - point
+  domain_bbox_wgs84: null

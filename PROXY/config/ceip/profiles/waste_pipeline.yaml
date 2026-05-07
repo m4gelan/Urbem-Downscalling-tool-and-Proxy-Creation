@@ -1,0 +1,68 @@
+# J_Waste pipeline defaults (merged under sector YAML `waste:`).
+# Family -> CEIP NFR tokens: `ceip/profiles/waste_families.yaml`.
+#
+# Proxy data mix (weights in `proxy` below):
+#   solid: CLC codes 132/121 + OSM point buffer for dispersed sources.
+#   wastewater: UWWTD agglomerations + treatment plants + population + impervious + industrial CLC.
+#   residual: population + GHSL SMOD rural classes + impervious.
+# CEIP alpha: `ceip.ceip_alpha_mode` + workbook path from paths.yaml / sector overlay.
+corine_window:
+  nuts_cntr: EL
+  pad_m: 5000.0
+output:
+  weights_tif_area: waste_areasource.tif
+  weights_tif_point: waste_pointsource.tif
+  write_intermediates: false
+cams:
+  gnfr_j_index: 13
+  country_iso3: GRC
+  pollutants_nc:
+  - ch4
+  - co
+  - nh3
+  - nmvoc
+  - nox
+  - pm10
+  - pm2_5
+  - sox
+ceip:
+  pollutant_aliases:
+    PM25: PM2_5
+    PM2.5: PM2_5
+    NOX: NOx
+    NMVOC: NMVOC
+  ceip_alpha_mode: reported_eu27
+paths: {}
+proxy:
+  crs_target: EPSG:3035
+  normalization:
+    method: quantile_minmax
+    q_low: 0.01
+    q_high: 0.99
+  solid:
+    weight_clc_132: 0.65
+    weight_clc_121: 0.15
+    weight_osm: 0.3
+    osm_point_buffer_m: 50.0
+  wastewater:
+    wwtp_buffer_m: 800.0
+    wwtp_kernel_sigma_px: 2.0
+    weight_agglo_cover: 0.35
+    weight_wwtp: 0.35
+    weight_pop: 0.05
+    weight_imperv: 0.25
+  residual:
+    smod_rural_codes:
+    - 11
+    - 12
+    - 13
+    weight_pop: 0.4
+    weight_rural_smod: 0.45
+    weight_imperv: 0.1
+  point_source_mask:
+    mode: multiply
+    alpha: 1.0
+composite:
+  include_incineration: false
+logging:
+  level: INFO

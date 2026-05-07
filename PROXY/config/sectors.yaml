@@ -1,0 +1,44 @@
+version: 1
+
+sectors:
+  - key: A_PublicPower
+    type: mixed
+    enabled: true
+    config: PROXY/config/sectors/publicpower.yaml
+  - key: B_Industry
+    type: mixed
+    enabled: true
+    config: PROXY/config/sectors/industry.yaml
+  - key: C_OtherCombustion
+    type: area
+    enabled: true
+    config: PROXY/config/sectors/othercombustion.yaml
+  - key: D_Fugitive
+    type: area
+    enabled: true
+    config: PROXY/config/sectors/fugitive.yaml
+  - key: E_Solvents
+    type: mixed
+    enabled: true
+    config: PROXY/config/sectors/solvents.yaml
+  - key: G_Shipping
+    type: area
+    enabled: true
+    config: PROXY/config/sectors/shipping.yaml
+  - key: I_Offroad
+    type: area
+    enabled: true
+    config: PROXY/config/sectors/offroad.yaml
+  - key: J_Waste
+    type: mixed
+    enabled: true
+    config: PROXY/config/sectors/waste.yaml
+  - key: H_Aviation
+    type: mixed
+    enabled: true
+    config: PROXY/config/sectors/aviation.yaml
+  - key: K_Agriculture
+    type: area
+    enabled: true
+    config: PROXY/config/sectors/agriculture.yaml
+

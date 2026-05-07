@@ -1,0 +1,77 @@
+# Per-country alpha fallback overrides for E_Solvents in Greece (EL / GR / GRC).
+#
+# Mirrors the historical PROXY/config/solvents/alpha_fallback_GR.json used by
+# E_Solvents/ceip.py when the CEIP XLSX is missing. Once the sector migrates to
+# core.alpha.fallback.resolve_alpha, this YAML becomes the active source and the
+# legacy JSON can be retired.
+#
+# Uniform 1/9 across the 9 D3 subsectors for all listed pollutants (= current
+# behavior; user can override individual values later).
+version: 1
+sector: E_Solvents
+country: EL
+
+groups:
+  d3a_domestic:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3b_road_paving:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3c_asphalt_roofing:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3d_coating:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3e_degreasing:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3f_dry_cleaning:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3g_chemical_products:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3h_printing:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111
+  d3i_other:
+    CO: 0.1111111111
+    NOx: 0.1111111111
+    NH3: 0.1111111111
+    NMVOC: 0.1111111111
+    PM10: 0.1111111111
+    PM2.5: 0.1111111111

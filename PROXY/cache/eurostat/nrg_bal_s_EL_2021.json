@@ -1,0 +1,227 @@
+{
+  "version": "2.0",
+  "class": "dataset",
+  "label": "Simplified energy balances",
+  "source": "ESTAT",
+  "updated": "2026-04-20T23:00:00+0200",
+  "value": {
+    "1": 0.0,
+    "2": 0.0,
+    "10": 59579.064,
+    "5": 5975.426,
+    "11": 0.0,
+    "6": 4155.417,
+    "3": 0.0,
+    "7": 15929.663,
+    "4": 0.0,
+    "0": 85639.57,
+    "8": 0.0,
+    "13": 135.414,
+    "14": 0.0,
+    "22": 63788.256,
+    "17": 20905.123,
+    "23": 1497.874,
+    "18": 47783.694,
+    "15": 0.0,
+    "19": 45022.873,
+    "16": 0.0,
+    "12": 179133.234,
+    "20": 0.0
+  },
+  "status": {
+    "9": "m",
+    "21": "m"
+  },
+  "id": [
+    "freq",
+    "nrg_bal",
+    "siec",
+    "unit",
+    "geo",
+    "time"
+  ],
+  "size": [
+    1,
+    2,
+    12,
+    1,
+    1,
+    1
+  ],
+  "dimension": {
+    "freq": {
+      "label": "Time frequency",
+      "category": {
+        "index": {
+          "A": 0
+        },
+        "label": {
+          "A": "Annual"
+        }
+      }
+    },
+    "nrg_bal": {
+      "label": "Energy balance",
+      "category": {
+        "index": {
+          "FC_OTH_CP_E": 0,
+          "FC_OTH_HH_E": 1
+        },
+        "label": {
+          "FC_OTH_CP_E": "Final consumption - other sectors - commercial and public services - energy use",
+          "FC_OTH_HH_E": "Final consumption - other sectors - households - energy use"
+        }
+      }
+    },
+    "siec": {
+      "label": "Standard international energy product classification (SIEC)",
+      "category": {
+        "index": {
+          "TOTAL": 0,
+          "C0000X0350-0370": 1,
+          "C0350-0370": 2,
+          "P1000": 3,
+          "S2000": 4,
+          "G3000": 5,
+          "O4000XBIO": 6,
+          "RA000": 7,
+          "W6100_6220": 8,
+          "N900H": 9,
+          "E7000": 10,
+          "H8000": 11
+        },
+        "label": {
+          "TOTAL": "Total",
+          "C0000X0350-0370": "Solid fossil fuels",
+          "C0350-0370": "Manufactured gases",
+          "P1000": "Peat and peat products",
+          "S2000": "Oil shale and oil sands",
+          "G3000": "Natural gas",
+          "O4000XBIO": "Oil and petroleum products (excluding biofuel portion)",
+          "RA000": "Renewables and biofuels",
+          "W6100_6220": "Non-renewable waste",
+          "N900H": "Nuclear heat",
+          "E7000": "Electricity",
+          "H8000": "Heat"
+        }
+      }
+    },
+    "unit": {
+      "label": "Unit of measure",
+      "category": {
+        "index": {
+          "TJ": 0
+        },
+        "label": {
+          "TJ": "Terajoule"
+        }
+      }
+    },
+    "geo": {
+      "label": "Geopolitical entity (reporting)",
+      "category": {
+        "index": {
+          "EL": 0
+        },
+        "label": {
+          "EL": "Greece"
+        }
+      }
+    },
+    "time": {
+      "label": "Time",
+      "category": {
+        "index": {
+          "2021": 0
+        },
+        "label": {
+          "2021": "2021"
+        }
+      }
+    }
+  },
+  "extension": {
+    "lang": "EN",
+    "id": "NRG_BAL_S",
+    "agencyId": "ESTAT",
+    "version": "1.0",
+    "datastructure": {
+      "id": "NRG_BAL_S",
+      "agencyId": "ESTAT",
+      "version": "54.0"
+    },
+    "annotation": [
+      {
+        "type": "CREATED",
+        "date": "2019-01-30T15:25:28+0100"
+      },
+      {
+        "type": "DISSEMINATION_DOI_XML",
+        "title": "<adms:identifier xmlns:adms=\"http://www.w3.org/ns/adms#\" xmlns:skos=\"http://www.w3.org/2004/02/skos/core.html\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><adms:Identifier rdf:about=\"https://doi.org/10.2908/NRG_BAL_S\"><skos:notation rdf:datatype=\"http://purl.org/spar/datacite/doi\">10.2908/NRG_BAL_S</skos:notation><dct:creator rdf:resource=\"http://publications.europa.eu/resource/authority/corporate-body/ESTAT\"/><dct:issued rdf:datatype=\"http://www.w3.org/2001/XMLSchema#date\">2023-01-19</dct:issued></adms:Identifier></adms:identifier>"
+      },
+      {
+        "type": "DISSEMINATION_OBJECT_TYPE",
+        "title": "DATASET"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_DATA",
+        "date": "2026-04-20T23:00:00+0200"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_GLOBAL",
+        "date": "2026-04-20T23:00:00+0200"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_PLANNED",
+        "date": "2026-04-20T23:00:00+0200"
+      },
+      {
+        "type": "ESMS_HTML",
+        "title": "Explanatory texts (metadata)",
+        "href": "https://ec.europa.eu/eurostat/cache/metadata/en/nrg_bal_esms.htm"
+      },
+      {
+        "type": "ESMS_SDMX",
+        "title": "Explanatory texts (metadata)",
+        "href": "https://ec.europa.eu/eurostat/api/dissemination/files?file=metadata/nrg_bal_esms.sdmx.zip"
+      },
+      {
+        "type": "OBS_COUNT",
+        "title": "2870916"
+      },
+      {
+        "type": "OBS_PERIOD_OVERALL_LATEST",
+        "title": "2024"
+      },
+      {
+        "type": "OBS_PERIOD_OVERALL_OLDEST",
+        "title": "1990"
+      },
+      {
+        "type": "SOURCE_INSTITUTIONS",
+        "text": "Eurostat"
+      },
+      {
+        "type": "UPDATE_DATA",
+        "date": "2026-04-20T23:00:00+0200"
+      },
+      {
+        "type": "UPDATE_STRUCTURE",
+        "date": "2025-12-11T23:00:00+0100"
+      }
+    ],
+    "status": {
+      "label": {
+        "m": "missing value; data cannot exist"
+      }
+    },
+    "positions-with-no-data": {
+      "freq": [],
+      "nrg_bal": [],
+      "siec": [],
+      "unit": [],
+      "geo": [],
+      "time": []
+    }
+  }
+}

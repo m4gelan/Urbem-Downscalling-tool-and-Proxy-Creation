@@ -1,0 +1,22 @@
+# Country-specific alpha fallback overrides for B_Industry / EL (Greece).
+#
+# Values defined here take priority over PROXY/config/ceip/alpha/fallback/defaults.yaml but
+# are still overridden by any value that appears in the reported-emissions workbook
+# (see core.alpha.fallback.resolve_alpha). Leaving this file empty (no ``groups``
+# block or no entries) means "use defaults.yaml + ultimate 1/n fallback".
+#
+# Schema:
+#   groups:
+#     <group_name>:
+#       <POLLUTANT>: <float>   # per-pollutant override
+#       default:    <float>    # used when pollutant is not listed explicitly
+#
+# Example (commented out so the default behaviour is preserved):
+#   groups:
+#     G1:
+#       NH3: 0.30
+#       default: 0.25
+version: 1
+sector: B_Industry
+country: EL
+groups: {}

@@ -1,0 +1,48 @@
+sector: E_Solvents
+enabled: true
+mode: mixed
+output_dir: OUTPUT/Proxy_weights/E_Solvents
+output_filename: solvents_areasource.tif
+pad_m: 5000.0
+
+cams_country_iso3: GRC
+nuts_cntr: EL
+
+cams:
+  gnfr: E
+  source_types:
+    - area
+  domain_bbox_wgs84: null
+
+visualization:
+  visualization_weight_band: 1
+  visualization_pollutant: "NMVOC, PM10"
+
+point_matching:
+  enabled: true
+  max_match_distance_km: 10.0
+  # facility_pool: eprtr  # default — paths.yaml eprtr.facilities
+pollutant_var: nmvoc
+pollutant_name: NMVOC
+
+# ref_tif: null
+# Optional: pin grid to an existing GeoTIFF (else CORINE + NUTS window via PROXY grid).
+
+solvents:
+  # Optional: ceip_years: [2018, 2019, 2020] — omit for all years in the reported workbook
+  ceip_year: 2020
+  paths:
+    ceip_workbook: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+    ceip_subsector_map_yaml: PROXY/config/ceip/profiles/solvents_subsectors.yaml
+  # Optional OSM PBF fallbacks if solvent GPKG is incomplete:
+  # osm_roads_pbf: data/OSM/roads.osm.pbf
+  # osm_landuse_buildings_pbf: data/OSM/landuse_buildings.osm.pbf
+  corine:
+    band: 1
+  tolerance_mass: 1.0e-5
+
+run:
+  show_progress: true
+
+logging:
+  level: WARNING

@@ -1,0 +1,305 @@
+{
+    "note": "Emission factors are from EMEP/EEA air pollutant emission inventory guidebook, chapter 1A41a (residential and commercial combustion). Values in ef are g/GJ from the guidebook unless noted; SOx mapped to so2. ch4/co2 not in these tables -> missing.",
+    "tables": [
+        {
+            "fuel": "Solid fuel (not biomass)",
+            "appliance": "Fireplaces, saunas and outdoor heaters",
+            "ef": {
+                "nox": 60,
+                "so2": 500,
+                "nh3": 5,
+                "pm2_5": 330,
+                "pm10": 330,
+                "co": 5000,
+                "nmvoc": 600,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Stoves, fireplaces, saunas and outdoor heaters",
+            "ef": {
+                "nox": 60,
+                "so2": 0.3,
+                "nh3": "missing",
+                "pm2_5": 2.2,
+                "pm10": 2.2,
+                "co": 30,
+                "nmvoc": 2.0,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Solid fuel (not biomass)",
+            "appliance": "Stoves",
+            "ef": {
+                "nox": 100,
+                "so2": 900,
+                "nh3": "missing",
+                "pm2_5": 450,
+                "pm10": 450,
+                "co": 5000,
+                "nmvoc": 600,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Solid fuel (not biomass)",
+            "appliance": "Small (single household scale, capacity <=50 kWth) boilers",
+            "ef": {
+                "nox": 158,
+                "so2": 900,
+                "nh3": "missing",
+                "pm2_5": 201,
+                "pm10": 225,
+                "co": 4787,
+                "nmvoc": 174,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Small (single household scale, capacity <=50 kWth) boilers",
+            "ef": {
+                "nox": 42,
+                "so2": 0.3,
+                "nh3": "missing",
+                "pm2_5": 0.2,
+                "pm10": 0.2,
+                "co": 22,
+                "nmvoc": 1.8,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Gas oil",
+            "appliance": "Stoves",
+            "ef": {
+                "nox": 34,
+                "so2": 60,
+                "nh3": "missing",
+                "pm2_5": 2.2,
+                "pm10": 2.2,
+                "co": 111,
+                "nmvoc": 1.2,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Gas oil",
+            "appliance": "Small (single household scale, capacity <=50 kWth) boilers",
+            "ef": {
+                "nox": 69,
+                "so2": 79,
+                "nh3": "missing",
+                "pm2_5": 1.5,
+                "pm10": 1.5,
+                "co": 3.7,
+                "nmvoc": 0.17,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Coal fuels",
+            "appliance": "Advanced coal combustion techniques <1 MWth - Advanced stove",
+            "ef": {
+                "nox": 150,
+                "so2": 450,
+                "nh3": "missing",
+                "pm2_5": 220,
+                "pm10": 240,
+                "co": 2000,
+                "nmvoc": 300,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Coal fuels",
+            "appliance": "Non-residential, medium size (>50 kWth to <=1 MWth) boilers",
+            "ef": {
+                "nox": 160,
+                "so2": 900,
+                "nh3": "missing",
+                "pm2_5": 170,
+                "pm10": 190,
+                "co": 2000,
+                "nmvoc": 200,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Coal fuels",
+            "appliance": "Non-residential, medium size (>1 MWth to <=50 MWth) boilers",
+            "ef": {
+                "nox": 180,
+                "so2": 900,
+                "nh3": "missing",
+                "pm2_5": 72,
+                "pm10": 76,
+                "co": 200,
+                "nmvoc": 20,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Coal fuels",
+            "appliance": "Non-residential, advanced coal combustion techniques <1 MWth - Manual boiler",
+            "ef": {
+                "nox": 200,
+                "so2": 450,
+                "nh3": "missing",
+                "pm2_5": 130,
+                "pm10": 140,
+                "co": 1500,
+                "nmvoc": 100,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Coal fuels",
+            "appliance": "Non-residential, advanced coal combustion techniques <1 MWth - Automatic boiler",
+            "ef": {
+                "nox": 165,
+                "so2": 450,
+                "nh3": "missing",
+                "pm2_5": 70,
+                "pm10": 78,
+                "co": 350,
+                "nmvoc": 23,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Fuel oil (distillate fuel oil)",
+            "appliance": "Non-residential, fuel oil combustion in boilers <= 1 MW",
+            "ef": {
+                "nox": 100,
+                "so2": 140,
+                "nh3": "missing",
+                "pm2_5": 3,
+                "pm10": 3,
+                "co": 40,
+                "nmvoc": 15,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Fuel oil (residual fuel oil)",
+            "appliance": "Non-residential, fuel oil combustion in boilers > 1 MW",
+            "ef": {
+                "nox": 100,
+                "so2": 140,
+                "nh3": "missing",
+                "pm2_5": 30,
+                "pm10": 40,
+                "co": 40,
+                "nmvoc": 5,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Non-residential, medium size (>50 kWth to <=1 MWth) boilers",
+            "ef": {
+                "nox": 73,
+                "so2": 1.4,
+                "nh3": "missing",
+                "pm2_5": 0.45,
+                "pm10": 0.45,
+                "co": 24,
+                "nmvoc": 0.36,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Non-residential, medium size (>1 MWth to <=50 MWth) boilers",
+            "ef": {
+                "nox": 40,
+                "so2": 0.3,
+                "nh3": "missing",
+                "pm2_5": 0.45,
+                "pm10": 0.45,
+                "co": 30,
+                "nmvoc": 2,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Non-residential, gas turbines",
+            "ef": {
+                "nox": 48,
+                "so2": 0.5,
+                "nh3": "missing",
+                "pm2_5": 0.2,
+                "pm10": 0.2,
+                "co": 4.8,
+                "nmvoc": 1.6,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Gas oil",
+            "appliance": "Non-residential, gas turbines",
+            "ef": {
+                "nox": 83,
+                "so2": 46,
+                "nh3": "missing",
+                "pm2_5": 9.5,
+                "pm10": 9.5,
+                "co": 2.6,
+                "nmvoc": 0.18,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Natural gas",
+            "appliance": "Non-residential, stationary reciprocating engines",
+            "ef": {
+                "nox": 135,
+                "so2": 0.5,
+                "nh3": "missing",
+                "pm2_5": 2,
+                "pm10": 2,
+                "co": 56,
+                "nmvoc": 89,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        },
+        {
+            "fuel": "Gas oil",
+            "appliance": "Non-residential, stationary reciprocating engines",
+            "ef": {
+                "nox": 942,
+                "so2": 48,
+                "nh3": "missing",
+                "pm2_5": 30,
+                "pm10": 30,
+                "co": 130,
+                "nmvoc": 50,
+                "ch4": "missing",
+                "co2": "missing"
+            }
+        }
+    ]
+}

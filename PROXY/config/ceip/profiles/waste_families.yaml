@@ -1,0 +1,27 @@
+# Normalized sector tokens (alphanumeric only, uppercase) -> waste proxy family.
+# Match equals key OR startswith; incineration only in exclude_always.
+#
+# Per-family proxy weights (CLC/OSM/pop/imperv), CAMS indices, and CEIP alpha mode live in
+# ``waste_pipeline.yaml`` (merged with ``sectors/waste.yaml`` under ``waste:``).
+
+families:
+  solid:
+    - "5A"
+    - "5B1"
+    - "5B2"
+  ww:
+    - "5D1"
+    - "5D2"
+    - "5D3"
+  res:
+    - "5C2"
+    - "5E"
+
+exclude_always:
+  - "5C1A"
+  - "5C1BI"
+  - "5C1BII"
+  - "5C1BIII"
+  - "5C1BIV"
+  - "5C1BV"
+  - "5C1BVI"

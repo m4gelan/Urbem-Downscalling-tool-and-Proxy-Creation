@@ -1,0 +1,184 @@
+# GNFR B Industry: NFR (normalized) -> G1..G4. See PROXY.sectors.B_Industry.
+# In ceip longer codes must be listed before shorter ones they prefix (e.g. 2C7A before 2C7).
+
+groups:
+  G1:
+    name: refineries_petroleum
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.85
+    w_clc_in_sector: 0.15
+    w_pop_in_p : 0.03
+    corine_classes: [121]
+    ceip_sectors:
+      - "1A1b"
+      - "1A1c"
+      - "1B1b"
+      - "1B2a5"
+      - "1B2a6"
+      - "1B2b5"
+      - "2C1b"
+    osm_rules:
+      any_of:
+        - { man_made: "works", product: "oil" }
+        - { man_made: "works", product: "fuel" }
+        - { man_made: "works", product: "petroleum" }
+        - { industrial: "refinery" }
+        - { industrial: "oil" }
+        - { industrial: "petroleum" }
+        - { industrial: "fuel" }
+        - { man_made: "storage_tank", content: "oil" }
+        - { man_made: "storage_tank", content: "fuel" }
+        - { man_made: "storage_tank", content: "diesel" }
+        - { man_made: "storage_tank", content: "gasoline" }
+        - { man_made: "storage_tank", content: "petroleum" }
+        - { landuse: "depot" }
+        - { industrial: "fuel_depot" }
+        - { amenity: "fuel_depot" }
+  G2:
+    name: manufacturing_combustion_residual
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.6
+    w_clc_in_sector: 0.4
+    w_pop_in_p : 0.1
+    corine_classes: [121]
+    ceip_sectors:
+      - "1A2gvii"
+      - "1A2gviii"
+      - "1A2a"
+      - "1A2b"
+      - "1A2c"
+      - "1A2d"
+      - "1A2e"
+      - "1A2f"
+      - "2D3a"
+      - "2D3b"
+      - "2D1"
+      - "2D2"
+      - "2G"
+      - "2H1"
+      - "2H2"
+      - "2H3"
+      - "2I"
+      - "2J"
+      - "2K"
+      - "2L"
+    osm_rules:
+      any_of:
+        - { landuse: "industrial" }
+        - { building: "industrial" }
+        - { building: "factory" }
+        - { building: "warehouse" }
+        - { man_made: "works" }
+        - { industrial: "factory" }
+        - { industrial: "engineering" }
+        - { industrial: "machine_shop" }
+        - { industrial: "manufacture" }
+        - { industrial: "textile" }
+        - { industrial: "food" }
+        - { industrial: "sawmill" }
+        - { power: "plant", plant_source: "gas" }
+        - { power: "plant", plant_source: "oil" }
+        - { power: "plant", plant_source: "biomass" }
+  G3:
+    name: mineral
+    osm_point_buffer_m: 3000
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.7
+    w_clc_in_sector: 0.3
+    w_pop_in_p : 0.05
+    corine_classes: [131]
+    ceip_sectors:
+      - "2A4a"
+      - "2A4b"
+      - "2A4c"
+      - "2A4d"
+      - "2A5a"
+      - "2A5b"
+      - "2A5c"
+      - "2A1"
+      - "2A2"
+      - "2A3"
+      - "2A6"
+    osm_rules:
+      any_of:
+        - { landuse: "quarry" }
+        - { man_made: "mineshaft" }
+        - { industrial: "cement" }
+        - { industrial: "lime" }
+        - { industrial: "glass" }
+        - { industrial: "ceramic" }
+        - { industrial: "brick" }
+        - { man_made: "works", product: "cement" }
+        - { man_made: "works", product: "lime" }
+        - { man_made: "works", product: "glass" }
+        - { man_made: "works", product: "ceramic" }
+        - { man_made: "works", product: "brick" }
+  G4:
+    name: chemical_metal
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.75
+    w_clc_in_sector: 0.25
+    w_pop_in_p : 0.05
+    corine_classes: [121]
+    ceip_sectors:
+      - "2B10a"
+      - "2B10b"
+      - "2B8a"
+      - "2B8b"
+      - "2B8c"
+      - "2B8d"
+      - "2B8e"
+      - "2B8f"
+      - "2B9a"
+      - "2B9b"
+      - "2B1"
+      - "2B2"
+      - "2B3"
+      - "2B4"
+      - "2B5"
+      - "2B6"
+      - "2B7"
+      - "2C7a"
+      - "2C7b"
+      - "2C7c"
+      - "2C7d"
+      - "2C1"
+      - "2C2"
+      - "2C3"
+      - "2C4"
+      - "2C5"
+      - "2C6"
+    osm_rules:
+      any_of:
+        - { industrial: "chemical" }
+        - { industrial: "pharmaceutical" }
+        - { industrial: "fertilizer" }
+        - { industrial: "petrochemical" }
+        - { man_made: "works", product: "chemical" }
+        - { man_made: "works", product: "fertilizer" }
+        - { man_made: "works", product: "pharmaceutical" }
+        - { man_made: "works", product: "plastic" }
+        - { landuse: "industrial", name: "chemical" }
+        - { landuse: "industrial", name: "pharma" }
+        - { landuse: "industrial", name: "fertilizer" }
+        - { industrial: "steel" }
+        - { industrial: "iron" }
+        - { industrial: "metal" }
+        - { industrial: "foundry" }
+        - { industrial: "aluminium" }
+        - { industrial: "smelting" }
+        - { industrial: "rolling_mill" }
+        - { man_made: "works", product: "steel" }
+        - { man_made: "works", product: "iron" }
+        - { man_made: "works", product: "aluminium" }
+        - { man_made: "works", product: "aluminum" }
+        - { man_made: "works", product: "copper" }
+        - { man_made: "works", product: "zinc" }
+        - { man_made: "works", product: "metal" }

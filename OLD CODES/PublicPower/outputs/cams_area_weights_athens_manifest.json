@@ -1,0 +1,26 @@
+{
+  "generated_utc": "2026-04-09T15:21:19.865129+00:00",
+  "cam_netcdf": "C:\\Users\\leopi\\PDM_local\\data\\given_CAMS\\CAMS-REG-ANT_v8.1_TNO_ftp\\netcdf\\CAMS-REG-v8_1_emissions_year2019.nc",
+  "corine_geotiff": "C:\\Users\\leopi\\PDM_local\\Input\\CORINE\\U2018_CLC2018_V2020_20u1.tif",
+  "landscan_geotiff": "C:\\Users\\leopi\\PDM_local\\data\\PublicPower\\landscan\\landscan-global-2020.tif",
+  "domain_bbox_wgs84": [
+    23.55,
+    37.85,
+    23.98,
+    38.08
+  ],
+  "corine_codes": [
+    121,
+    3
+  ],
+  "corine_band": 1,
+  "pop_exponent": 1.0,
+  "pop_floor": 0.0,
+  "landscan_resampling": "bilinear",
+  "fallback_if_no_corine": "pop_in_cell",
+  "weight_geojson": "C:\\Users\\leopi\\PDM_local\\PublicPower\\outputs\\cams_area_weights_athens.geojson",
+  "map_overlay": {
+    "grid_width": 950,
+    "grid_height": 820
+  }
+}

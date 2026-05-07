@@ -1,0 +1,197 @@
+{
+  "pipeline_schema": 1,
+  "_comment": "Single declarative spec: raw data paths, how each proxy is built (metadata for factory/UI), GNFR allocation, SNAP map for future downscaling. path_base is relative to the project repo root (parent of urbem_interface).",
+
+  "inputs": {
+    "path_base": "Input",
+    "corine_raster": "CORINE/U2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif",
+    "corine_gdb": "CORINE/U2018_clc2018_v2020_20u1_fgdb/DATA/U2018_CLC2018_V2020_20u1.gdb",
+    "corine_gdb_layer": "U2018_CLC2018_V2020_20u1",
+    "eprtr_gpkg": "E_PRTR/eea_v_4326_10_m_ied-eprtr_p_2007-2024_v16_r00/eea_v_4326_10_m_ied-eprtr_p_2007-2024_v16_r00/ied_SiteMap.gpkg",
+    "shipping_routes_shp": "Shipping_Routes/shipping_routes_wgs.shp",
+    "population_raster": "population_proxies/GHS_POP_E2015_GLOBE_R2019A_4326_30ss_V1_0.tif"
+  },
+
+  "factory_reference": {
+    "_note": "Bundled JSON used by proxies.factory.build_proxies; files under urbem_interface/config/factory_bundled/",
+    "corine_classes_json": "factory_bundled/corine_classes.json",
+    "eprtr_snap_assignment_json": "factory_bundled/eprtr_snap_assignment.json",
+    "crs_projected": "EPSG:3035",
+    "crs_wgs84": "EPSG:4326",
+    "crs_corine": "EPSG:3035",
+    "population_output_basename": "Proxy_Population.tif"
+  },
+
+  "proxy_definitions": {
+    "industry": {
+      "output_file": "Proxy_Industry.tif",
+      "fallback_files": ["LU_Industry.tif"],
+      "proxy_config": {
+        "method": "corine_raster",
+        "description": "Industrial / commercial land from CORINE reclass (proxy ind).",
+        "corine_proxy_reclass_key": "ind"
+      },
+      "snap_config": {
+        "notes": "GNFR A,B,D use this mask; not equal to SNAP1 E-PRTR layer."
+      }
+    },
+    "population": {
+      "output_file": "Proxy_Population.tif",
+      "fallback_files": [
+        "GHS_POP_E2015_GLOBE_R2019A_4326_30ss_V1_0.tif"
+      ],
+      "proxy_config": {
+        "method": "ghs_population_copy",
+        "description": "GHS-POP raster warped to domain in downscaling."
+      },
+      "snap_config": {}
+    },
+    "waste_wastewater": {
+      "output_file": "Proxy_Waste_Wastewater.tif",
+      "fallback_files": ["LU_Waste.tif"],
+      "proxy_config": {
+        "method": "eprtr_polygon_rasterize",
+        "description": "E-PRTR sector 5 sites into CORINE polygons + Code_18 fallback (eprtr_snap_assignment.json).",
+        "eprtr_snaps": [9],
+        "corine_fallback": "snap9"
+      },
+      "snap_config": {
+        "primary_snap": 9
+      }
+    },
+    "agriculture": {
+      "output_file": "Proxy_Agriculture.tif",
+      "fallback_files": ["LU_Agriculture.tif"],
+      "proxy_config": {
+        "method": "corine_raster",
+        "description": "Agricultural land from CORINE reclass (proxy agr).",
+        "corine_proxy_reclass_key": "agr"
+      },
+      "snap_config": {
+        "notes": "K_AgriLivestock and L_AgriOther share this mask today; see future_disaggregation."
+      }
+    },
+    "shipping": {
+      "output_file": "Proxy_Shipping.tif",
+      "fallback_files": ["LU_Shipping.tif", "lu_shipping_with ports.tif"],
+      "proxy_config": {
+        "method": "shipping_routes_max_ports",
+        "description": "Merged shipping lines and port mask."
+      },
+      "snap_config": {}
+    },
+    "aviation": {
+      "output_file": "Proxy_Aviation.tif",
+      "fallback_files": ["LU_Airports.tif"],
+      "proxy_config": {
+        "method": "corine_raster",
+        "description": "Airport class from CORINE.",
+        "corine_proxy_reclass_key": "airport"
+      },
+      "snap_config": {}
+    },
+    "offroad": {
+      "output_file": "Proxy_OffRoad_Mobility.tif",
+      "fallback_files": ["Non_Road_Mob_Sources.tif"],
+      "proxy_config": {
+        "method": "corine_raster",
+        "description": "Non-road mobility composite (offroad reclass).",
+        "corine_proxy_reclass_key": "offroad"
+      },
+      "snap_config": {}
+    },
+    "eprtr_snap34": {
+      "output_file": "Proxy_EPRTR_SNAP34.tif",
+      "fallback_files": ["LU_Snap34.tif"],
+      "proxy_config": {
+        "method": "eprtr_polygon_rasterize",
+        "description": "SNAP34-class E-PRTR facilities + CORINE Code_18 fallback (121-133).",
+        "eprtr_snaps": [34]
+      },
+      "snap_config": {
+        "primary_snap": 34
+      }
+    },
+    "eprtr_snap1": {
+      "output_file": "Proxy_EPRTR_SNAP1.tif",
+      "fallback_files": ["LU_Snap1.tif"],
+      "proxy_config": {
+        "method": "eprtr_polygon_rasterize",
+        "description": "SNAP1-class E-PRTR facilities + CORINE fallback.",
+        "eprtr_snaps": [1]
+      },
+      "snap_config": {
+        "primary_snap": 1
+      }
+    }
+  },
+
+  "downscaling": {
+    "gnfr_to_proxy": {
+      "A_PublicPower": "industry",
+      "B_Industry": "industry",
+      "C_OtherStationaryComb": "population",
+      "D_Fugitives": "industry",
+      "E_Solvents": "population",
+      "F1_RoadTransport_Exhaust_Gasoline": "population",
+      "F2_RoadTransport_Exhaust_Diesel": "population",
+      "F3_RoadTransport_Exhaust_LPG_gas": "population",
+      "F4_RoadTransport_NonExhaust": "population",
+      "G_Shipping": "shipping",
+      "H_Aviation": "aviation",
+      "I_OffRoad": "offroad",
+      "J_Waste": "waste_wastewater",
+      "K_AgriLivestock": "agriculture",
+      "L_AgriOther": "agriculture"
+    },
+    "snap_proxy_map": {
+      "1": "eprtr_snap1",
+      "34": "eprtr_snap34",
+      "9": "waste_wastewater"
+    },
+    "_snap_proxy_map_note": "Maps SNAP sector index to proxy_definitions id for future SNAP-level disaggregation (not used by area_sources yet).",
+    "ghsl_urbancentre": "ghs_europe_iso3.tif",
+    "uc_apply_to_gnfr": [
+      "F1_RoadTransport_Exhaust_Gasoline",
+      "F2_RoadTransport_Exhaust_Diesel",
+      "F3_RoadTransport_Exhaust_LPG_gas",
+      "F4_RoadTransport_NonExhaust"
+    ],
+    "uc_factor": 3
+  },
+
+  "auxiliary_proxies": [
+    {
+      "id": "eprtr_snap34_aux",
+      "file": "Proxy_EPRTR_SNAP34.tif",
+      "snap": 34,
+      "used_in_downscaling": false,
+      "description": "Built by factory; reserved for snap_proxy_map / future SNAP downscaling."
+    },
+    {
+      "id": "eprtr_snap1_aux",
+      "file": "Proxy_EPRTR_SNAP1.tif",
+      "snap": 1,
+      "used_in_downscaling": false,
+      "description": "Built by factory; reserved for snap_proxy_map / future SNAP downscaling."
+    }
+  ],
+
+  "semantic_proxy_roles": {
+    "industry": "corine_industry_commercial_energy",
+    "population": "ghs_population_density",
+    "waste_wastewater": "eprtr_waste_wastewater_corine",
+    "agriculture": "corine_agriculture_combined",
+    "shipping": "shipping_ports_merged",
+    "aviation": "airports_corine",
+    "offroad": "non_road_mobility_combined",
+    "eprtr_snap34": "eprtr_industrial_processes_snap34",
+    "eprtr_snap1": "eprtr_energy_thermal_snap1"
+  },
+
+  "future_disaggregation": {
+    "_comment": "Planned: split agriculture proxies and pollutant-specific weights (see proxy_definitions.agriculture.snap_config).",
+    "agri_subproxies": {},
+    "pollutant_proxy_weights": {}
+  }
+}

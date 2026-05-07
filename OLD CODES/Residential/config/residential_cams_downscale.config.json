@@ -1,0 +1,84 @@
+{
+  "country": {
+    "cams_iso3": "GRC",
+    "nuts_cntr": "EL"
+  },
+  "paths": {
+    "cams_nc": "data/given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf/CAMS-REG-v8_1_emissions_year2019.nc",
+    "corine": null,
+    "nuts_gpkg": "Data/geometry/NUTS_RG_20M_2021_3035.gpkg",
+    "hotmaps": {
+      "heat_res": "data/OtherCombustion/Hotmaps/heat_res_curr_density.tif",
+      "heat_nonres": "data/OtherCombustion/Hotmaps/heat_nonres_curr_density.tif",
+      "gfa_res": "data/OtherCombustion/Hotmaps/gfa_res_curr_density.tif",
+      "gfa_nonres": "data/OtherCombustion/Hotmaps/gfa_nonres_curr_density.tif"
+    },
+    "gains_dir": "data/OtherCombustion/GAINS",
+    "eurostat_xlsx": "data/OtherCombustion/EUROSTAT/Nrg_d_hhq_custom_16993535_spreadsheet.xlsx_.xlsx",
+    "emep_ef": "Residential/config/EMEP_emission_factors.json",
+    "gains_mapping": "Residential/config/GAINS_mapping.json",
+    "residential_sourcearea_tif": "SourceProxies/outputs/EL/Residential_sourcearea.tif"
+  },
+  "corine": {
+    "band": 1,
+    "pad_m": 5000
+  },
+  "cams": {
+    "gnfr": "C",
+    "source_types": ["area"],
+    "domain_bbox_wgs84": null
+  },
+  "base_proxy": {
+    "heat_exp": 0.7,
+    "gfa_exp": 0.3,
+    "use_additive_instead": false,
+    "additive_heat_weight": 0.7,
+    "additive_gfa_weight": 0.3,
+    "epsilon": 1e-12
+  },
+  "morphology": {
+    "urban_111": 111,
+    "urban_112": 112,
+    "urban_121": 121,
+    "residential_fireplace_heating_stove": {
+      "w111": 0.6,
+      "w112": 1.3,
+      "w_other": 1.0
+    },
+    "commercial_boilers": {
+      "w111": 1.2,
+      "w121": 1.8,
+      "w_other": 0.5
+    }
+  },
+  "gains": {
+    "year_column": "2020",
+    "iso3_file_overrides": {}
+  },
+  "eurostat": {
+    "enabled": true,
+    "end_use_sheet": "Table 3_2023",
+    "fuel_mix_sheet": "Table 1_2021",
+    "end_use_config": "Residential/config/eurostat_end_use.json"
+  },
+  "co2": {
+    "mode": "sum_ff_bf"
+  },
+  "pollutants": [
+    { "output": "nh3", "cams_var": "nh3" },
+    { "output": "nox", "cams_var": "nox" },
+    { "output": "sox", "cams_var": "sox" },
+    { "output": "nmvoc", "cams_var": "nmvoc" },
+    { "output": "pm2_5", "cams_var": "pm2_5" },
+    { "output": "pm10", "cams_var": "pm10" },
+    { "output": "co", "cams_var": "co" },
+    { "output": "co2_total", "cams_var": null, "from_co2_mode": true }
+  ],
+  "output_dir": "Residential/outputs/downscaled",
+  "run": {
+    "write_residential_sourcearea": true,
+    "write_emissions_geotiffs": false,
+    "write_weight_geotiffs": false,
+    "show_progress": true
+  }
+}

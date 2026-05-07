@@ -1,0 +1,21 @@
+{
+  "region": "Ioannina",
+  "year": 2019,
+  "source_type": "area",
+  "domain": {
+    "nrow": 30,
+    "ncol": 30,
+    "xmin": 468812,
+    "ymin": 4375636,
+    "xmax": 498812,
+    "ymax": 4405636,
+    "crs": "EPSG:32634"
+  },
+  "paths": {
+    "input_root": "Input",
+    "cams_folder": "given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf",
+    "output_root": "Output",
+    "proxy_country": "default",
+    "emission_region": "Ioannina"
+  }
+}

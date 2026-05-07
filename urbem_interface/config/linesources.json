@@ -1,0 +1,45 @@
+{
+  "gnfr_sectors": [
+    "F1_RoadTransport_Exhaust_Gasoline",
+    "F2_RoadTransport_Exhaust_Diesel",
+    "F3_RoadTransport_Exhaust_LPG_gas",
+    "F4_RoadTransport_NonExhaust"
+  ],
+  "road_types": [
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
+    "primary",
+    "primary_link",
+    "secondary",
+    "secondary_link"
+  ],
+  "road_type_weights": {
+    "motorway": 10,
+    "motorway_link": 10,
+    "trunk": 5,
+    "trunk_link": 5,
+    "primary": 2,
+    "primary_link": 2,
+    "secondary": 2,
+    "secondary_link": 2
+  },
+  "road_width_m": {
+    "motorway": 20,
+    "motorway_link": 20,
+    "trunk": 16,
+    "trunk_link": 16,
+    "primary": 12,
+    "primary_link": 12,
+    "secondary": 12,
+    "secondary_link": 12,
+    "tertiary": 8,
+    "tertiary_link": 8
+  },
+  "pop_proxy": "yes",
+  "centre": "yes",
+  "centre_factor": 3,
+  "centre_pollutants": "all",
+  "snap": 7
+}

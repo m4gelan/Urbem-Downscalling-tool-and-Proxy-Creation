@@ -1,0 +1,47 @@
+# Canonical pollutant names used throughout the PROXY pipeline.
+#
+# This file is the single source of truth for pollutant-label normalization. Any code
+# path that needs to compare pollutant names (alpha loader, CEIP reader, band keys) is
+# expected to canonicalize via this file.
+#
+# Format:
+#   canonical:
+#     NOx:
+#       aliases: [NOX, NOx, nox, NO_x, NOxEq]
+#     PM2.5:
+#       aliases: [PM2.5, PM2_5, PM25, pm25, PM2p5]
+#
+# Note: the current codebase still has three runtime forms of PM2.5 in different files
+# (agriculture JSON uses ``PM2.5``; solvents fallback JSON uses ``PM2_5``; offroad's
+# ``norm_pollutant_key`` emits ``pm25``). Those call sites migrate incrementally in
+# Phase 2/3/4. Until then this file is the spec; when everything is wired through it,
+# the ambiguity goes away.
+version: 1
+
+canonical:
+  NOx:
+    aliases: [NOX, NOx, nox, NO_x]
+  NH3:
+    aliases: [NH3, NH_3, nh3]
+  SO2:
+    aliases: [SO2, SOx, SO_x, so2]
+  CO:
+    aliases: [CO, co]
+  NMVOC:
+    aliases: [NMVOC, VOC, VOCs, nmvoc]
+  PM10:
+    aliases: [PM10, PM_10, pm10]
+  PM2.5:
+    aliases: [PM2.5, PM2_5, PM25, pm25, PM2p5, "pm2.5"]
+  CO2:
+    aliases: [CO2, CO_2, co2]
+  CH4:
+    aliases: [CH4, CH_4, ch4]
+  N2O:
+    aliases: [N2O, N_2O, n2o]
+
+country_iso3_aliases:
+  # ISO2 -> ISO3 mapping used for CAMS-side lookups (distinct from the alpha-workbook
+  # mapping which keeps the short code GR/EL).
+  EL: GRC
+  GR: GRC

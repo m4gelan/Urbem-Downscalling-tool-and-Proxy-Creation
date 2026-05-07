@@ -1,0 +1,44 @@
+{
+  "_description": "Enteric fermentation CH4 emission factors per animal head per year. Source: IPCC 2006 Guidelines for National Greenhouse Gas Inventories, Volume 4 (Agriculture), Tables 10.11 and 10.10. Default values for Western Europe.",
+  "_units": "kg CH4 per head per year",
+  "_source": "IPCC 2006 Vol.4 Ch.10 Tables 10.11 and 10.01",
+  "_note": "Only ruminants contribute meaningfully to enteric CH4. Pigs and poultry are monogastric and are excluded from this source. Goats use Table 10.01 Tier 1 default.",
+  "species_factors": {
+    "bovine": {
+      "ch4_per_head_per_year_kg": 116,
+      "ipcc_table": "10.11",
+      "animal_category": "dairy cattle, Western Europe default",
+      "included_in_enteric": true
+    },
+    "sheep": {
+      "ch4_per_head_per_year_kg": 8,
+      "ipcc_table": "10.11",
+      "animal_category": "sheep, Western Europe default",
+      "included_in_enteric": true
+    },
+    "goats": {
+      "ch4_per_head_per_year_kg": 5,
+      "ipcc_table": "10.01",
+      "animal_category": "goats, Tier 1 default",
+      "included_in_enteric": true
+    },
+    "pigs": {
+      "ch4_per_head_per_year_kg": 1.5,
+      "ipcc_table": "10.11",
+      "animal_category": "swine",
+      "included_in_enteric": false,
+      "exclusion_reason": "Monogastric — negligible enteric CH4"
+    },
+    "poultry": {
+      "ch4_per_head_per_year_kg": 0,
+      "included_in_enteric": false,
+      "exclusion_reason": "Monogastric — no enteric CH4"
+    }
+  },
+  "intensity_weight_params": {
+    "normalisation": "EU-wide median of ruminant_intensity_nc",
+    "cap_low": 0.05,
+    "cap_high": 5.0,
+    "missing_data_fallback": 1.0
+  }
+}

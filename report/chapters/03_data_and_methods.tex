@@ -1,0 +1,85 @@
+% ==============================================================================
+% Chapter 3 — Data and Methods
+% ==============================================================================
+
+\chapter{Data and Methods}
+\label{ch:methods}
+
+\todo[inline]{Write data and methods chapter.}
+
+\section{Emission Input Data}
+\label{sec:data_emissions}
+
+\subsection{CAMS-REG RI-URBANS Inventory}
+\label{sec:data_cams}
+
+The \cams{} emission inventory used in this study is the RI-URBANS version of
+CAMS-REG-v6.1 \citep{Kuenen_ST15_2025}, with a base year of 2019 and a
+horizontal resolution of approximately $\sim$\qtyproduct{6 x 6}{\km}. The
+dataset covers 13 GNFR emission sectors and the following pollutants: NO$_x$,
+PM\textsubscript{2.5}, PM\textsubscript{10}, NMVOC, SO\textsubscript{2},
+NH\textsubscript{3}, CO, and total particle number (TPN).
+
+\todo[inline]{Describe file format (NetCDF), units (Tg/year), grid definition,
+and how data were obtained from the TNO FTP repository.}
+
+\subsection{UFP Number Inventory}
+\label{sec:data_ufp}
+
+\todo[inline]{Describe TPN emissions data: size-speciated UFP, sectors covered,
+data availability.}
+
+\section{Spatial Proxy Datasets}
+\label{sec:data_proxies}
+
+\begin{table}[h]
+  \centering
+  \caption{Spatial proxy datasets used for emission downscaling.}
+  \label{tab:proxies}
+  \begin{tabular}{llll}
+    \toprule
+    \textbf{Proxy} & \textbf{Source} & \textbf{Resolution} & \textbf{GNFR sectors} \\
+    \midrule
+    Population density    & GHS-POP 2015 (JRC)   & 30 arc-sec & C, E \\
+    Road network          & OpenStreetMap        & Vector     & F \\
+    Traffic volumes       & OpenTransportMap     & Vector     & F (weighting) \\
+    Industrial areas      & CORINE Land Cover 2018 & 100 m   & A, B, D \\
+    Agricultural areas    & CORINE Land Cover 2018 & 100 m   & K, L \\
+    Port areas            & CORINE Land Cover 2018 & 100 m   & G \\
+    Airport areas         & CORINE Land Cover 2018 & 100 m   & H \\
+    Railway network       & OpenStreetMap        & Vector     & I (railway) \\
+    Point sources         & E-PRTR v17           & Point      & A, B, D, J \\
+    Urban centre          & GHS-UCDB 2015        & Polygon    & F (weighting) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\todo[inline]{Describe each proxy in detail: data source, preprocessing steps,
+known limitations.}
+
+\section{Study Domain Definition}
+\label{sec:data_domain}
+
+\todo[inline]{Define the model domains for Ioannina and Kozani: bounding box in
+UTM coordinates, grid resolution (1x1 km), coordinate reference system.
+Include a map figure showing both domains.}
+
+\section{The UrbEm Downscaling Framework}
+\label{sec:methods_urbem}
+
+\todo[inline]{Give a concise description of the UrbEm methodology
+\citep{Ramacher2021}: area/line/point source workflow, proxy normalisation,
+mass conservation, output format for EPISODE-CityChem.}
+
+\section{EPISODE-CityChem Simulation Setup}
+\label{sec:methods_episode}
+
+\todo[inline]{Describe model configuration: domain, meteorology input,
+chemistry scheme, boundary conditions, simulation period.}
+
+\section{Evaluation Methodology}
+\label{sec:methods_eval}
+
+\todo[inline]{Describe the observational datasets used for model evaluation
+(monitoring stations, species, periods) and the statistical metrics
+(RMSE, bias, correlation, FAC2).}

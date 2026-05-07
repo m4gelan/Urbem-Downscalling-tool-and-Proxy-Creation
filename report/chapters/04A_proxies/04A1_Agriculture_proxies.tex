@@ -1,0 +1,1010 @@
+%% ================================================================
+\section{Agriculture}
+\label{sec:agriculture}
+
+\subsection{Agriculture: scope and decomposition}
+
+Agricultural activities emit a wide range of pollutants through
+processes whose spatial drivers differ markedly. Enteric fermentation
+and manure management follow livestock systems, synthetic fertiliser
+application follows crop mix and management intensity, rice cultivation
+is geographically restricted, biomass burning is episodic and
+crop-specific, and liming depends on soil acidity rather than land
+cover alone. In CAMS-REG these activities are reported primarily under
+GNFR~K (agricultural livestock) and GNFR~L (agricultural other), but
+their internal heterogeneity is too large to justify a single sectoral
+proxy.
+
+For the present thesis, this heterogeneity matters both methodologically
+and substantively. Methodologically, agriculture is the first sector in
+which the upgraded source-specific framework is implemented in full.
+Substantively, the sector contributes to pollutants that are directly
+relevant for the later applications, especially NH$_3$ as a precursor
+of secondary particulate matter, but also CH$_4$, PM, NMVOC, and
+selected CO$_2$ sources that are required for inventory completeness.
+The agricultural block is therefore organised into four steps:
+identifying the process sources retained, assigning pollutant-specific
+mass fractions, defining thematic proxy families, and synthesising the
+main uncertainties.
+
+\subsection{Process sources and pollutant mapping}
+
+Table~\ref{tab:pollutant_sources} lists the process sources retained
+for each pollutant, together with the GNFR sector to which CAMS assigns
+them and the reference used to justify that attribution.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Agricultural process sources by pollutant and GNFR sector.}
+  \label{tab:pollutant_sources}
+  \begin{tabular}{lcll}
+    \hline
+    Pollutant & Source & CAMS sector & Reference \\
+    \hline
+    CH$_4$ & Enteric fermentation & K & \citep{ref_ch4_nh3_review} \\
+     & Manure management & K & \citep{ref_ch4_nh3_review} \\
+     & Rice paddies & L & \citep{ref_ch4_nh3_review} \\
+    \hline
+    NH$_3$ & Synthetic fertiliser application & L & \citep{EMEP_EEA} \\
+     & Manure management & K & \citep{EMEP_EEA} \\
+     & Livestock housing & K & \citep{EMEP_EEA} \\
+    \hline
+    NO$_x$ & Fertilised soil & L & \citep{EMEP_EEA} (Chapter~3.D) \\
+     & Manure management & K & \citep{EMEP_EEA} (Chapter~3.B) \\
+     & Biomass burning & L & \citep{EMEP_EEA} (Chapter~4.F) \\
+    \hline
+    CO & Biomass burning & L & \citep{andreae_merlet_2001} \\
+    \hline
+    CO$_2$ & Urea application & L & \citep{IPPC_2006_V10,kim2017} \\
+     & Soil liming & L & \citep{IPPC_2006_V10,RB209} \\
+    \hline
+    NMVOC & Crop production & L & \citep{konig1995,lamb1993} \\
+     & Manure management & K & \citep{schade_crutzen_1995,Puliafito_2019} \\
+     & Biomass burning & L & \citep{Puliafito_2019} \\
+    \hline
+    PM$_{10}$, PM$_{2.5}$ & Biomass burning & L & \citep{Puliafito_2019,karanasiou_2021} \\
+     & Livestock housing & K & \citep{cambra_lopez_2010} \\
+    \hline
+  \end{tabular}
+\end{table}
+
+The decomposition follows three criteria. First, each source must be
+compatible with the way CAMS aggregates emissions at GNFR level.
+Second, it must have a spatial behaviour that is distinguishable from
+the other sources retained in the same sector. Third, it must matter
+for at least one pollutant relevant to the downscaling objective. The
+purpose of the decomposition is therefore not to reproduce the full
+inventory compilation chain, but to replace an overly generic sectoral
+proxy with a set of process-specific spatial patterns that better match
+how emissions are expected to occur.
+
+Several agricultural activities are deliberately excluded from this
+block because CAMS allocates them to other GNFR sectors. Agricultural
+machinery is mapped to GNFR~I (off-road mobile sources) and pesticide
+use to GNFR~E (solvent and product use). SO$_2$ emissions from the
+agricultural sector are negligible at European scale
+(Table~\ref{tab:cams_kl_totals}) and are therefore not decomposed into
+sub-sources. CAMS also reports primary particulate matter only, so
+secondary organic aerosol formation is not spatially allocated here.
+
+\subsection{Mass-fraction coefficients}
+
+Table~\ref{tab:alpha_agriculture} presents the $\alpha$ values used to
+recombine the source-specific proxies into pollutant-specific weights.
+For CH$_4$, CO$_2$, CO, and NMVOC, the fractions are derived from
+European totals assembled from the EEA reporting framework for 2020
+\citep{EEA_GHG_Emissions_2020}. For NH$_3$, NO$_x$, and particulate
+matter, the fractions follow the EMEP/EEA Guidebook
+\citep{EMEP_EEA}. The one-year mismatch with the 2019 CAMS base year is
+accepted here because the coefficients are used as first-order spatial
+weights rather than as year-specific source apportionment for Greece.
+
+\begin{table}[htbp]
+  \centering
+  \caption{European agricultural source totals (Gg) and corresponding
+  $\alpha$ values used in the agriculture block.}
+  \label{tab:alpha_agriculture}
+  \begin{tabular}{lcll}
+    \hline
+    Pollutant & Source & Emissions & $\alpha$ \\
+    \hline
+    CH$_4$ & Enteric fermentation & 6575.21 & 0.790 \\
+     & Manure management & 1645.17 & 0.198 \\
+     & Rice paddies & 98.32 & 0.012 \\
+    \hline
+    NH$_3$ & Synthetic fertiliser application & 1749 & 0.541 \\
+     & Manure-management pathways & 1481 & 0.459 \\
+    \hline
+    NO$_x$ & Fertilised soil & 638 & 0.936 \\
+     & Manure management & 37.6 & 0.055 \\
+     & Biomass burning & 5.8 & 0.009 \\
+    \hline
+    CO$_2$ & Urea application & 4704.57 & 0.468 \\
+     & Soil liming & 5346.93 & 0.532 \\
+    \hline
+    NMVOC & Crop production & 330.96 & 0.239 \\
+     & Manure management & 1052.35 & 0.760 \\
+     & Biomass burning & 2.04 & 0.001 \\
+    \hline
+    PM$_{10}$ & Biomass burning & 3.7 & 0.036 \\
+     & Livestock housing & 99 & 0.964 \\
+    \hline
+    PM$_{2.5}$ & Biomass burning & 3.6 & 0.146 \\
+     & Livestock housing & 21 & 0.854 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+The combined NH$_3$ row is retained deliberately. In the EMEP
+accounting logic, manure storage and application are treated together,
+and the total manure-management contribution also includes manure
+generated in open yards and excreta deposited during grazing. A more
+granular split between manure management and housing would therefore
+require assumptions that are not directly supported by the European
+totals used here. The combined coefficient is consequently interpreted
+as a pragmatic budget split, while the spatial allocation itself is
+still improved by separating the corresponding proxy patterns.
+
+For carbon monoxide, biomass burning is the only agricultural source
+retained in this framework, so no source competition arises within the
+sectoral budget. The agriculture subsections below therefore focus on
+sources that differ spatially rather than artificially subdividing a
+single-source pollutant.
+
+\subsection{Livestock-related proxies}
+
+The first proxy family targets emissions controlled by the geography of
+animal production systems. These sources are tied to grazing, herd
+composition, manure handling, and confined livestock infrastructure.
+
+\subsubsection{Enteric fermentation}
+\label{sec:mu-rho-enteric}
+
+\paragraph{Rationale and spatial driver.}
+Enteric CH$_4$ is produced in the rumen and hindgut of ruminants. Its
+spatial pattern is driven first by where animals graze and second by
+which ruminant species dominate in a given region. The proxy therefore
+combines direct field evidence of grazing from LUCAS with species-level
+livestock counts from the Eurostat agricultural census.
+
+\paragraph{Input data and eligibility.}
+The point-level signal comes from the LUCAS grazing indicator and the
+LUCAS land-cover code \texttt{LC1}; the regional intensity modifier
+comes from Eurostat Agricultural Census livestock counts at NUTS-2
+level (Appendix~\ref{app:c21}). Only points falling in agricultural CLC
+classes are retained.
+
+\paragraph{Score definition.}
+Each LUCAS point receives a grazing score
+$s_i^{\mathrm{ent}}$, where $\gamma$ denotes the
+\texttt{SURVEY\_GRAZING} code:
+\begin{equation}
+  s_i^{\mathrm{ent}} =
+  \begin{cases}
+    1.0, & \gamma = 1 \text{ (grazing observed)},\\[3pt]
+    0.0, & \gamma \in \{0,2\} \text{ (no grazing observed)},\\[3pt]
+    0.6, & \gamma \text{ missing and } \texttt{LC1} \in \{\text{E*},\text{B55}\},\\[3pt]
+    \text{excluded}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+The fallback value of 0.6 is used as a moderate expert prior for
+grassland points without a grazing record: it preserves a positive
+signal where grazing is agronomically plausible, while keeping the
+score clearly below a confirmed observation.
+
+For each NUTS-2 region $n$ and CLC class $c$, the mean grazing score is
+\begin{equation}
+  \bar{s}_{n,c}^{\mathrm{ent}} =
+  \frac{1}{|\mathcal{P}_{n,c}|}
+  \sum_{i \in \mathcal{P}_{n,c}} s_i^{\mathrm{ent}},
+\end{equation}
+where $\mathcal{P}_{n,c}$ is the set of retained points.
+
+To account for differences in ruminant composition, the mean score is
+scaled by a livestock-intensity index:
+\begin{equation}
+  I_n^{\mathrm{rum}} =
+  116\,N_{\mathrm{bovine}} + 8\,N_{\mathrm{sheep}} + 5\,N_{\mathrm{goats}},
+\end{equation}
+where the coefficients are IPCC~(2006) default enteric CH$_4$
+emission factors in kg~CH$_4$~head$^{-1}$~yr$^{-1}$
+\citep{IPPC_2006_V10}. The corresponding weight is
+\begin{equation}
+  \omega_n =
+  \mathrm{clip}\!\left(
+    \frac{I_n^{\mathrm{rum}}}{\tilde{I}_{\mathrm{EU}}},
+    0.05, 5.0
+  \right).
+\end{equation}
+The clipping range regularises the proxy so that a few very high-density
+regions do not dominate the full European scaling.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{ent}} =
+  \omega_n \cdot \bar{s}_{n,c}^{\mathrm{ent}},
+\end{equation}
+and the corresponding relevance field follows
+Equation~\ref{eq:rho-def}. This subsection captures \emph{animal
+presence}; the next one addresses where the associated excreta are
+stored, handled, or applied.
+
+\paragraph{Limitations and expected bias.}
+The LUCAS grazing indicator does not distinguish between ruminant
+species, so species-specific information enters only through the NUTS-2
+scaling stage and cannot resolve within-region herd composition. The
+fallback score of 0.6 remains an agronomic prior rather than a direct
+observation, and the clipping thresholds are regularisation parameters
+rather than measured physical limits.
+
+\subsubsection{Manure management}
+\label{sec:mu-rho-manure}
+
+\paragraph{Rationale and spatial driver.}
+Manure-management emissions (CH$_4$, NH$_3$, NO$_x$, NMVOC) arise from
+storage, handling, land application, and direct deposition of excreta
+on pasture. Their spatial variation therefore depends both on where
+livestock are present and on which agricultural parcels are likely to
+receive manure.
+
+\paragraph{Input data and eligibility.}
+The proxy combines two signals from LUCAS: the grazing score already
+used for enteric fermentation, which captures direct pasture
+deposition, and a land-use weight based on \texttt{SURVEY\_LU1} and
+\texttt{SURVEY\_LC1}, which approximates the likelihood of manure
+application or livestock-related manure handling on the parcel.
+
+\paragraph{Score definition.}
+The grazing component is identical to the enteric score
+$s_i^{\mathrm{ent}}$. In the manure context it captures direct
+deposition on pasture, which \citet{oenema_2017} identify as the single
+largest manure-management category in European livestock systems,
+accounting for roughly 30--40\,\% of total manure-management activity.
+The EMEP/EEA Guidebook \citep{EMEP_EEA} further notes that NH$_3$
+emission factors per kg\,N excreted are substantially lower for pasture
+deposition than for housing, storage, and land-application pathways,
+because urine and dung deposited on grass volatilise more slowly than
+slurry handled in confined systems. The grazing component therefore
+carries a stronger signal for CH$_4$ than for NH$_3$, but it remains
+necessary for the manure proxy because direct deposition is part of the
+inventory source structure.
+
+The second component represents likely land application. This is not
+observed directly in LUCAS, so the weighting scheme is necessarily
+inferential. \citet{Velthof2009} allocate ruminant manure to fodder
+land at approximately equal per-hectare rates and distinguish different
+application rates across arable crop groups for monogastric manure.
+That pattern supports assigning relatively high weights to managed
+grassland and to arable classes associated with crops that commonly
+receive manure, while keeping all weights below unity because the proxy
+expresses likelihood rather than confirmed spreading. The land-use
+weights used for the second component are:
+\begin{itemize}
+  \setlength{\itemsep}{0.25em}
+  \setlength{\parskip}{0pt}
+  \item managed grassland in agricultural use: $w_{\mathrm{LU}}=0.8$;
+  \item high manure-use arable classes
+        $(\texttt{B11}, \texttt{B13}, \texttt{B2*}, \texttt{B32})$:
+        $w_{\mathrm{LU}}=0.8$;
+  \item intermediate manure-use arable classes
+        $(\texttt{B12}, \texttt{B14}, \texttt{B15}, \texttt{B16},
+        \texttt{B17}, \texttt{B18}, \texttt{B19}, \texttt{B31})$:
+        $w_{\mathrm{LU}}=0.6$;
+  \item fallow land: $w_{\mathrm{LU}}=0.7$;
+  \item other agricultural land with only limited or uncertain manure
+        reception: $w_{\mathrm{LU}}=0.1$.
+\end{itemize}
+Managed grassland receives a high weight because fodder land is a
+primary destination for ruminant manure in the European nitrogen-budget
+framework of \citet{Velthof2009}. Within cropland, the high and
+intermediate groups follow the crop differentiation in that same study,
+which separates classes with strong evidence of manure use from those
+where application is less common. Fallow land is kept relatively high
+because manure can be applied before the next cropping cycle, whereas
+permanent crops and other ambiguous agricultural land remain low because
+their manure reception is more variable and less consistently documented
+\citep{oenema_2017}. The resulting weights are therefore
+literature-informed heuristics interpreted as probabilities of likely
+manure reception rather than direct observations of application.
+
+The point-level manure score is then
+\begin{equation}
+  s_i^{\mathrm{man}} =
+  \begin{cases}
+    \max\!\left(s_i^{\mathrm{ent}}, w_{\mathrm{LU}}\right),
+      & \text{if } s_i^{\mathrm{ent}} \text{ is defined},\\[4pt]
+    w_{\mathrm{LU}},
+      & \text{if } s_i^{\mathrm{ent}} \text{ is undefined and }
+        w_{\mathrm{LU}} > 0,\\[4pt]
+    \text{excluded}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+The maximum is preferred to a sum because direct deposition and
+land-application evidence are not independent pathways at point scale;
+adding them would double-count precisely those parcels where the
+livestock signal is already strongest.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is the arithmetic mean of $s_i^{\mathrm{man}}$ over
+retained points in each pair $(n,c)$:
+\begin{equation}
+  \mu_{n,c}^{\mathrm{man}} =
+  \frac{1}{|\mathcal{P}_{n,c}|}
+  \sum_{i \in \mathcal{P}_{n,c}} s_i^{\mathrm{man}},
+\end{equation}
+with $\mu_{n,c}^{\mathrm{man}}=0$ for empty pairs. Relevance then
+follows Equation~\ref{eq:rho-def}. This proxy is intended for spatial
+allocation only, not for process-level manure accounting.
+
+\paragraph{Limitations and expected bias.}
+The score is pollutant-agnostic even though CH$_4$, NH$_3$, NO$_x$, and
+NMVOC respond differently to pasture deposition, slurry, storage type,
+and application technique. The resulting proxy is therefore a
+deliberate compromise across the four pollutants. National manure
+statistics or farm-register data would allow a more differentiated
+treatment. The next subsection narrows the focus to emissions
+associated with confined livestock infrastructure.
+
+\subsubsection{Livestock housing (NH$_3$ and primary PM)}
+\label{sec:proxy-housing}
+
+\paragraph{Rationale and spatial driver.}
+This proxy represents confined livestock housing and associated yard or
+storage activity, which is used here for NH$_3$ and for housing-related
+primary PM. The same spatial pattern is considered acceptable for both
+pollutant groups because they are colocated around barns, animal yards,
+and manure-handling surfaces, while pollutant-specific differences are
+handled through the $\alpha$ coefficients rather than through separate
+geographies. In the NH$_3$ case, the process corresponds to confined
+livestock housing and associated manure storage within GNFR~K, excluding
+excreta deposited directly during grazing. Emissions arise when urine,
+faeces, and soiled bedding accumulate in enclosed or semi-enclosed
+systems such as barns, animal yards, and slurry stores, where
+volatilisation is enhanced by ventilation, temperature, and exposed
+emitting surfaces \citep{EMEP_EEA,wyer_2022}. Spatial variation is
+therefore controlled by the geography of livestock production, the
+degree of animal confinement, and the contrast between grazing-based and
+housed systems. In LUCAS~2022, agricultural activity is represented
+primarily through \texttt{SURVEY\_LU1}, with \texttt{U111} indicating
+agricultural production, while \texttt{SURVEY\_LC1} helps distinguish
+likely livestock settings from crop-dominated parcels.
+
+\paragraph{Input data and eligibility.}
+The proxy uses \texttt{SURVEY\_GRAZING}, \texttt{SURVEY\_LU1}, and
+\texttt{SURVEY\_LC1} from LUCAS, together with gridded livestock counts
+for cattle, pigs, poultry, sheep, and goats. Points are retained when
+they indicate an agricultural setting plausibly associated with housed
+livestock activity and when they do not simply represent direct grazing
+deposition.
+
+\paragraph{Score definition.}
+The stage-1 point score applies a grazing filter followed by a
+land-use/land-cover tier. Let $\gamma$ again denote the
+\texttt{SURVEY\_GRAZING} code. If grazing is directly observed
+($\gamma=1$), then $s_i^{\mathrm{hous}}=0$ because the point is
+interpreted as an open grazing context. If grazing is not observed
+($\gamma=2$), the score takes one of the following values:
+\begin{itemize}
+  \setlength{\itemsep}{0.2em}
+  \setlength{\parskip}{0pt}
+  \item farm-building context within agriculture: 1.00;
+  \item managed grassland in agricultural use: 0.55;
+  \item cropland in agricultural use: 0.20;
+  \item ley pasture or temporary grass within cropland: 0.30;
+  \item fallow land: 0.20.
+\end{itemize}
+If grazing is ambiguous or unrecorded, the same tier is discounted by
+$\lambda=0.4$:
+\begin{equation}
+  s_i^{\mathrm{hous}} = \lambda \cdot s_i^{\mathrm{tier}}.
+\end{equation}
+The factor $\lambda$ is retained as a calibrated heuristic to keep
+ambiguous points below otherwise equivalent non-grazing observations.
+Setting $\lambda=0.4$ also keeps the treatment consistent with the
+broader logic used elsewhere in the chapter: when no direct grazing
+signal is observed, the housing score is damped rather than interpreted
+as positive evidence of animal presence. A non-zero cropland weight is
+still retained because some livestock systems in LUCAS are embedded in
+mixed crop--livestock settings, where cropland parcels may sit close to
+yards, housing, or manure storage even if the parcel itself is not a
+building footprint; the weight is therefore reduced to 0.2 rather than
+set to zero.
+
+The stage-1 signal is aggregated as
+\begin{equation}
+  \bar{s}_{n,c}^{\mathrm{hous}} =
+  \frac{1}{|\mathcal{P}^{*}_{n,c}|}
+  \sum_{i \in \mathcal{P}^{*}_{n,c}} s_i^{\mathrm{hous}}.
+\end{equation}
+
+The stage-2 livestock-intensity factor is
+\begin{equation}
+  I_g^{\mathrm{hous}} =
+  41.16\,N_{\mathrm{bovine},g}
+  + 8.00\,N_{\mathrm{pigs},g}
+  + 0.54\,N_{\mathrm{poultry},g}
+  + 0.291\,N_{\mathrm{sheep},g}
+  + 0.231\,N_{\mathrm{goats},g},
+\end{equation}
+where the coefficients are taken from
+Table~\ref{tab:livestock_housing_factors}. The corresponding weight is
+\begin{equation}
+  \omega_g =
+  \mathrm{clip}\!\left(
+    \frac{I_g^{\mathrm{hous}}}{\tilde{I}_{\mathrm{EU}}},
+    0.05, 5.0
+  \right).
+\end{equation}
+As in the enteric proxy, the clipping range acts as a regularisation
+device that prevents a small number of intense livestock cells from
+dominating the proxy.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{housing}} =
+  \omega_{g(n,c)} \cdot \bar{s}_{n,c}^{\mathrm{hous}},
+\end{equation}
+where $g(n,c)$ denotes the ancillary livestock grid cell used for the
+pair $(n,c)$. Relevance follows Equation~\ref{eq:rho-def}. The proxy is
+thus complementary to the grazing-based pathways rather than
+overlapping with them: observed grazing suppresses housing relevance,
+whereas agricultural points without grazing evidence retain positive
+relevance according to how strongly their context suggests confined
+livestock activity.
+
+\paragraph{Limitations and expected bias.}
+The proxy does not distinguish housing technologies, storage systems,
+or production regimes such as dairy versus beef or intensive versus
+extensive husbandry. It also infers housing from land-use context
+rather than directly observing buildings or animal capacity. The next
+proxy family therefore turns away from livestock infrastructure and
+towards crop and fertiliser management.
+
+\subsection{Crop and fertiliser-related proxies}
+
+The second family covers sources whose spatial pattern follows crop
+composition, nutrient-management intensity, and fertiliser form rather
+than livestock location alone. Two distinct fertiliser pathways are
+retained on purpose. The first proxy targets the general geography of
+mineral-nitrogen use and is used for NH$_3$ and NO$_x$, whose spatial
+variation is controlled primarily by where mineral fertiliser is applied
+and how intensively it is used. The second targets urea specifically
+and is retained because CO$_2$ from urea hydrolysis is a product-
+specific source that cannot be represented by a general mineral-N
+intensity field alone. The two subsections should therefore be read as
+complementary rather than redundant: one is a broad management-intensity
+proxy, the other a product-specific proxy.
+
+\subsubsection{Fertilised soil (synthetic nitrogen)}
+\label{sec:mu-rho-synth}
+
+\paragraph{Rationale and spatial driver.}
+NH$_3$ and NO$_x$ associated with mineral nitrogen application vary
+primarily with crop type, fertiliser rate, and management intensity.
+The present proxy does not estimate emissions directly; instead, it
+uses literature-derived mineral-N application rates as a spatial
+indicator of relative emission intensity. That makes the proxy
+appropriate for allocation of a known sectoral total even when absolute
+rates are uncertain. Its role in the chapter is to represent the
+\emph{general} geography of mineral-fertiliser use, irrespective of the
+exact commercial product applied. The underlying chemistry differs by
+pathway.
+Ammoniacal fertilisers and the ammonium formed after urea hydrolysis can
+release NH$_3$ through volatilisation:
+\begin{equation}
+  \mathrm{NH_4^+ + OH^- \rightleftharpoons NH_3 + H_2O}.
+\end{equation}
+In soils, nitrification and related microbial transformations of
+ammonium also generate NO and, more broadly, NO$_x$:
+\begin{equation}
+  \mathrm{NH_4^+ + 2\,O_2 \rightarrow NO_3^- + 2\,H^+ + H_2O},
+\end{equation}
+\begin{equation}
+  \mathrm{NO \xrightarrow[\text{atmosphere}]{} NO_2},
+\end{equation}
+while denitrification can also yield NO under favourable soil
+conditions. The proxy therefore represents the spatial intensity of
+mineral-N use as the common driver of these nitrogen-loss pathways,
+rather than trying to reconstruct each reaction mechanism separately at
+plot scale.
+
+\paragraph{Input data and eligibility.}
+Eligible LUCAS points are those whose \texttt{LC1} indicates cropland
+(\texttt{B*}), permanent grassland (\texttt{E10}), or semi-natural
+grassland (\texttt{E20}) combined with agricultural land use
+\texttt{U111}, which is used here as a proxy for improved grassland
+receiving mineral nitrogen. Points whose LC1 code cannot be mapped to
+the rate table are excluded.
+
+\paragraph{Score definition.}
+Each eligible point is mapped to a crop category $k$ and assigned the
+literature rate $R_k$ from Table~\ref{tab:synthetic-n-rates}:
+\begin{equation}
+  s_i^{\mathrm{synth}} = R_{k(\texttt{LC1},\texttt{LU1})}.
+\end{equation}
+The rates are expressed in kg~N~ha$^{-1}$ and are not bounded to
+$[0,1]$. This is deliberate: the subsequent normalisation operates on
+relative ranking rather than on absolute magnitude.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{synth}} =
+  \frac{1}{|\mathcal{P}_{n,c}|}
+  \sum_{i \in \mathcal{P}_{n,c}} s_i^{\mathrm{synth}},
+\end{equation}
+with $\mu_{n,c}^{\mathrm{synth}}=0$ when no eligible points are
+available. Relevance then follows Equation~\ref{eq:rho-def}. The next
+subsection uses this broad synthetic-N logic as a starting point, but
+restricts the interpretation to the specific case of urea. Keeping both
+subsections is methodologically justified because they represent two
+different pathways: the present proxy captures the general geography of
+mineral-N application relevant for NH$_3$ and NO$_x$, whereas the urea
+proxy isolates the product-specific CO$_2$ source that arises only when
+the applied fertiliser contains urea. In other words, the synthetic-N
+proxy answers the question ``where is mineral fertilisation likely to be
+intense?'', whereas the urea proxy answers the narrower question
+``where is that mineral fertilisation more likely to involve urea?''.
+
+\paragraph{Limitations and expected bias.}
+The rates are European literature defaults rather than year-specific,
+farm-specific observations, and the LC1-to-category mapping may miss
+rare crop classes. The proxy should therefore be interpreted as a
+relative fertilisation-intensity field, not as a reconstructed
+fertiliser budget.
+
+\subsubsection{Urea application}
+\label{sec:mu-rho-urea}
+
+\paragraph{Rationale and spatial driver.}
+This subsection represents the spatial distribution of CO$_2$ emissions
+from \textbf{urea application to agricultural soils}. Unlike
+Section~\ref{sec:mu-rho-synth}, which represents the overall intensity
+of \emph{mineral nitrogen} use across crop and grassland systems, the
+present proxy focuses on the subset of mineral fertiliser applied in
+the form of urea. This distinction matters because the relevant
+emission mechanism is specific to urea itself rather than to synthetic
+nitrogen in general.
+
+Following the IPCC methodology, urea hydrolysis ultimately releases
+carbon dioxide:
+\begin{equation}
+  \mathrm{CO(NH_2)_2 + H_2O \rightarrow 2\,NH_3 + CO_2}.
+\end{equation}
+Accordingly,
+\begin{equation}
+  E_{\mathrm{CO_2},\mathrm{urea}} =
+  M_{\mathrm{urea}} \cdot EF_{\mathrm{urea}},
+\end{equation}
+where $M_{\mathrm{urea}}$ is the amount of urea applied and
+$EF_{\mathrm{urea}}$ is the IPCC emission factor
+\citep{IPPC_2006_V10}. Because harmonised subnational statistics on
+urea use are unavailable, the proxy is framed explicitly as a
+first-order approximation of likely urea-use geography rather than as a
+direct observation of product-specific application. Spatial variation in
+this source therefore depends not simply on where agricultural land
+receives mineral nitrogen, but on where urea specifically is likely to
+be used. In practice, the proxy is constructed from two elements:
+first, a baseline distinction between cropland and grassland from LUCAS
+land-cover observations; and second, a grassland-specific livestock-
+intensity adjustment intended to capture differences in the management
+intensity of fodder and grazing systems. This subsection therefore does
+not replace the previous synthetic-N proxy. Instead, it inherits the
+idea that fertiliser use intensity is spatially structured, but narrows
+the question to the subset of that activity involving urea, because
+only that subset produces the CO$_2$ source of interest here.
+
+\paragraph{Input data and eligibility.}
+Retained LUCAS points are classified as cropland or grassland
+according to the agricultural land-cover selection described in
+Appendix~\ref{app:lucas}. Gridded bovine, sheep, and goat counts are
+used only for the grassland adjustment, where management intensity is
+expected to vary most strongly. This separation mirrors the conceptual
+structure of the proxy: cropland provides the baseline domain in which
+synthetic fertiliser use is most common, while grassland requires an
+additional intensity term because fertiliser use there is more
+heterogeneous across extensive and intensive systems.
+
+\paragraph{Score definition.}
+The baseline point score is
+\begin{equation}
+  s_{i,0}^{\mathrm{urea}} =
+  \begin{cases}
+    1.0, & \text{cropland},\\[3pt]
+    0.7, & \text{grassland},\\[3pt]
+    \text{excluded}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+The cropland value is set to 1.0 because cropped land is the primary
+domain of synthetic fertiliser application. The lower grassland value
+does not imply a fixed ratio of urea use between cropland and
+grassland; it is a heuristic way of expressing that fertilised
+grassland is both eligible and more heterogeneous. This baseline
+distinction is intended to capture the fact that mineral fertiliser use
+extends to pastures, but less uniformly than on cropland
+\citep{IFASTAT_consumption,einarsson_2021}.
+
+For grassland points, the baseline is scaled by a livestock-intensity
+indicator. The motivation is to approximate how strongly a given
+grassland area is associated with surrounding livestock production
+systems. In agricultural regions where more grazing livestock are
+supported, grassland and fodder areas are more likely to be managed
+intensively and to require higher nutrient inputs, including mineral
+nitrogen application. This relationship is not treated as a direct
+observation of urea use, but as a proxy for the relative intensity of
+managed grassland systems. This interpretation is consistent with
+Eurostat's use of grazing livestock density as an indicator defined
+relative to fodder area, including forage crops and permanent
+grassland. Eurostat further notes that higher grazing livestock density
+implies more manure available per hectare of fodder area and therefore
+greater nutrient pressure, even though realised impacts remain
+management-dependent
+\citep{EurostatLivestockPatterns,EurostatGrazingGlossary}. The indicator
+is therefore written as:
+\begin{equation}
+  I_g^{\mathrm{grass}} =
+  N_{\mathrm{bovine},g} +
+  N_{\mathrm{sheep},g} +
+  N_{\mathrm{goats},g},
+\end{equation}
+\begin{equation}
+  \omega_g^{\mathrm{grass}} =
+  \frac{I_g^{\mathrm{grass}}}{\tilde{I}_{\mathrm{EU}}^{\mathrm{grass}}}.
+\end{equation}
+The final point score is
+\begin{equation}
+  s_i^{\mathrm{urea}} =
+  \begin{cases}
+    1.0, & i \text{ is cropland},\\[3pt]
+    0.7 \cdot \omega_{g(i)}^{\mathrm{grass}}, & i \text{ is grassland},\\[3pt]
+    \text{excluded}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+Livestock intensity is applied only to grassland because the proxy uses
+it as an indicator of managed fodder-system intensity, not as a direct
+determinant of urea use everywhere. The cropland baseline is therefore
+left unchanged, while the grassland branch is allowed to vary according
+to the relative intensity of the surrounding grazing-livestock system.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{urea}} =
+  \frac{1}{|\mathcal{P}_{n,c}|}
+  \sum_{i \in \mathcal{P}_{n,c}} s_i^{\mathrm{urea}},
+\end{equation}
+with $\mu_{n,c}^{\mathrm{urea}}=0$ for empty pairs. Relevance then
+follows Equation~\ref{eq:rho-def}. Relative to the previous subsection,
+the key distinction is that the synthetic-N proxy represents broad
+fertilisation intensity, whereas the present proxy isolates only the
+subset of that management likely to involve urea. The pairing is thus
+hierarchical rather than duplicative: the synthetic-N proxy describes
+the broader fertilisation domain, while the urea proxy selects one
+product-specific pathway within that domain.
+
+\paragraph{Limitations and expected bias.}
+The proxy does not observe urea directly and cannot distinguish it from
+other mineral-N products such as ammonium nitrate or
+urea-ammonium-nitrate solutions. The grassland scaling is also only an
+indicator of management intensity, not a one-to-one predictor of urea
+application. Future work could improve this proxy through fertiliser
+sales data, farm-accountancy data, or crop-specific information on the
+share of urea in total mineral-N use.
+
+\subsubsection{Crop production NMVOC}
+\label{sec:proxy-agsoils-nmvoc}
+
+\paragraph{Rationale and spatial driver.}
+This proxy represents the crop-production component of the agricultural
+NMVOC inventory category. Although the reported category is often named
+``crop production and agricultural soils'', the spatial signal retained
+here is driven primarily by vegetation type and crop composition rather
+than by soil properties. Spatial variation is therefore assumed to
+follow crop area and crop-specific emission factors.
+
+The EMEP/EEA Guidebook \cite{EMEP_EEA} expresses emissions as
+\begin{equation}
+  E_{\mathrm{NMVOC}} = \sum_i A_i \times m_{D,i} \times t_i \times EF_i,
+  \label{eq:emep-nmvoc}
+\end{equation}
+where $A_i$ is crop area, $m_{D,i}$ is mean dry-matter yield, $t_i$ is
+emission duration, and $EF_i$ is the crop-specific factor. The proxy
+therefore uses crop composition as the dominant control.
+
+\paragraph{Input data and eligibility.}
+All agricultural CORINE points (CLC~12--22) with a valid
+\texttt{SURVEY\_LC1} code are eligible. Points with missing crop
+information are excluded. The crop-to-factor mapping follows the EMEP
+Guidebook and the Th\"unen NIR rule \citep{thuenen_nmvoc}, under which
+only a small number of crop groups have directly measured factors and
+other crop types inherit either the wheat or grass factor. This
+assignment is not arbitrary: the Guidebook Table~3.3 and Annex~A3
+ultimately trace back to measurements reported by \citet{konig1995} and
+\citet{lamb1993}, while the Th\"unen methodology provides an explicit
+inventory rule for extending those sparse measurements to broader crop
+classes in a way that remains consistent with operational national
+inventory practice.
+
+\paragraph{Score definition.}
+For each LUCAS point $i$ with LC1 code $k$,
+\begin{equation}
+  s_i^{\mathrm{nmvoc}} =
+  EF_k \times \frac{\texttt{SURVEY\_LC1\_PERC}}{100},
+  \label{eq:nmvoc-point}
+\end{equation}
+where $EF_k$ comes from Table~\ref{tab:nmvoc-ef}. If LC1 has no entry
+in the table, the point receives zero. A secondary check on
+\texttt{SURVEY\_LC2} is applied if LC1 is not matched. The justification
+for assigning wheat as the default EF to many annual crops is that the
+available literature does not support crop-specific factors for the full
+European crop spectrum; the Th\"unen rule is therefore used as a
+transparent and reproducible bridge between sparse measurements and the
+broader crop nomenclature required by the proxy.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{nmvoc}} =
+  \frac{1}{N_{n,c}} \sum_{i \in (n,c)} s_i^{\mathrm{nmvoc}},
+\end{equation}
+with $\mu_{n,c}^{\mathrm{nmvoc}}=0$ for empty pairs. Unlike biomass
+burning, no external spatial dataset is required because the crop
+composition observed by LUCAS is itself the relevant spatial signal.
+
+\paragraph{Limitations and expected bias.}
+Only four crop groups have independently measured EFs, and the
+remaining categories inherit proxy factors. This introduces substantial
+uncertainty, especially for permanent crops in southern Europe, which
+are treated as non-emitting in the present implementation and may
+therefore be underestimated. The next family turns from crop and
+fertiliser management to specialised land-use cases whose geography is
+more sharply constrained.
+
+\subsection{Specialised land-use proxies}
+
+The final family contains sources whose spatial pattern is dominated by
+highly specific land uses or environmental conditions rather than by
+general agricultural management intensity.
+
+\subsubsection{Rice paddies (CH$_4$)}
+\label{sec:proxy-rice}
+
+\paragraph{Rationale and spatial driver.}
+Methane from flooded rice soils arises from methanogenesis in anoxic,
+carbon-rich pore water. Emission factors depend strongly on water
+regime, with \citet{yann2009} reporting a difference of roughly a
+factor of three between irrigated rice and rain-fed or deepwater
+systems. Within Europe, however, the first-order determinant of spatial
+variation is simply where rice is grown, because cultivation is
+geographically concentrated in a limited number of regions such as the
+Po Valley, the Ebro Delta, the Camargue, the Thessaloniki plain, and
+the Mondego lowlands \citep{bogliani_2014}. A presence proxy is
+therefore a defensible first approximation, even though it does not
+resolve the more detailed effect of water management.
+
+\paragraph{Input data and eligibility.}
+Only LUCAS points identified as rice by \texttt{LC1}=\texttt{B17} are
+retained. All other points are excluded.
+
+\paragraph{Score definition.}
+The point-level score is binary:
+\begin{equation}
+  s_i^{\mathrm{rice}} =
+  \begin{cases}
+    1.0, & \text{if } \texttt{LC1}=\texttt{B17},\\
+    \text{excluded}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+This is explicitly a presence proxy, not an intensity proxy. Variation
+in water management is left to the emission factor embedded in the
+inventory.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{rice}} =
+  \frac{1}{|\mathcal{P}_{n,c}|}
+  \sum_{i \in \mathcal{P}_{n,c}} s_i^{\mathrm{rice}},
+\end{equation}
+with zero assigned where no retained points exist. Relevance follows
+Equation~\ref{eq:rho-def}. The next subsection remains land-use
+specific, but combines remote sensing with crop composition rather than
+using field observations alone.
+
+\paragraph{Limitations and expected bias.}
+The proxy captures the presence of rice cultivation but not the
+intensity of flooding or drainage management. Satellite-derived
+inundation products or national rice calendars would be required to
+resolve that additional variability.
+
+\subsubsection{Biomass burning (field residues)}
+\label{sec:proxy-biomass}
+
+\paragraph{Rationale and spatial driver.}
+Open burning of crop residues emits NO$_x$, CO, PM$_{2.5}$, PM$_{10}$,
+CH$_4$, and other combustion products directly into the lower
+atmosphere. As emphasised by \citet{pinakana2024} and
+\citet{andreae_2019}, residue burning is often selected because it is a
+rapid and low-cost way to clear fields before the next sowing cycle,
+even though it carries clear air-quality and health implications. The
+practice is formally prohibited across the EU under GAEC~3
+\citep{eu_reg_2021_2115}, yet satellite-derived burned-area products
+continue to identify agricultural fire signals in cropland areas across
+Europe \citep{forrest_2024}. This combination of legal prohibition and
+observed persistence makes farmer surveys or administrative declarations
+insufficient as the sole spatial basis. A credible proxy must therefore
+identify both where agricultural fires occur and what residues are
+available to burn.
+
+\paragraph{Input data and eligibility.}
+The proxy combines GFED4.1s satellite fire emissions with LUCAS crop
+composition. GFED provides the regional fire geography, while LUCAS
+identifies the residue-producing crop mix within agricultural classes.
+
+\paragraph{Score definition.}
+The annual agricultural fire score for GFED pixel $r$ is
+\begin{equation}
+  s_r^{\mathrm{burn}} =
+  \frac{1}{N_{\mathrm{yr}}}
+  \sum_{\mathrm{yr}=1997}^{2015}
+  \sum_{m=1}^{12}
+  E_{r,m}^{\mathrm{yr}} \cdot f_{r,m}^{\mathrm{AGRI,yr}} \cdot A_r,
+  \label{eq:gfed-score}
+\end{equation}
+where $A_r$ is the pixel area. The 19-year mean is used to recover a
+stable climatological spatial pattern rather than a single anomalous
+year and is therefore treated as a proxy for persistent fire-prone
+locations in the absence of a harmonised annual European product for
+the inventory year.
+
+At NUTS-2 level,
+\begin{equation}
+  \mu_n^{\mathrm{burn}} =
+  \sum_{r:\,\mathrm{centre}(r)\in n} s_r^{\mathrm{burn}}.
+  \label{eq:nuts2-burn}
+\end{equation}
+
+Within each pair $(n,c)$, residue availability is represented by
+\begin{equation}
+  \bar{w}(n,c) =
+  \frac{1}{N_{n,c}}
+  \sum_{k \in \mathcal{C}_{\mathrm{emep}}} N_{n,c,k} \cdot s_k,
+  \label{eq:lucas-weight}
+\end{equation}
+where $\mathcal{C}_{\mathrm{emep}}$ is the eligible crop set and $s_k$
+the crop-specific residue-to-yield ratio. The final raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{burn}} =
+  \mu_n^{\mathrm{burn}} \cdot
+  \frac{n_{n,c}\,\bar{w}(n,c)}
+       {\displaystyle\sum_{c'} n_{n,c'}\,\bar{w}(n,c')}.
+  \label{eq:clc-split}
+\end{equation}
+
+\paragraph{Aggregation and normalisation.}
+The corresponding relevance field is obtained from
+Equation~\ref{eq:rho-def}. Unlike the preceding proxies, biomass
+burning merges a coarse remote-sensing climatology with fine-scale crop
+composition, which is why the within-region split is essential.
+
+\paragraph{Limitations and expected bias.}
+GFED4.1s ends in 2015, so temporal transferability is assumed when the
+climatology is applied to the later CAMS inventory year. The proxy also
+inherits uncertainty from crop rotations and from occasional
+misclassification of non-agricultural fires near field boundaries. The
+last specialised proxy differs again by relying on direct soil
+observations rather than crop or fire data.
+
+\subsubsection{Soil liming (CO$_2$)}
+\label{sec:proxy-liming}
+
+\paragraph{Rationale and spatial driver.}
+Agricultural liming emits CO$_2$ when carbonate amendments are applied
+to acidic soils. The dominant spatial control is therefore soil pH
+rather than crop area alone. This makes liming a useful example of a
+proxy that cannot be represented well by land cover without auxiliary
+soil data. NFR~3.G.1 covers the application of limestone
+(\(\mathrm{CaCO_3}\)) or dolomite (\(\mathrm{CaMg(CO_3)_2}\)) to acidic
+soils, with carbon dioxide released during neutralisation of soil
+acidity:
+\begin{equation}
+  \mathrm{CaCO_3 + 2\,H^+ \rightarrow Ca^{2+} + H_2O + CO_2}.
+\end{equation}
+The spatial pattern is governed primarily by two factors. First, soil
+pH determines whether liming is agronomically required at all: RB209
+\citep{RB209} sets crop- and soil-specific target pH values and
+therefore provides an operational criterion for when lime demand should
+fall to zero. Second, land use matters because arable systems generally
+require a higher target pH than managed grassland, while strongly
+calcareous soils typically require no lime application
+\citep{goulding2016,RB209}.
+
+\paragraph{Input data and eligibility.}
+The proxy uses directly measured soil pH from LUCAS Soil 2018
+(Appendix~\ref{app:lucas_topsoil}) together with the LUCAS land-cover
+code and soil organic carbon. Points are retained if they correspond to
+cropland (\texttt{B*}) or managed grassland (\texttt{E10}, \texttt{E20}).
+Organic carbon is used to split points into mineral and organic/peaty
+soils using a threshold of 60~g~kg$^{-1}$. The use of
+\(\mathrm{pH_{H_2O}}\) as the core spatial discriminator is important:
+it provides a direct empirical representation of the continental
+acidity gradient, which is the dominant control on lime demand and is
+stronger than any purely land-cover-based approximation.
+
+\paragraph{Score definition.}
+The point-level lime-demand score is defined by four piecewise-linear
+functions of $\mathrm{pH_{H_2O}}$, corresponding to mineral versus
+organic/peaty soils and arable versus grassland management. The
+functions are derived from RB209 guidance
+\citep{RB209,goulding2016}. RB209 is used here as a pragmatic,
+transparent proxy basis rather than as a claim that UK agronomic
+recommendations apply universally across Europe.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=1.1\textwidth]{figures/Agriculture/RB209.png}
+  \caption{RB209-based piecewise lime-demand functions used to define
+  the point-level score $s_i^{\mathrm{lime}}$. Separate curves are used
+  for mineral and organic/peaty soils, and for arable and grassland
+  management.}
+  \label{fig:rb209-lime-curves}
+\end{figure}
+
+The score is
+\begin{equation}
+  s_i^{\mathrm{lime}} =
+  d_{\mathrm{SOM}(i),\,\mathrm{LU}(i)}\!\left(\mathrm{pH_{H_2O},i}\right),
+\end{equation}
+where $\mathrm{SOM}(i)\in\{\mathrm{min},\mathrm{org}\}$ and
+$\mathrm{LU}(i)\in\{\mathrm{ar},\mathrm{gr}\}$.
+
+\paragraph{Aggregation and normalisation.}
+The raw proxy is
+\begin{equation}
+  \mu_{n,c}^{\mathrm{lime}} =
+  \frac{1}{N_{n,c}}
+  \sum_{i \in (n,c)} s_i^{\mathrm{lime}},
+\end{equation}
+with zero assigned when no eligible soil points are available.
+Relevance follows Equation~\ref{eq:rho-def}. Relative to the previous
+subsections, the main strength of this proxy is that it uses direct soil
+measurements rather than an inferred management signal.
+
+\paragraph{Limitations and expected bias.}
+RB209 was developed for UK conditions, so its transfer to continental
+Europe introduces uncertainty related to mineralogy, texture, and base
+saturation. LUCAS Soil 2018 is also a snapshot and cannot capture
+long-term re-acidification trends. These limitations are acceptable for
+spatial allocation, but they should not be interpreted as a continent-
+wide liming recommendation model.
+
+\subsection{Cross-cutting uncertainties and synthesis}
+
+The agricultural proxy block combines datasets with very different
+levels of evidential strength. Enteric fermentation, biomass burning,
+and soil liming are comparatively well anchored in observable spatial
+signals: grazing observations, satellite fire products, and measured
+soil pH. By contrast, livestock housing and urea application rely more
+heavily on heuristic assumptions because harmonised European data on
+housing systems and product-specific fertiliser use are not available at
+the required scale.
+
+The main structural uncertainty therefore does not arise from the
+mathematical framework itself, but from the degree of interpretation
+required to convert available data into source-specific spatial
+patterns. The shared framework helps by making those assumptions
+explicit: where direct evidence exists, it enters through $\mu$;
+where it does not, the heuristic choice is identified and bounded
+rather than hidden inside a composite land-cover proxy.
+
+From the perspective of the later case studies, the most important
+agricultural upgrades are the NH$_3$-related proxies, because they are
+likely to matter most for secondary particulate matter, and the
+biomass-burning proxy, because it separates a distinctly episodic source
+from the broader agricultural land mask. The CO$_2$ proxies are kept in
+the same framework for consistency and completeness, but their main role
+here is methodological: they demonstrate that the source-specific
+approach can accommodate process controls that differ substantially from
+those governing air-pollutant emissions.

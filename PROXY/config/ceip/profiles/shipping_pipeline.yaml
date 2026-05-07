@@ -1,0 +1,21 @@
+# G_Shipping area pipeline defaults (merged under sector YAML `shipping:`).
+
+corine_window:
+  nuts_cntr: EL
+  pad_m: 5000.0
+output:
+  weights_tif: shipping_areasource.tif
+  write_diagnostics: false
+proxy:
+  osm_subdivide: 4
+  land_damp: 0.12
+  weight_emodnet: 0.25
+  weight_osm: 0.5
+  weight_port: 0.25
+  port_level2: 123
+  write_diagnostics: false
+cams:
+  gnfr_g_index: 10
+  country_iso3: GRC
+logging:
+  level: INFO

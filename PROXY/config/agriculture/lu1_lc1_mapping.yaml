@@ -1,0 +1,269 @@
+# Single source of truth for LUCAS LU1 / LC1 / GRAZING codes as interpreted by PROXY.
+#
+# This file mirrors PROXY/docs/agriculture_class_mapping.md. It is designed to be read
+# at runtime by future agriculture helpers (see plan Phase 1.2). Current sector code
+# still uses inline hard-coded sets; migration to this YAML happens progressively once
+# Phase 1.6 restructure lands.
+#
+# Guiding principles:
+# - Every downstream module references a group NAME, not a list of codes.
+# - `tier` is a 0..1 proxy score used by that module's stage-1 logic.
+# - Values must not drift silently from docs/agriculture_class_mapping.md.
+version: 1
+
+# ---------------------------------------------------------------------------
+# LUCAS SURVEY_LU1 (Land Use)
+# ---------------------------------------------------------------------------
+lu1:
+  U111:
+    description: Agriculture (excluding fallow land)
+    agricultural: true
+  U112:
+    description: Fallow land
+    agricultural: true
+  U113:
+    description: Kitchen gardens
+    agricultural: true
+    downweighted: true
+  U120:
+    description: |
+      LUCAS LU1 code - forest land. Per user confirmation (2026-04) this class is
+      treated as forestry and excluded from every agricultural proxy (livestock
+      housing, manure, fertilized land, etc.). The reinterpretation that had been
+      explored in Phase 1.3 (mixed farming with livestock dominant, score 0.55)
+      is NOT active; the corresponding YAML block in ``livestock_housing``
+      section keeps ``enabled: false`` as the default.
+    agricultural: false
+    status: confirmed_forest
+
+# ---------------------------------------------------------------------------
+# LUCAS SURVEY_LC1 (Land Cover)
+# ---------------------------------------------------------------------------
+lc1:
+  buildings:
+    codes: [A11, A12]
+    description: Artificial buildings (roof / wall)
+  cropland_high_manure:
+    # Velthof et al. (2009): high manure-use arable groups.
+    exact: [B11, B13, B32]
+    prefix: [B2]
+    description: High manure-use cropland
+  cropland_intermediate_manure:
+    exact: [B12, B14, B15, B16, B17, B18, B19, B31]
+    description: Intermediate manure-use cropland
+  cropland_all:
+    prefix: [B]
+    description: All cropland codes (used as residual / fallback match)
+  ley:
+    exact: [B55]
+    description: Temporary grassland (ley)
+  grassland:
+    exact: [E10, E20]
+    description: Grassland with / without trees
+  grassland_with_trees:
+    exact: [E10]
+  grassland_without_trees:
+    exact: [E20]
+
+# ---------------------------------------------------------------------------
+# LUCAS SURVEY_GRAZING (animal observation)
+# ---------------------------------------------------------------------------
+grazing:
+  0:
+    description: No grazing evidence (confirmed non-grazing)
+    is_grazing: false
+  1:
+    description: Grazing observed
+    is_grazing: true
+  2:
+    description: Grazing traces but no animals seen (treated as confirmed non-grazing)
+    is_grazing: false
+
+# ---------------------------------------------------------------------------
+# Livestock housing tiers (source_relevance/livestock_housing.py)
+# ---------------------------------------------------------------------------
+livestock_housing:
+  missing_grazing_damping: 0.4
+  tiers:
+    - name: building_active_agri
+      requires: {lu1: U111, lc1_group: buildings}
+      score: 1.0
+    - name: managed_grassland
+      requires: {lu1: U111, lc1_group: grassland}
+      score: 0.55
+    - name: cropland_generic
+      requires: {lu1: U111, lc1_group: cropland_all, exclude_lc1_group: ley}
+      score: 0.20
+    - name: ley
+      requires: {lu1: U111, lc1_group: ley}
+      score: 0.30
+    - name: fallow
+      requires: {lu1: U112}
+      score: 0.20
+
+  # U120 handling. The user confirmed (Phase 1.3 review) that U120 represents forest
+  # land and must NOT contribute to livestock-housing scoring. Default is therefore
+  # disabled: points with SURVEY_LU1 == U120 are skipped exactly like the pre-refactor
+  # behaviour. The YAML entry is retained (rather than deleted) so that:
+  #   - the Python loader has a single documented place to read from;
+  #   - a user who later decides to reinterpret U120 for a specific country can flip
+  #     `enabled: true` and set a score without editing Python.
+  # If you re-enable this, the score must be in [0, 1]; 0.55 (grassland-equivalent)
+  # was the candidate value considered during the Phase 1.3 review.
+  u120_mixed_livestock:
+    enabled: false
+    score: null
+    source: "User confirmation 2026-04: U120 = forest (legacy LUCAS dictionary interpretation)"
+    review_status: "confirmed forest; do not change without methodology update"
+
+# ---------------------------------------------------------------------------
+# Manure management land-application weights (source_relevance/manure.py)
+# ---------------------------------------------------------------------------
+manure_land_application:
+  u111_grassland:   0.8
+  u111_high_manure: 0.8
+  u111_intermediate_manure: 0.6
+  u111_residual_b:  0.1
+  u111_other:       0.1
+  u112_fallow:      0.7
+  u113_b_arable:    same_as_u111
+  u113_grassland:   0.1
+  u113_other:       0.1
+
+# ---------------------------------------------------------------------------
+# Synthetic N eligibility (source_relevance/fertilized_land.py)
+# ---------------------------------------------------------------------------
+fertilized_land:
+  eligible:
+    - description: All B-series cropland (any LU1)
+      lc1_group: cropland_all
+    - description: Grassland with trees (any LU1)
+      lc1: E10
+    - description: Grassland without trees, only when actively farmed (LU1 U111)
+      lc1: E20
+      lu1: U111
+  phase_1_4_audit:
+    status: documented_no_numeric_change
+    summary: |
+      eligible_synthetic_n(lc1, lu1) in source_relevance/fertilized_land.py L64-75 returns
+      True whenever LC1 starts with "B", without inspecting LU1. This over-includes kitchen
+      gardens (U113), fallow land (U112), and the U120 class being corrected in Phase 1.3.
+      Matching is asymmetric: E20 requires LU1==U111 but B* does not.
+    current_behavior:
+      b_prefix_any_lu1: true
+      e10_any_lu1: true
+      e20_requires_u111: true
+    candidate_restrictions_for_review:
+      - "restrict B* to LU1 in {U111, U112} (drop U113 kitchen gardens and U120 forestry/mixed)"
+      - "restrict B* to LU1 in {U111} only (matches the E20 pattern)"
+      - "keep current behaviour; document over-inclusion as intentional"
+    drift_risk: |
+      Any change here will shift mu per (NUTS-2, CLC) for the synthetic-N proxy, which
+      feeds NH3/NOx/N2O rho. No change applied until the user confirms which option to
+      adopt.
+
+# ---------------------------------------------------------------------------
+# B55 (ley / temporary grassland) cross-module usage
+# ---------------------------------------------------------------------------
+b55_cross_module_audit:
+  # B55 is handled differently by three proxies. This divergence is INTENTIONAL under
+  # the current CAMS-REG-ANT methodology (ley hosts livestock, receives low manure, is
+  # grazeable). It is recorded here so Phase 1.6 restructure does not accidentally
+  # collapse the three into one shared rule.
+  status: documented_intentional_divergence
+  livestock_housing:
+    tier: 0.30
+    file: PROXY/sectors/K_Agriculture/source_relevance/livestock_housing.py
+    rationale: "Ley supports housing signal between pure cropland (0.20) and grassland (0.55)."
+  manure_land_application:
+    tier: 0.10
+    file: PROXY/sectors/K_Agriculture/source_relevance/manure.py
+    rationale: "B55 falls into the residual B-prefix weight in Velthof (2009); it is NOT in high- or intermediate-manure groups."
+  enteric_grazing:
+    tier_when_grazing_missing: 0.60
+    file: PROXY/sectors/K_Agriculture/source_relevance/enteric_grazing.py
+    rationale: "When SURVEY_GRAZING is missing, B55 is treated as grass-equivalent for grazing likelihood."
+  review_notes:
+    - "Do not unify these without scientific review; each proxy has a legitimate reason."
+    - "If/when the YAML becomes the single source of truth, preserve all three tiers."
+
+# ---------------------------------------------------------------------------
+# Rice paddies (source_relevance/rice.py)
+# ---------------------------------------------------------------------------
+rice:
+  # Current code uses `startswith("B17")` which matches only B17 (LUCAS has no sub-codes),
+  # so the behavior is identical to an exact match.
+  eligible_lc1_prefix: [B17]
+  phase_1_4_audit:
+    status: documented_no_numeric_change
+    current_behavior: |
+      source_relevance/rice.py L28 uses norm_lucas_str(lc1).startswith("B17"). LUCAS 2022
+      defines B17 as "Rice" with no B17x sub-codes, so in practice startswith behaves
+      identically to exact equality.
+    recommendation: |
+      When the YAML-driven version lands (Phase 1.6+), switch to an exact match for
+      clarity. No numeric change expected because the input universe never contains
+      other strings starting with "B17".
+
+# ---------------------------------------------------------------------------
+# NMVOC emission factors by LC1 (source_relevance/agricultural_soils.py)
+# Values in kg NMVOC ha-1 yr-1 (EMEP Table 3.3 via Thunen NIR assignment).
+# ---------------------------------------------------------------------------
+nmvoc_ef:
+  B11: 0.32
+  B12: 0.32
+  B13: 1.03
+  B14: 0.32
+  B15: 0.32
+  B16: 0.32
+  B17: 0.32
+  B18: 0.32
+  B19: 0.32
+  B21: 0.32
+  B22: 0.32
+  B23: 0.32
+  B32: 1.34
+  B41: 0.32
+  B51: 0.41
+  B52: 0.41
+  B53: 0.41
+  B54: 0.41
+  B55: 0.41
+  E10: 0.41
+  E20: 0.41
+
+# ---------------------------------------------------------------------------
+# Biomass-burning residue ratios (source_relevance/biomass_burning.py)
+# kg dry residue / kg grain yield (EMEP Table 3-2).
+# ---------------------------------------------------------------------------
+residue_ratios:
+  B11: 1.3
+  B12: 1.3
+  B13: 1.2
+  B14: 1.6
+  B15: 1.3
+  B16: 1.0
+  B17: 1.4
+  B18: 1.2
+  B19: 1.2
+  B33: 2.1
+  B41: 1.7
+
+# ---------------------------------------------------------------------------
+# Agricultural CORINE CLC EEA44 indices
+# ---------------------------------------------------------------------------
+corine_agricultural_indices:
+  range: [12, 22]
+  inclusive: true
+  members:
+    12: {clc_l3: 211, label: "Non-irrigated arable land"}
+    13: {clc_l3: 212, label: "Permanently irrigated land"}
+    14: {clc_l3: 213, label: "Rice fields"}
+    15: {clc_l3: 221, label: "Vineyards"}
+    16: {clc_l3: 222, label: "Fruit trees and berry plantations"}
+    17: {clc_l3: 223, label: "Olive groves"}
+    18: {clc_l3: 231, label: "Pastures"}
+    19: {clc_l3: 241, label: "Annual crops associated with permanent crops"}
+    20: {clc_l3: 242, label: "Complex cultivation patterns"}
+    21: {clc_l3: 243, label: "Agriculture with significant natural vegetation"}
+    22: {clc_l3: 244, label: "Agro-forestry areas"}

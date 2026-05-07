@@ -1,0 +1,288 @@
+\section{Solvent and product use}
+\label{sec:solvents}
+
+\subsection{Scope and inventory mapping}
+
+This block targets the area-source component of GNFR~E, which groups
+solvent and product use activities under the broad heading of product
+application, surface treatment, degreasing, domestic solvent use, and
+related diffuse processes. In contrast to public power, these emissions
+are not attached to a small number of explicit stacks, and in contrast
+to residential combustion they are not driven primarily by one dominant
+activity variable such as heat demand. The spatial problem is therefore
+to redistribute coarse CAMS area-source mass toward fine-grid locations
+that are plausible for the different types of solvent use aggregated
+inside GNFR~E.
+
+The implementation is restricted to the CAMS area-source geometry
+within GNFR~E. For each CAMS parent cell and pollutant, the final
+fine-grid weights are normalised so that the redistributed pixel shares
+sum to unity inside that parent cell. The output is thus a
+mass-conserving multi-band weight raster, one band per pollutant, ready
+to be combined with the corresponding CAMS cell totals.
+
+\subsection{Conceptual design}
+
+GNFR~E is internally heterogeneous. Domestic product use, road paving,
+roofing, coating, printing, chemical products, dry cleaning, and
+industrial degreasing do not share the same fine-scale geography.
+A single land-cover mask would therefore reproduce the same weakness
+identified earlier for agriculture and residential combustion: one
+sector-level proxy would force all solvent-related processes to follow a
+single spatial pattern.
+
+The upgraded design separates the problem into three layers:
+\begin{itemize}
+  \item a set of fine-grid indicator layers describing settlement,
+        services, industry, and transport-related infrastructure;
+  \item an intermediate set of four archetype activity surfaces
+        representing household, service, industrial, and infrastructure
+        solvent-use environments;
+  \item a final set of nine solvent subsectors, each expressed as a
+        mixture of the four archetypes and then recombined with
+        pollutant-specific national shares.
+\end{itemize}
+
+This creates a two-stage weighting system. First, spatial indicators
+describe where each type of solvent-related activity is likely to occur.
+Second, national subsector shares determine how much of each pollutant
+should follow each solvent-use subsector. The resulting method remains
+mass conserving within each CAMS parent cell while allowing pollutant
+bands to differ spatially.
+
+The archetype definitions and subsector mixing coefficients are
+summarised in Appendix~\ref{app:solvents_downscaling},
+Tables~\ref{tab:solvents_archetypes} and
+\ref{tab:solvents_subsectors_beta}.
+
+\subsection{Fine-grid activity surfaces}
+
+Let $g$ denote a fine pixel on the national reference grid. The method
+first constructs a set of non-negative indicator layers $z_{g,u}$ from
+harmonised ancillary datasets. These indicators represent, at fine
+resolution, the main spatial environments in which solvent use is
+expected to occur:
+\begin{itemize}
+  \item population and residential urban fabric for household-oriented
+        uses;
+  \item service-oriented urban and commercial land for retail and
+        tertiary activities;
+  \item industrial land and building footprints for manufacturing and
+        product-processing uses;
+  \item road length, road hierarchy, transport-related land, and built
+        surfaces for infrastructure-linked activities.
+\end{itemize}
+
+The underlying indicators combine gridded population, CORINE land-cover
+classes, and OpenStreetMap-derived roads and land-use polygons. Each
+indicator is first transformed to a unitless relevance field
+$\tilde{z}_{g,u} \in [0,1]$ using a clipped quantile scaling:
+\begin{equation}
+  \tilde{z}_{g,u} =
+  \mathrm{clip}_{[0,1]}
+  \left(
+    \frac{
+      \min\!\left(\max(z_{g,u}, q_u^{0.01}), q_u^{0.99}\right) - q_u^{0.01}
+    }{
+      q_u^{0.99} - q_u^{0.01}
+    }
+  \right),
+\end{equation}
+where $q_u^{0.01}$ and $q_u^{0.99}$ are the 1st and 99th percentiles of
+positive finite values for indicator $u$. This scaling preserves
+relative spatial contrasts while preventing a small number of extreme
+pixels from dominating the proxy.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial evidence used for the solvent archetype proxy surfaces.}
+  \label{tab:solvents-spatial-rules}
+  \scriptsize
+  \begin{tabular}{p{0.18\textwidth} p{0.28\textwidth} p{0.42\textwidth}}
+    \toprule
+    Archetype & Spatial weighting & Retained evidence \\
+    \midrule
+    Household &
+    $\lambda_{\mathrm{pop}}=0.70$, $\lambda_{\mathrm{res}}=0.30$. &
+    Gridded population and residential urban fabric classes. \\
+    Service &
+    $\lambda_{\mathrm{urban}}=0.40$, $\lambda_{\mathrm{service\,land}}=0.35$, $\lambda_{\mathrm{OSM}}=0.25$. &
+    Urban fabric, commercial and service land, and OSM retail, commercial, civic, and public land-use features. \\
+    Industrial &
+    $\lambda_{\mathrm{CLC}}=0.35$, $\lambda_{\mathrm{OSM}}=0.35$, $\lambda_{\mathrm{buildings}}=0.30$. &
+    Industrial and construction-related land, OSM industrial, commercial, warehouse, service, and aeroway features, and building footprints. \\
+    Infrastructure &
+    $\lambda_{\mathrm{road}}=0.35$, $\lambda_{\mathrm{weighted\,road}}=0.35$, $\lambda_{\mathrm{transport}}=0.20$, $\lambda_{\mathrm{roof}}=0.10$. &
+    Road length, hierarchy-weighted road length, transport-related land, and roof-area support. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The normalised indicators are then aggregated into four archetype
+surfaces, indexed by $a \in \{\mathrm{house}, \mathrm{serv},
+\mathrm{ind}, \mathrm{infra}\}$:
+\begin{equation}
+  A_g^{(a)} =
+  \sum_{u \in \mathcal{U}(a)}
+  \lambda_u^{(a)} \, \tilde{z}_{g,u},
+\end{equation}
+with weights $\lambda_u^{(a)}$ renormalised over the indicators actually
+available for that archetype. The four archetypes may be interpreted as
+first-order activity surfaces for household solvent use, service-sector
+uses, industrial uses, and infrastructure-linked uses respectively.
+
+\subsection{Subsector activity and pollutant shares}
+
+The solvent block is decomposed into nine subsectors corresponding to
+the CEIP 2.D.3 subdivision:
+\begin{equation}
+  s \in \{
+  \mathrm{2D3a},\mathrm{2D3b},\ldots,\mathrm{2D3i}
+  \}.
+\end{equation}
+These subsectors cover domestic solvent use, road paving, asphalt
+roofing, coating, degreasing, dry cleaning, chemical products,
+printing, and a residual ``other'' category.
+
+Each subsector is represented as a convex mixture of the four archetype
+surfaces:
+\begin{equation}
+  R_g^{(s)} =
+  \sum_{a}
+  \beta_{s,a} \, A_g^{(a)},
+\end{equation}
+where the coefficients $\beta_{s,a}$ satisfy
+\begin{equation}
+  \sum_a \beta_{s,a} = 1
+  \qquad \forall s.
+\end{equation}
+The $\beta$ matrix expresses the substantive interpretation of each
+solvent-use subsector. For example, road paving is mapped entirely to
+the infrastructure archetype, dry cleaning to the service archetype,
+chemical products to the industrial archetype, and mixed activities such
+as coating or ``other'' to weighted combinations of several archetypes.
+
+Pollutant-specific national shares are derived from national 2.D.3
+totals. Let $E_{r,s,p}^{\mathrm{nat}}$ denote the reported national
+emission total for country $r$, subsector $s$, and pollutant $p$. The
+subsector share is
+\begin{equation}
+  \alpha_{r,s,p} =
+  \frac{E_{r,s,p}^{\mathrm{nat}}}
+       {\displaystyle\sum_{s'} E_{r,s',p}^{\mathrm{nat}}}.
+  \label{eq:solvents-alpha}
+\end{equation}
+Two completion rules are applied to make these ratios operational for
+all pollutants:
+\begin{itemize}
+  \item if a pollutant is reported only for a subset of subsectors, the
+        non-reported subsectors retain zero and the reported subsectors
+        are normalised to sum to one;
+  \item if a pollutant has no solvent subsector information at all, the
+        nine subsectors receive equal shares, that is
+        $\alpha_{r,s,p}=1/9$ for all $s$.
+\end{itemize}
+
+This choice reflects the intended interpretation of the CEIP data. A
+missing pollutant row does not imply the absence of GNFR~E emissions in
+the CAMS inventory; it only means that no national solvent subsector
+split is available for that pollutant. In that case, an uninformative
+equal split is preferred to borrowing the mixture of another pollutant.
+
+\subsection{Within-cell normalisation and final weights}
+
+Let $m$ denote a CAMS GNFR~E area-source parent cell and let
+$g \in m$ denote fine pixels whose centres fall inside that parent cell.
+Each raw subsector surface $R_g^{(s)}$ is normalised within the
+corresponding CAMS parent cell:
+\begin{equation}
+  \rho_{g \mid m}^{(s)} =
+  \frac{R_g^{(s)}}
+       {\displaystyle\sum_{g' \in m} R_{g'}^{(s)}}.
+\end{equation}
+If the denominator is zero for a given subsector and CAMS cell, a
+generic solvent proxy is used instead:
+\begin{equation}
+  G_g = \sum_a \eta_a A_g^{(a)},
+\end{equation}
+where $\eta_a$ are equal archetype weights. If that generic proxy is
+also zero within the CAMS cell, the algorithm falls back to a uniform
+distribution over the valid pixel support of the cell. This ensures that
+no CAMS area-source mass is lost simply because a particular fine-grid
+indicator is absent locally.
+
+The final pollutant-specific weight in pixel $g$ for CAMS cell $m$ is
+then
+\begin{equation}
+  W_{g,m,p}^{\mathrm{solv}} =
+  \sum_s \alpha_{r,s,p} \, \rho_{g \mid m}^{(s)}.
+\end{equation}
+By construction,
+\begin{equation}
+  \sum_{g \in m} W_{g,m,p}^{\mathrm{solv}} = 1
+  \qquad \forall m,p,
+\end{equation}
+so the fine-grid redistribution is mass conserving inside every CAMS
+parent cell.
+
+If $E_{m,p}^{\mathrm{CAMS}}$ denotes the CAMS GNFR~E area emission for
+parent cell $m$ and pollutant $p$, the gridded allocation is
+\begin{equation}
+  e_{g,m,p}^{\mathrm{solv}} =
+  E_{m,p}^{\mathrm{CAMS}} \,
+  W_{g,m,p}^{\mathrm{solv}}.
+\end{equation}
+The method therefore separates three distinct tasks: activity
+representation through archetypes, pollutant-specific subsector shares
+through $\alpha$, and mass-conserving redistribution within CAMS cells
+through $\rho$.
+
+\subsection{Interpretation of activity and alpha ratios}
+
+The activity term in this block should be understood as a spatial
+likelihood surface rather than as a direct estimate of solvent use in
+physical units. Population density, service land, industrial land,
+building surfaces, and road infrastructure are not themselves emissions,
+but they are informative about where the different solvent-use
+subsectors are likely to occur. The four archetypes therefore play the
+same conceptual role as source-specific proxy families in the other
+chapter sections: they encode relative spatial relevance.
+
+The $\alpha$ ratios have a different role. They do not alter the
+fine-scale geography directly; instead, they determine how much each
+pollutant draws from each solvent subsector. A pollutant associated
+mainly with domestic product use will inherit more of the household
+archetype, while a pollutant concentrated in chemical products or
+degreasing will inherit more of the industrial mixture. Spatial
+differences between pollutant bands thus arise from the interaction
+between the common fine-grid activity surfaces and the
+pollutant-specific national subsector shares.
+
+\subsection{Limitations}
+
+The method remains a first-order allocation scheme for a highly diverse
+sector. Several limitations follow directly from that role.
+
+First, the archetype surfaces are inferred from generic spatial
+indicators rather than observed solvent-use statistics. They distinguish
+plausible environments of use, but they do not recover product-specific
+consumption or facility-level activity directly.
+
+Second, the national subsector shares are only as detailed as the
+available 2.D.3 reporting. Where a pollutant is reported for only a few
+subsectors, the method preserves that selectivity. Where no solvent
+subsector split is reported, the equal-share fallback is intentionally
+uninformative and should be read as a regularisation device rather than
+as evidence of equal real-world contributions.
+
+Third, the infrastructure-related component relies partly on
+OpenStreetMap geometry. Although this is a major improvement over a pure
+land-cover proxy, completeness and tagging quality may still vary across
+space.
+
+Despite these limitations, the GNFR~E workflow represents a substantial
+advance over a single composite proxy. It allows solvent emissions to
+respond differently to household, service, industrial, and
+infrastructure environments while preserving pollutant-specific national
+subsector structure and exact mass conservation within each CAMS parent
+cell.

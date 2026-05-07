@@ -1,0 +1,15 @@
+# Single index for CEIP profile YAMLs. Paths are project-root-relative (as elsewhere in PROXY).
+# Sectors may override these via industry_paths / waste / solvents paths in sector YAMLs.
+
+sectors:
+  B_Industry:
+    groups_yaml: PROXY/config/ceip/profiles/industry_groups.yaml
+  D_Fugitive:
+    groups_yaml: PROXY/config/ceip/profiles/fugitive_groups.yaml
+  J_Waste:
+    families_yaml: PROXY/config/ceip/profiles/waste_families.yaml
+  E_Solvents:
+    subsectors_yaml: PROXY/config/ceip/profiles/solvents_subsectors.yaml
+
+shared:
+  pollutant_aliases_yaml: PROXY/config/pollutant_aliases.yaml

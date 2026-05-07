@@ -1,0 +1,191 @@
+% CAMS-REG-ANT v8.1 NetCDF structure (reference)
+% Compile standalone: pdflatex CAMS_REG_ANT_v81_netcdf_structure.tex
+% Or \input{CAMS_REG_ANT_v81_netcdf_structure} from a larger document (omit \documentclass below).
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{url}
+\geometry{margin=2.5cm}
+\title{Structure of CAMS-REG-ANT v8.1 anthropogenic emission NetCDF files}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Purpose and scope}
+
+This note describes the logical layout of \textbf{CAMS-REG-ANT} gridded anthropogenic emission inventories distributed as \textbf{NetCDF} (Climate and Forecast conventions), as used in this project with \textbf{format\_id 1.6} and \textbf{CF-1.5} global attributes.
+
+The numeric \textbf{dimension sizes} in the tables below (e.g.\ number of \texttt{source} rows, grid lengths) are \textbf{example values} from one NetCDF file whose metadata was dumped to \path{data/given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf/details.json} (underlying CSV: year 2019 in that snapshot). Another year, domain, or TNO release may change counts; the \textbf{variable names, dimensions, and semantics} described here should remain comparable for the same product line.
+
+\section{Conceptual model}
+
+The file is not a dense 2-D field per species alone. It stores a \textbf{list of emission sources}, each aligned on the \texttt{source} dimension:
+
+\begin{itemize}
+  \item \textbf{Where} the source sits: WGS84 longitude/latitude of the point or of the centre of an area source; optional 1-based indices into the regular lon/lat grid.
+  \item \textbf{Which country} and \textbf{which GNFR sector} (A--L, including F1--F4 for road transport) apply to that source.
+  \item \textbf{Whether} the source is treated as \textbf{area} (gridded) or \textbf{point}.
+  \item \textbf{How much} of each pollutant is emitted annually, as parallel 1-D arrays (one value per \texttt{source} index).
+\end{itemize}
+
+Lookup tables indexed by \texttt{country}, \texttt{emis\_cat}, and \texttt{source\_type} provide human-readable labels. A regular \textbf{longitude} $\times$ \textbf{latitude} grid (with bounds and cell \textbf{area}) defines the target raster used when aggregating sources to maps.
+
+\section{Global attributes}
+
+Global metadata from that snapshot:
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  Attribute & Value \\
+  \midrule
+  author & Hugo Denier van der Gon, Jeroen Kuenen \\
+  institution & TNO, Utrecht, The Netherlands \\
+  history & Converted to NetCDF from CAMS-REG-v8\_1\_emissions\_year2019.csv \\
+  Conventions & CF-1.5 \\
+  creation\_time & 2025-08-04 16:33:54 \\
+  format\_id & 1.6 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{Dimensions}
+
+\begin{center}
+\begin{tabular}{lrl}
+  \toprule
+  Name & Size (example) & Role \\
+  \midrule
+  \texttt{source} & 3\,925\,697 & One entry per emission record \\
+  \texttt{longitude} & 900 & Target grid: cell-centre longitudes \\
+  \texttt{latitude} & 840 & Target grid: cell-centre latitudes \\
+  \texttt{country} & 76 & Lookup: ISO3 / country name \\
+  \texttt{emis\_cat} & 15 & Lookup: GNFR code and label \\
+  \texttt{source\_type} & 2 & Lookup: area vs.\ point \\
+  \texttt{bound} & 2 & Lower/upper for lat/lon bounds \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{Coordinate grid and cell area}
+
+\begin{itemize}
+  \item \textbf{\texttt{longitude}} (dim \texttt{longitude}): degrees east; CF \texttt{standard\_name} \texttt{longitude}; attribute \texttt{bounds} $\rightarrow$ \texttt{longitude\_bounds}. Example description: regular grid $[-30,60]$ with $0.1^\circ$ resolution.
+  \item \textbf{\texttt{latitude}} (dim \texttt{latitude}): degrees north; \texttt{bounds} $\rightarrow$ \texttt{latitude\_bounds}. Example: $[30,72]$ with $0.05^\circ$ resolution.
+  \item \textbf{\texttt{longitude\_bounds}}, \textbf{\texttt{latitude\_bounds}}: shape $(n_{\mathrm{lon}},2)$ and $(n_{\mathrm{lat}},2)$.
+  \item \textbf{\texttt{area}}: dims \texttt{(latitude, longitude)}, attribute \texttt{units} \texttt{m2}, \texttt{standard\_name} \texttt{cell\_area}.
+\end{itemize}
+
+\section{Lookup tables}
+
+\subsection{Country (\texttt{country})}
+
+\begin{itemize}
+  \item \texttt{country\_id}: ISO3 code (fixed-length character).
+  \item \texttt{country\_name}: full name.
+\end{itemize}
+Per-source field \texttt{country\_index} is \textbf{1-based} into these tables.
+
+\subsection{GNFR emission category (\texttt{emis\_cat} = 15)}
+
+The per-source field \texttt{emission\_category\_index} is \textbf{1-based} into \texttt{emis\_cat}. The code order used in \path{urbem_interface/emissions/prepare_cams.py} is:
+
+\begin{center}
+\small
+\begin{tabular}{cll}
+  \toprule
+  Index & Code & Full name (code in pipeline) \\
+  \midrule
+  1 & A & A\_PublicPower \\
+  2 & B & B\_Industry \\
+  3 & C & C\_OtherStationaryComb \\
+  4 & D & D\_Fugitives \\
+  5 & E & E\_Solvents \\
+  6 & F1 & F1\_RoadTransport\_Exhaust\_Gasoline \\
+  7 & F2 & F2\_RoadTransport\_Exhaust\_Diesel \\
+  8 & F3 & F3\_RoadTransport\_Exhaust\_LPG\_gas \\
+  9 & F4 & F4\_RoadTransport\_NonExhaust \\
+  10 & G & G\_Shipping \\
+  11 & H & H\_Aviation \\
+  12 & I & I\_OffRoad \\
+  13 & J & J\_Waste \\
+  14 & K & K\_AgriLivestock \\
+  15 & L & L\_AgriOther \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The NetCDF variables \texttt{emis\_cat\_code} and \texttt{emis\_cat\_name} repeat the GNFR code and a short sector name for each index.
+
+\subsection{Source type (\texttt{source\_type} = 2)}
+
+\begin{itemize}
+  \item \texttt{source\_type\_index} on each \texttt{source} row is \textbf{1-based} into this table.
+  \item \textbf{1} = area (gridded / area-filling sources).
+  \item \textbf{2} = point.
+\end{itemize}
+
+\noindent Variables \texttt{source\_type\_code} and \texttt{source\_type\_name} document the two rows (e.g.\ \texttt{a}/area vs.\ point).
+
+\section{Per-source variables (dimension \texttt{source})}
+
+All arrays below have length equal to \texttt{source} (example: 3\,925\,697).
+
+\begin{center}
+\begin{tabular}{p{4.2cm}p{8.5cm}}
+  \toprule
+  Variable & Meaning \\
+  \midrule
+  \texttt{longitude\_source}, \texttt{latitude\_source} & WGS84 coordinates (degrees); centre of area or point location. \\
+  \texttt{longitude\_index}, \texttt{latitude\_index} & Optional \textbf{1-based} indices into the \texttt{longitude} / \texttt{latitude} axes. \\
+  \texttt{country\_index} & 1-based index into \texttt{country}. \\
+  \texttt{emission\_category\_index} & 1-based GNFR index $1\ldots15$. \\
+  \texttt{source\_type\_index} & 1 = area, 2 = point. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{Pollutant variables (dimension \texttt{source})}
+
+Each pollutant is a float array parallel to \texttt{source}. Non-negative annual fluxes; units in file attributes (typically \texttt{units} = \texttt{kg/year} and a more specific \texttt{long\_units}).
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+  \toprule
+  Variable & long\_units (example) & Notes \\
+  \midrule
+  \texttt{ch4} & kg(CH4)/year & \\
+  \texttt{co} & kg(CO)/year & \\
+  \texttt{nh3} & kg(NH3)/year & \\
+  \texttt{nmvoc} & kg(NMVOC)/year & \\
+  \texttt{nox} & kg(NO2)/year & NO$_x$ reported as NO$_2$ mass equivalent \\
+  \texttt{pm10} & kg(PM10)/year & \\
+  \texttt{pm2\_5} & kg(PM2\_5)/year & \\
+  \texttt{sox} & kg(SO2)/year & SO$_x$ as SO$_2$ proxy \\
+  \texttt{co2\_ff} & kg(CO2\_FF)/year & Fossil CO$_2$ \\
+  \texttt{co2\_bf} & kg(CO2\_BF)/year & Biofuel CO$_2$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The eight-species subset \texttt{ch4}, \texttt{co}, \texttt{nh3}, \texttt{nmvoc}, \texttt{nox}, \texttt{pm10}, \texttt{pm2\_5}, \texttt{sox} is what \path{prepare_cams.py} uses by default for air-quality style workflows; CO$_2$ arrays may still be present in the same file.
+
+\section{What this format does \emph{not} encode}
+
+\begin{itemize}
+  \item There is \textbf{no third ``line'' source geometry} in the NetCDF: only \textbf{area} and \textbf{point} appear in \texttt{source\_type\_index}. Road-related emissions are carried under GNFR \textbf{F1--F4}, not as a separate line dimension.
+  \item Temporal resolution in this inventory is \textbf{annual} (kg\,yr$^{-1}$), not hourly or monthly, unless a different product is used.
+\end{itemize}
+
+\section{Use in this codebase}
+
+The function \texttt{prepare\_cams\_emissions} in \path{urbem_interface/emissions/prepare_cams.py} reads \texttt{emission\_category\_index}, \texttt{source\_type\_index}, coordinates, filters by requested GNFR sectors and area/point mode, and \textbf{accumulates} each pollutant into the native lon/lat grid using indices or lon/lat binning. For a machine-readable dump of any \texttt{.nc} file, use \path{code/scripts/describe_cams_dataset.py}.
+
+\end{document}

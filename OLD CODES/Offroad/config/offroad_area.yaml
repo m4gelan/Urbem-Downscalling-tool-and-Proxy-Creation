@@ -1,0 +1,87 @@
+# GNFR I (off-road) area-source weights: rail + pipeline + non-road composite, CEIP/NIR shares, CAMS-cell normalized.
+# Paths relative to project root unless absolute. sectors.json merges paths.cams_nc, corine, nuts_gpkg, landscan when present.
+#
+# CEIP Excel (ceip_xlsx), two supported layouts:
+#   Long (typical): COUNTRY, YEAR, SECTOR, POLLUTANT, TOTAL — sectors 1A3c / 1A3ei / 1A3eii → rail / pipe / non-road shares.
+#   Wide: country, pollutant, E_1A3c, E_1A3ei, E_1A3eii — numeric columns only ratios matter.
+# TOTAL may use NO/NE/IE like CEIP (skipped). defaults.ceip_year filters YEAR (omit to use modal year from sheet).
+# cntr_code_to_iso3: map EL, GR → GRC so CEIP rows match the country raster.
+
+country:
+  nuts_cntr: EL
+
+corine_window:
+  pad_m: 5000
+
+paths:
+  cams_nc: data/given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf/CAMS-REG-v8_1_emissions_year2019.nc
+  corine: data/CORINE/U2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif
+  nuts_gpkg: Data/geometry/NUTS_RG_20M_2021_3035.gpkg
+  osm_gpkg: data/Offroad/osm_offroad_layers.gpkg
+  population_tif: data/PublicPower/landscan/landscan-global-2020.tif
+  ceip_xlsx: data/Offroad/CEIP_Offroad.xlsx
+  ceip_sheet: null
+  facilities_tif: null
+  country_grid_tif: null
+
+# Map NUTS CNTR_CODE (EL) → ISO3 used in CEIP / CAMS
+cntr_code_to_iso3:
+  EL: GRC
+  GR: GRC
+
+defaults:
+  fallback_country_iso3: GRC
+  ceip_year: 2019
+  default_shares_rail: 0.34
+  default_shares_pipe: 0.33
+  default_shares_nonroad: 0.33
+
+pollutants:
+  - nox
+  - pm2_5
+  - nh3
+  - co
+  - nm_voc
+  - so2
+
+ceip_pollutant_aliases:
+  NOX: nox
+  PM25: pm2_5
+  PM2.5: pm2_5
+  PM2_5: pm2_5
+  NMVOC: nm_voc
+  SOX: so2
+  SO2: so2
+
+proxy:
+  rail_buffer_m: 150
+  pipeline_buffer_m: 75
+  osm_subdivide: 4
+  pipe_fac_weight: 0.8
+  pipe_raw_weight: 0.2
+  w_agri: 0.5
+  w_ind: 0.35
+  w_pop: 0.15
+  w_clc_ind: 0.6
+  w_osm_ind: 0.4
+  corine_agri_codes:
+    - 211
+    - 212
+    - 213
+    - 241
+    - 242
+    - 243
+  corine_agri_optional:
+    - 221
+    - 222
+    - 223
+  corine_ind_codes:
+    - 121
+    - 131
+    - 133
+  corine_ind_optional:
+    - 123
+
+output:
+  dir: SourceProxies/outputs/EL
+  filename: Offroad_Sourcearea.tif

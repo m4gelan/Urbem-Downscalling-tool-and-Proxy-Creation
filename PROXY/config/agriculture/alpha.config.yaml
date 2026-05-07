@@ -1,0 +1,47 @@
+_description: European mass shares (alpha) by pollutant and process_id; maps to source_relevance/*.py
+  stems.
+pollutants:
+  CH4:
+  - process_id: enteric_grazing
+    alpha: 0.79
+  - process_id: manure
+    alpha: 0.198
+  - process_id: rice
+    alpha: 0.012
+  NH3:
+  - process_id: fertilized_land
+    alpha: 0.541
+  - process_id: manure
+    alpha: 0.459
+  NOx:
+  - process_id: fertilized_land
+    alpha: 0.936
+  - process_id: manure
+    alpha: 0.055
+  - process_id: biomass_burning
+    alpha: 0.009
+  CO2:
+  - process_id: urea_application
+    alpha: 0.468
+  - process_id: soil_liming
+    alpha: 0.532
+  NMVOC:
+  - process_id: agricultural_soils
+    alpha: 0.239
+  - process_id: manure
+    alpha: 0.76
+  - process_id: biomass_burning
+    alpha: 0.001
+  CO:
+  - process_id: biomass_burning
+    alpha: 1.0
+  PM10:
+  - process_id: biomass_burning
+    alpha: 0.036
+  - process_id: livestock_housing
+    alpha: 0.964
+  PM2.5:
+  - process_id: biomass_burning
+    alpha: 0.146
+  - process_id: livestock_housing
+    alpha: 0.854

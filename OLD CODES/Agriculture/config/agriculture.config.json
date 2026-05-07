@@ -1,0 +1,48 @@
+{
+  "project_root": null,
+  "run": {
+    "country": ["AT","BE","BG","CY","CZ","DE","DK","EE","EL","ES","FI","FR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"],
+    "year": 2020,
+    "nodata": -128,
+    "intermediary": true
+  },
+  "lucas_build": {
+    "lucas_data": "data/Agriculture/EU_LUCAS_2022.csv",
+    "synthetic_n_rate_json": "Agriculture/config/synthetic_N_rate.json",
+    "output_csv": "Agriculture/results/lucas_nuts2_clc_relevance.csv",
+    "corine_raster": null,
+    "gfed41s_agri_dm_mean_npy":    "data/Agriculture/gfed41s_agri_dm_mean.npy",
+    "gfed41s_grid_area_npy":       "data/Agriculture/gfed41s_grid_area.npy",
+    "gfed41s_nuts2_lookup_parquet":"data/Agriculture/gfed41s_nuts2_lookup.parquet",
+    "lucas_soil_2018_csv":         "data/Agriculture/LUCAS-SOIL-2018-v2/LUCAS-SOIL-2018.csv"
+  },
+  "paths": {
+    "geometry": {
+      "nuts_gpkg": "Data/geometry/NUTS_RG_20M_2021_3035.gpkg"
+    },
+    "census": {
+      "c21_gpkg": "data/Agriculture/C21.gpkg",
+      "c21_field_map_json": "Agriculture/config/emission_factors/c21_census_field_map.json",
+      "c21_explore_head_json": "data/Agriculture/C21.explore_head.json",
+      "enteric_factors_json": "Agriculture/config/emission_factors/enteric_fermentation_factors.json",
+      "housing_factors_json": "Agriculture/config/emission_factors/livestock_housing_factors.json"
+    },
+    "inputs": {
+      "corine_raster": "Input/CORINE/U2018_CLC2018_V2020_20u1.tif"
+    },
+    "outputs": {
+      "long_csv": "Agriculture/results/weights_long.csv",
+      "wide_csv": "Agriculture/results/weights_wide.csv",
+      "pollutant_dir": "Agriculture/results/pollutants",
+      "combined_csv": "Agriculture/results/weights_wide.csv",
+      "intermediary_dir": "Agriculture/results/intermediary"
+    }
+  },
+  "visualization": {
+    "enabled": true,
+    "output_dir": "Agriculture/results/plots",
+    "dpi": 150,
+    "map_clc_code": 18,
+    "plot_pollutants": ["CH4", "NOx"]
+  }
+}

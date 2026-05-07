@@ -1,0 +1,42 @@
+version: 1
+
+scoring:
+  distance_weight: 0.5
+  pollutant_weight: 0.3
+  activity_weight: 0.2
+  min_score: 0.4
+  nearest_candidates: 25
+  fallback_min_score: 0.25
+  fallback_nearest_candidates: 60
+  fallback_pollutant_weight: 0.15
+  fallback_activity_weight: 0.1
+  fallback_distance_weight: 0.75
+  min_coverage_rate: 0.2
+  # No facility farther than this (km) is considered a candidate (per-sector override below).
+  max_match_distance_km: 30.0
+
+tie_break:
+  - higher_score
+  - lower_distance
+  - stable_facility_id
+
+sector_profiles:
+  A_PublicPower:
+    preferred_eprtr_sector_codes: [1]
+    max_match_distance_km: 20.0
+  B_Industry:
+    preferred_eprtr_sector_codes: [2, 3, 4, 6]
+    max_match_distance_km: 25.0
+  D_Fugitive:
+    # E-PRTR main activity: 1 Energy, 3 Mineral, 4 Chemical (override in fugitive.yaml if needed).
+    preferred_eprtr_sector_codes: [1, 3, 4]
+    max_match_distance_km: 25.0
+  E_Solvents:
+    preferred_eprtr_sector_codes: [9]
+    max_match_distance_km: 25.0
+  J_Waste:
+    preferred_eprtr_sector_codes: [5]
+    max_match_distance_km: 12.0
+  H_Aviation:
+    max_match_distance_km: 10.0
+

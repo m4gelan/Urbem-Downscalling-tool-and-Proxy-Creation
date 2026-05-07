@@ -1,0 +1,285 @@
+\section{Waste}
+\label{sec:waste}
+
+\subsection{Scope and inventory mapping}
+
+This block targets the \textbf{area-source} component of CAMS GNFR~J
+(\emph{Waste}). In the CAMS-REG-ANT inventory, GNFR~J is reported as a
+single aggregated waste sector, while the fine-scale geography of waste
+emissions is known to differ substantially between landfill-related
+activity, wastewater handling, and diffuse residual waste processes.
+The methodological problem is therefore not the construction of final
+downscaled emissions at this stage, but the construction of
+pollutant-specific \emph{within-cell spatial weights} that can later be
+combined with the corresponding CAMS cell totals.
+
+This distinction is essential. The workflow described here produces a
+multi-band raster of normalised fine-grid weights, one band per
+pollutant, such that the fine-pixel shares sum to unity within each
+CAMS GNFR~J area cell. It does not by itself alter the CAMS emission
+mass, nor does it claim that CAMS already resolves the internal waste
+subsectors needed for spatial allocation.
+
+\subsection{Conceptual design}
+
+GNFR~J is internally heterogeneous. Landfill-type activity, composting,
+anaerobic digestion, domestic and industrial wastewater handling, open
+waste burning, and other diffuse waste processes do not follow the same
+fine-scale spatial pattern. A single land-cover mask would therefore
+force all waste-related pollutants to share the same geography despite
+their different process origins.
+
+The upgraded design separates the problem into three linked elements:
+\begin{itemize}
+  \item a set of three operational proxy families representing solid
+        waste treatment, wastewater, and residual diffuse waste;
+  \item pollutant-specific country-level family shares derived from
+        CEIP/NRD waste subsector totals;
+  \item a final composite proxy that recombines the common family
+        surfaces with the pollutant-specific national shares and is then
+        normalised within each CAMS parent cell.
+\end{itemize}
+
+This produces a transparent two-stage weighting system. First, the
+ancillary geospatial datasets describe where different waste-related
+activities are most plausibly located. Second, the CEIP/NRD national
+subsector totals determine how strongly each pollutant should follow
+each proxy family in each country. Pollutant bands may therefore differ
+spatially even though CAMS provides only one aggregate GNFR~J area layer.
+The operational family split and the supporting waste proxy datasets are
+summarised in Appendix~\ref{app:waste_downscaling},
+Tables~\ref{tab:waste_families} and \ref{tab:waste_proxy_inputs}.
+
+\subsection{Operational proxy families and pollutant shares}
+
+The detailed CEIP/NRD waste subsectors available for this block include
+biological treatment of waste, waste incineration, open burning,
+wastewater handling, and residual waste categories. For the area-proxy
+workflow, these subsectors are aggregated into three operational
+families:
+\begin{itemize}
+  \item \textbf{Solid waste treatment:} 5A, 5B1, 5B2;
+  \item \textbf{Wastewater:} 5D1, 5D2, 5D3;
+  \item \textbf{Residual diffuse waste:} 5C2, 5E.
+\end{itemize}
+
+Incineration-like subsectors (\textbf{all 5C1$\ast$ codes}) are excluded
+from the default area-weighting workflow. This is a deliberate design
+choice intended to avoid double counting with point-source treatment of
+waste incineration facilities, which are conceptually closer to
+stack-like infrastructure than to diffuse area activity.
+
+Let $c$ denote country and $p$ pollutant. The national CEIP/NRD family
+totals are written as
+\begin{equation}
+  E_{\mathrm{solid},c,p} =
+  E_{5A,c,p} + E_{5B1,c,p} + E_{5B2,c,p},
+\end{equation}
+\begin{equation}
+  E_{\mathrm{ww},c,p} =
+  E_{5D1,c,p} + E_{5D2,c,p} + E_{5D3,c,p},
+\end{equation}
+\begin{equation}
+  E_{\mathrm{res},c,p} =
+  E_{5C2,c,p} + E_{5E,c,p}.
+\end{equation}
+
+The corresponding pollutant-specific family shares are
+\begin{equation}
+  w_{\mathrm{solid},c,p} =
+  \frac{E_{\mathrm{solid},c,p}}
+       {E_{\mathrm{solid},c,p} + E_{\mathrm{ww},c,p} + E_{\mathrm{res},c,p}},
+\end{equation}
+\begin{equation}
+  w_{\mathrm{ww},c,p} =
+  \frac{E_{\mathrm{ww},c,p}}
+       {E_{\mathrm{solid},c,p} + E_{\mathrm{ww},c,p} + E_{\mathrm{res},c,p}},
+\end{equation}
+\begin{equation}
+  w_{\mathrm{res},c,p} =
+  \frac{E_{\mathrm{res},c,p}}
+       {E_{\mathrm{solid},c,p} + E_{\mathrm{ww},c,p} + E_{\mathrm{res},c,p}}.
+\end{equation}
+
+By construction,
+\begin{equation}
+  w_{\mathrm{solid},c,p} +
+  w_{\mathrm{ww},c,p} +
+  w_{\mathrm{res},c,p} = 1.
+\end{equation}
+
+If the denominator is zero for a country--pollutant pair, the
+implementation uses a transparent fallback ladder: first the mean family
+mixture from other pollutants available for the same country, then a
+European mean across countries with valid data, and finally an equal
+split across the three families. These fallbacks should be interpreted
+as regularisation devices that keep the weighting system operational
+when subsector-resolved waste reporting is incomplete.
+
+\subsection{Family-specific spatial proxies}
+
+Let $i$ denote a fine pixel on the reference grid. The method constructs
+three non-negative family surfaces
+$P_{\mathrm{solid},c}(i)$, $P_{\mathrm{ww},c}(i)$, and
+$P_{\mathrm{res},c}(i)$ from harmonised ancillary datasets, reprojected
+to a common fine grid and transformed to unitless relevance fields.
+These surfaces do not represent emissions directly; they represent the
+relative spatial plausibility of each family.
+
+\paragraph{Solid waste treatment.}
+The solid-waste proxy is anchored primarily in CORINE Land Cover class
+132 (\emph{dump sites}), which is the most direct harmonised European
+land-cover indicator of landfill-type activity. Because composting and
+anaerobic digestion are not consistently captured by one dedicated
+pan-European land-cover class, the method adds CORINE class 121
+(\emph{industrial or commercial units}) as a secondary support layer.
+OpenStreetMap waste-related features, where available, are used only as
+geometric refinement of this support and not as a standalone estimate of
+activity intensity. This hierarchy reflects the stronger semantic link
+between class~132 and solid waste disposal, while acknowledging the weak
+harmonised EU-wide evidence base for composting and anaerobic digestion.
+
+\paragraph{Wastewater.}
+The wastewater proxy combines wastewater infrastructure and settlement
+support. UWWTD agglomerations describe the broad serviced population
+footprint, while UWWTD treatment plants provide infrastructure anchors
+for treatment-related activity. These layers are complemented by GHSL
+population and Copernicus imperviousness as distributed support for
+built-up wastewater generation. An optional industrial-land term may be
+added to reflect the spatial relevance of industrial wastewater
+handling. The resulting proxy therefore links domestic wastewater mainly
+to populated serviced areas, while retaining explicit support from
+wastewater infrastructure.
+
+\paragraph{Residual diffuse waste.}
+The residual diffuse proxy is designed to remain spatially diffuse
+rather than infrastructure-dominated. It combines GHSL population with
+GHSL settlement classes emphasising rural or low-density settlement
+patterns, together with imperviousness as a supplementary settlement
+indicator where appropriate. This reflects the intended interpretation
+of residual diffuse waste as a combination of general settlement-related
+waste activity and open burning processes that are more plausibly
+associated with rural or peri-urban populations than with large
+specialised facilities.
+
+\subsection{Composite proxy and within-cell normalisation}
+
+For pollutant $p$, country $c$, and fine pixel $i$, the raw composite
+waste proxy is
+\begin{equation}
+  P_{J,c,p}(i) =
+  w_{\mathrm{solid},c,p} \, P_{\mathrm{solid},c}(i)
+  + w_{\mathrm{ww},c,p} \, P_{\mathrm{ww},c}(i)
+  + w_{\mathrm{res},c,p} \, P_{\mathrm{res},c}(i).
+\end{equation}
+
+This equation expresses the central logic of the workflow. The
+fine-scale geography comes from the three common family surfaces, while
+the pollutant-specific and country-specific differences come from the
+CEIP/NRD-derived weights. A pollutant whose national waste budget is
+dominated by wastewater will inherit more of the wastewater geography;
+a pollutant dominated by landfill-type or residual waste processes will
+inherit more of those respective families.
+
+Let $m$ denote a CAMS GNFR~J area cell and let $i \in m$ denote fine
+pixels whose centres fall inside that CAMS cell. The final within-cell
+weight is then
+\begin{equation}
+  W_{J,c,p}(i) =
+  \frac{P_{J,c,p}(i)}
+       {\displaystyle\sum_{k \in m} P_{J,c,p}(k)}.
+\end{equation}
+
+By construction,
+\begin{equation}
+  \sum_{i \in m} W_{J,c,p}(i) = 1
+  \qquad \forall m,p.
+\end{equation}
+
+If the denominator is zero for a given CAMS cell and pollutant, the
+algorithm falls back to a uniform distribution over the valid fine-grid
+support of that CAMS cell. This ensures that a CAMS cell retains a
+complete weight field even when the fine-scale proxy evidence is absent
+locally.
+
+The final product is therefore a set of pollutant-specific
+\emph{normalised weighting rasters}. These layers are intended for a
+later downscaling step in which they may be combined with the
+corresponding CAMS cell totals. They are not themselves the downscaled
+emissions.
+
+\subsection{Inputs and software}
+
+The main inputs are summarised in
+Table~\ref{tab:waste_inputs}. The underlying datasets themselves are
+described in Appendix~\ref{app:datasets}, including the CEIP/NRD waste
+workbook (Appendix~\ref{app:waste_ceip}), the UWWTD layers
+(Appendix~\ref{app:waste_uwwtd}), the GHSL population and settlement
+products (Appendix~\ref{app:waste_ghsl}), Copernicus imperviousness
+(Appendix~\ref{app:waste_imperviousness}), and the optional
+OpenStreetMap waste-feature extract (Appendix~\ref{app:waste_osm}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Main inputs for CAMS GNFR~J waste weighting layers.}
+  \label{tab:waste_inputs}
+  \begin{tabular}{p{3.4cm}p{9.3cm}}
+    \hline
+    Ingredient & Role \\
+    \hline
+    CAMS-REG-ANT NetCDF & GNFR~J area-cell geometry, pollutant list, and parent-cell support for within-cell normalisation \\
+    CEIP/NRD waste emissions & Country- and pollutant-specific subsector totals used to derive $w_{\mathrm{solid}}$, $w_{\mathrm{ww}}$, and $w_{\mathrm{res}}$ \\
+    CORINE CLC 2018 & Reference grid; class~132 for dump sites and class~121 for industrial/commercial support \\
+    OpenStreetMap waste features & Optional geometric refinement of solid-waste support \\
+    UWWTD agglomerations & Spatial support for serviced wastewater population \\
+    UWWTD treatment plants & Infrastructure anchors for wastewater activity \\
+    GHSL population / settlement classes & Diffuse settlement support for wastewater and residual waste families \\
+    Copernicus imperviousness & Built-surface support for wastewater and residual waste proxies \\
+    NUTS geometry & Country masks and reference-grid domain construction \\
+    \hline
+  \end{tabular}
+\end{table}
+
+The implementation is designed as a modular Python workflow using
+\texttt{rasterio}, \texttt{geopandas}, \texttt{xarray},
+\texttt{numpy}, \texttt{pandas}, and related GIS utilities. The output
+is written as a multi-band GeoTIFF of pollutant-specific weights,
+accompanied by diagnostic tables for the CEIP family shares and for
+CAMS cells requiring zero-proxy fallback.
+
+\subsection{Interpretation and limitations}
+
+The three family surfaces should be interpreted as first-order spatial
+likelihood layers rather than as direct measurements of waste activity.
+They identify plausible environments of occurrence for the main waste
+process groups represented inside GNFR~J, but they do not reconstruct
+facility throughput, wastewater loads, or waste quantities in physical
+units at pixel level.
+
+Several limitations follow directly from that role.
+
+First, CAMS provides only an aggregate GNFR~J area layer and does not
+separate the waste sector into internally resolved area subcategories.
+The decomposition into three proxy families is therefore an external
+analytical construction rather than an inventory-native distinction.
+
+Second, harmonised European proxy evidence is uneven across the waste
+subsectors. Landfill-type activity is relatively well represented by
+CORINE class~132, but composting and anaerobic digestion do not have an
+equally direct EU-wide land-cover equivalent. Their spatial placement
+therefore relies partly on broader industrial/commercial support and, if
+available, auxiliary OSM geometry.
+
+Third, waste incineration subsectors are excluded by default from the
+area-weighting methodology. This improves consistency with a separate
+point-source treatment of incineration facilities, but it also means
+that the area proxy is intentionally not a full representation of all
+reported CEIP waste processes.
+
+Despite these limitations, the GNFR~J workflow represents a substantial
+improvement over a single undifferentiated waste proxy. It preserves the
+country- and pollutant-specific subsector structure visible in CEIP/NRD
+reporting, allows landfill, wastewater, and diffuse waste processes to
+follow different fine-scale geographies, and maintains exact
+within-CAMS-cell normalisation for the weighting raster ultimately used
+in the downscaling pipeline.

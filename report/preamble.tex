@@ -1,0 +1,199 @@
+% ==============================================================================
+% preamble.tex
+% Global settings, packages and custom commands for the PDM thesis.
+% Included by main.tex via \input{preamble}.
+% ==============================================================================
+
+% ------------------------------------------------------------------------------
+% Page layout
+% ------------------------------------------------------------------------------
+\usepackage[
+  a4paper,
+  top=2.5cm, bottom=2.5cm,
+  left=3cm,  right=2.5cm,
+  headheight=14pt
+]{geometry}
+
+% ------------------------------------------------------------------------------
+% Language & encoding
+% ------------------------------------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{microtype}          % Better character spacing / justification
+
+% ------------------------------------------------------------------------------
+% Typography
+% ------------------------------------------------------------------------------
+\usepackage{lmodern}            % Latin Modern fonts (scalable)
+\usepackage{setspace}
+\setstretch{1.12}               % Tighter than one-and-a-half spacing (whole document)
+
+% ------------------------------------------------------------------------------
+% Mathematics
+% ------------------------------------------------------------------------------
+\usepackage{amsmath, amssymb, amsthm}
+
+% ------------------------------------------------------------------------------
+% Figures & tables
+% ------------------------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc}
+\usepackage[
+  font=small,
+  labelfont=bf,
+  labelsep=period
+]{caption}
+\usepackage{subcaption}         % \begin{subfigure}
+\usepackage{float}              % [H] placement specifier
+\usepackage{booktabs}           % \toprule, \midrule, \bottomrule
+\usepackage{multirow}           % Cells spanning multiple rows
+\usepackage{array}              % Advanced column formatting
+\usepackage{longtable}          % Tables spanning multiple pages
+\usepackage{rotating}           % Sideways figures / tables
+\graphicspath{{figures/}}       % Default figure search path
+\usepackage{threeparttable}
+\usepackage{tablefootnote}
+% ------------------------------------------------------------------------------
+% Units (atmospheric science: µg/m³, km², t/year, etc.)
+% ------------------------------------------------------------------------------
+\usepackage{siunitx}
+\sisetup{
+  per-mode          = symbol,
+  range-phrase      = {--},
+  range-units       = single,
+  detect-all
+}
+\usepackage{xspace}
+% Convenient shortcuts
+\newcommand{\ugm}{\si{\micro\gram\per\cubic\metre}}
+\newcommand{\kmsq}{\si{\kilo\metre\squared}}
+\newcommand{\tyr}{\si{\tonne\per\year}}
+
+% ------------------------------------------------------------------------------
+% Colours
+% ------------------------------------------------------------------------------
+\usepackage[dvipsnames, table]{xcolor}
+\definecolor{epflred}{RGB}{230, 0, 26}      % EPFL brand red
+\definecolor{noablue}{RGB}{0, 84, 166}      % NOA brand blue
+\definecolor{linkblue}{RGB}{0, 70, 140}
+
+% ------------------------------------------------------------------------------
+% Bibliography (natbib must load BEFORE hyperref for correct link integration)
+% ------------------------------------------------------------------------------
+\usepackage[
+  numbers,
+  sort&compress,
+  square,
+  comma
+]{natbib}
+\bibliographystyle{plainnat}    % Numbered refs; works with hyperref and URL fields
+
+% ------------------------------------------------------------------------------
+% URLs (load before hyperref; allows breaks in paths — used by the .bbl via \url)
+% ------------------------------------------------------------------------------
+\usepackage{xurl}             % Like url, with more break characters for long links
+
+% ------------------------------------------------------------------------------
+% Hyperlinks & PDF metadata  (load AFTER most other packages, AFTER natbib)
+% ------------------------------------------------------------------------------
+\usepackage[
+  colorlinks  = true,
+  linkcolor   = linkblue,
+  citecolor   = linkblue,
+  urlcolor    = linkblue,
+  breaklinks  = true,
+  pdftitle    = {High-Resolution Urban Emission Inventories for Air Quality Modelling},
+  pdfauthor   = {Leo Pillac-Mage},
+  pdfsubject  = {EPFL Master Thesis 2026}
+]{hyperref}
+\hypersetup{pdfborder={0 0 0}} % avoid boxes if links are ever drawn as borders
+
+% ------------------------------------------------------------------------------
+% Cross-references (load AFTER hyperref)
+% ------------------------------------------------------------------------------
+\usepackage{cleveref}           % \cref{fig:map} → "Figure 3"
+
+% ------------------------------------------------------------------------------
+% Headers & footers
+% ------------------------------------------------------------------------------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\leftmark}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Plain style for chapter opening pages
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[C]{\small\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% ------------------------------------------------------------------------------
+% Code listings
+% ------------------------------------------------------------------------------
+\usepackage{listings}
+\lstset{
+  basicstyle   = \ttfamily\footnotesize,
+  breaklines   = true,
+  frame        = single,
+  numbers      = left,
+  numberstyle  = \tiny\color{gray},
+  keywordstyle = \color{blue}\bfseries,
+  commentstyle = \color{gray}\itshape,
+  stringstyle  = \color{BrickRed},
+  showstringspaces = false,
+  tabsize      = 4
+}
+% Python and R language definitions
+\lstdefinelanguage{Python}{
+  keywords={import,from,def,class,return,if,else,elif,for,while,try,except,with,as,in,not,and,or,True,False,None},
+  morecomment=[l]{\#},
+  morestring=[b]"
+}
+\lstdefinelanguage{R}{
+  keywords={function,if,else,for,while,return,library,require,TRUE,FALSE,NULL,NA},
+  morecomment=[l]{\#},
+  morestring=[b]"
+}
+
+% ------------------------------------------------------------------------------
+% Draft tools — TODO notes (comment out for final version)
+% ------------------------------------------------------------------------------
+\usepackage[colorinlistoftodos, prependcaption]{todonotes}
+% Usage: \todo{Fix this} or \todo[inline]{Long comment}
+% To disable all notes in final version, replace the line above with:
+% \usepackage[disable]{todonotes}
+
+% ------------------------------------------------------------------------------
+% Miscellaneous utilities
+% ------------------------------------------------------------------------------
+\usepackage{lipsum}             % Placeholder text — remove when writing
+\usepackage{enumitem}           % Fine-grained list control
+\usepackage{csquotes}           % Context-sensitive quotation marks
+\usepackage{pdfpages}           % \includepdf for appendices
+\usepackage{emptypage}          % Suppress headers on empty pages
+
+% ------------------------------------------------------------------------------
+% Custom commands
+% ------------------------------------------------------------------------------
+% Abbreviations used throughout
+\newcommand{\cams}{CAMS\nobreakdash-REG}
+\newcommand{\urbem}{UrbEm}
+\newcommand{\episode}{EPISODE\nobreakdash-CityChem}
+
+% Shorthand for inline code
+\newcommand{\code}[1]{\texttt{#1}}
+
+% Supervisor and author information (edit here, used in titlepage)
+\newcommand{\thesisTitle}{High-Resolution Urban Emission Inventories\\for Air Quality Modelling}
+\newcommand{\thesisSubtitle}{Upgrade and Application of the UrbEm Downscaling Tool\\to the Metronome Mission Cities (Ioannina \& Kozani)}
+\newcommand{\thesisAuthor}{Leo Pillac-Mage}
+\newcommand{\supervisorNOA}{Dr.\ Evangelos Gerasopoulos \& Dr.\ Eleni Athanasopoulou}
+\newcommand{\institutionNOA}{National Observatory of Athens (NOA)}
+\newcommand{\supervisorEPFL}{[EPFL supervisor name]}
+\newcommand{\institutionEPFL}{\'Ecole Polytechnique F\'ed\'erale de Lausanne (EPFL)}
+\newcommand{\thesisYear}{2026}

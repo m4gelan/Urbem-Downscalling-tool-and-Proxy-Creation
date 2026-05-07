@@ -1,0 +1,219 @@
+\section{Residential and commercial stationary combustion}
+\label{sec:rescom}
+
+\subsection{Scope and inventory mapping}
+
+Residential and commercial combustion covers small stationary sources that are
+not public power or industrial plants: space and water heating, cooking, and
+related uses in dwellings and in commercial or institutional buildings. In the
+CAMS-REG-ANT GNFR split, these emissions are reported under
+\textbf{GNFR~C} (\emph{Other stationary combustion}), together with other
+non-industrial combustion that is not mapped to GNFR~A or~B
+\citep{cams_glob_ant}. The downscaling workflow described here targets the
+\textbf{area-source} component of GNFR~C (CAMS \texttt{source\_type} area),
+because that is the part of the inventory that requires redistribution from
+coarse CAMS grid cells to the national fine reference grid. Point sources, if
+present within the same GNFR code, are out of scope for this block.
+
+The method follows the EMEP/EEA air pollutant emission inventory guidebook
+logic for residential and commercial combustion \citep{EMEP_EEA}: emissions
+depend on fuel, appliance technology, and activity, while fine-scale spatial
+patterns are driven by building-related heat demand and settlement structure
+rather than by a single land-cover class.
+
+\subsection{Conceptual design}
+
+GNFR~C aggregates many fuels and devices into one sectoral total per CAMS cell
+and pollutant. A single land-cover proxy would force all pollutants to share
+the same spatial pattern. The upgraded approach instead combines:
+\begin{itemize}
+  \item \textbf{National activity structure} from GAINS domestic-sector shares
+        (fuel $\times$ appliance, year 2020), mapped to a small set of model
+        classes;
+  \item \textbf{Technology-specific emission factors} from EMEP/EEA-style
+        tabulations (fuel and appliance categories), yielding class- and
+        pollutant-dependent emission intensities;
+  \item \textbf{End-use calibration} from Eurostat household final energy by
+        end use, used as a country-specific multiplicative correction on mapped
+        activity;
+  \item \textbf{Spatial proxies} from Hotmaps building heat and floor-area
+        densities, refined with CORINE Land Cover (CLC) urban morphology
+        classes.
+\end{itemize}
+Pollutant-specific downscaling weights are built inside each CAMS cell so that
+fine-grid allocations sum to the CAMS cell total per pollutant (mass
+conserving).
+
+\subsection{Model classes}
+
+Process detail is represented through seven aggregated \emph{model classes}
+$k$: five residential ($R_{\ast}$) and two commercial ($C_{\ast}$), listed in
+Appendix~\ref{tab:rescom_model_classes}. They condense GAINS ``fuel $\times$
+device'' rows: each GAINS row is assigned to exactly one class using ordered
+rules on the GAINS fuel string and appliance string (first match wins). Rules
+are fuel-aware where needed so that the same appliance phrase in different
+fuels can still be aligned with the correct EMEP fuel category via explicit
+hints (Appendix~\ref{tab:rescom_emep_fuel_hints}).
+
+\subsection{National activity and end-use correction}
+
+Let $r$ denote the country (ISO3) associated with a CAMS source record, $(f,a)$
+a GAINS fuel--appliance pair, and $s_{r,f,a}$ the national share of fuel $f$
+allocated to appliance $a$ in the chosen GAINS year (converted to a fraction).
+Let $k(f,a)$ be the model class returned by the mapping rules. The
+end-use correction $F_{\mathrm{enduse}}(r,k)$ is derived from Eurostat household
+final energy shares by end use (Table~3 in the custom workbook; exact row
+labels in Appendix~\ref{tab:rescom_eurostat_table3}). Residential classes
+linked to space and water heating use the mean of the corresponding Eurostat
+shares where both are available. Commercial boiler classes use a neutral
+factor (unity) because the same household end-use table does not describe
+commercial buildings. If Eurostat parsing fails for a country, all factors
+default to unity.
+
+The corrected activity weight for row $(f,a)$ is
+\begin{equation}
+  A_{\mathrm{corr}}(r,f,a) = s_{r,f,a}\, F_{\mathrm{enduse}}\bigl(r,k(f,a)\bigr).
+\end{equation}
+
+\subsection{Emission factors and class intensities}
+
+For each pollutant $p$, emission factors $\mathrm{EF}_p(f,a)$ are taken from
+technology tables keyed by fuel and appliance character strings consistent with
+the EMEP/EEA guidebook (chapter~1A4 residential and commercial combustion).
+The implementation matches each GAINS row to the best-scoring table row using
+token overlap on fuel and appliance text, with an optional bonus when a
+user-defined hint links a GAINS fuel substring to an EMEP fuel substring
+(Appendix~\ref{tab:rescom_emep_fuel_hints}).
+
+The class-level intensity used in the weight builder is
+\begin{equation}
+  M(r,p,k) = \sum_{(f,a):\, k(f,a)=k} A_{\mathrm{corr}}(r,f,a)\,
+             \mathrm{EF}_p(f,a).
+\end{equation}
+Thus $M$ combines national structure, end-use calibration, and guidebook
+factors before any spatial pattern is applied. Pollutant-specific weights arise
+because $\mathrm{EF}_p$ differs across $p$ (including separate treatment of
+fossil and biogenic CO$_2$ when the inventory provides \texttt{co2\_ff} and
+\texttt{co2\_bf}; total CO$_2$ uses their sum when configured).
+
+\subsection{Spatial base proxies and CLC morphology}
+
+Let $i$ index pixels on the national CORINE reference window (same extent and
+resolution as the SourceProxies outputs: CLC grid aligned to the NUTS-based
+window). Hotmaps rasters supply residential and non-residential current heat
+density and gross floor area density, denoted
+$H_{\mathrm{res}}(i)$, $H_{\mathrm{com}}(i)$,
+$G_{\mathrm{res}}(i)$, $G_{\mathrm{com}}(i)$, harmonised to that grid.
+
+Base proxies combine heat and floor area with exponents
+$\gamma_{\mathrm{heat}}=0.7$ and $\gamma_{\mathrm{gfa}}=0.3$, or an additive
+alternative if a multiplicative form is numerically unstable:
+\begin{align}
+  R_{\mathrm{base}}(i) &=
+  H_{\mathrm{res}}(i)^{\gamma_{\mathrm{heat}}}\,
+  G_{\mathrm{res}}(i)^{\gamma_{\mathrm{gfa}}},
+  \\
+  C_{\mathrm{base}}(i) &=
+  H_{\mathrm{com}}(i)^{\gamma_{\mathrm{heat}}}\,
+  G_{\mathrm{com}}(i)^{\gamma_{\mathrm{gfa}}},
+\end{align}
+with non-negative inputs and missing values set to zero after resampling.
+
+CLC classes 111 (continuous urban fabric), 112 (discontinuous urban fabric), and
+121 (industrial or commercial units) define binary indicators
+$U_{111}(i)$, $U_{112}(i)$, $U_{121}(i)$.
+For residential fireplace and heating-stove classes, a morphology factor
+$f_R(i)$ upweights discontinuous urban fabric and downweights purely industrial
+cells relative to other locations; for commercial boiler classes, a factor
+$f_C(i)$ emphasises industrial/commercial and dense urban cells. Cooking stoves
+and residential boilers without that morphology use $R_{\mathrm{base}}(i)$ only.
+Full algebraic forms are given in the configuration; the role of CLC is to
+modulate \emph{where} within the building-energy proxy residential versus
+commercial combustion is emphasised, not to replace energy-based allocation.
+
+The spatial score for class $k$ is denoted $X(i,k)$: piecewise products of
+$R_{\mathrm{base}}$ or $C_{\mathrm{base}}$ with $f_R$ or $f_C$ as defined for
+each $k$.
+
+\subsection{Unnormalised weights, normalisation, and gridded emissions}
+
+For pollutant $p$ and fine pixel $i$ belonging to CAMS area cell $c$, let
+$r(i)$ be the country of the inventory record (taken from the CAMS country
+index for that cell). The unnormalised weight is
+\begin{equation}
+  U(i,p) = \sum_{k} M\bigl(r(i),p,k\bigr)\, X(i,k).
+\end{equation}
+Within each CAMS cell $c$,
+\begin{equation}
+  w(i,p) = \frac{U(i,p)}{\displaystyle\sum_{j \in c} U(j,p)},
+\end{equation}
+with the convention that if the denominator is zero or non-finite, weights are
+uniform over pixels intersecting $c$ inside the national domain. By construction,
+$\sum_{i \in c} w(i,p)=1$ for each $p$.
+
+Gridded emissions (kg\,yr$^{-1}$ per pixel) follow
+\begin{equation}
+  E(i,p) = w(i,p)\, E_{\mathrm{CAMS}}(c,p),
+\end{equation}
+where $E_{\mathrm{CAMS}}(c,p)$ is the CAMS GNFR~C area total for cell $c$ and
+pollutant $p$. The same workflow applies to NH$_3$, NO$_x$, SO$_x$, NMVOC,
+PM$_{2.5}$, PM$_{10}$, CO, and CO$_2$ (as total fossil plus biogenic CO$_2$
+when both components are summed).
+
+\subsection{Inputs and software}
+
+Table~\ref{tab:rescom_inputs} summarises mandatory inputs; Eurostat Table~1 fuel
+columns (Appendix~\ref{tab:rescom_eurostat_table1}) are documented for
+consistency with national fuel mix but are not yet used to rescale $M$.
+Implementation lives under \path{Residential/downscale/} with JSON
+configuration (\path{Residential/config/residential_cams_downscale.config.json},
+\path{Residential/config/eurostat_end_use.json},
+\path{Residential/config/GAINS_mapping.json},
+\path{Residential/config/EMEP_emission_factors.json}). Hotmaps GeoTIFFs can be
+retrieved with \path{Residential/auxiliaries/download_hotmaps_building_rasters.py}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Main inputs for GNFR~C residential/commercial downscaling.}
+  \label{tab:rescom_inputs}
+  \begin{tabular}{p{3.2cm}p{9.5cm}}
+    \hline
+    Ingredient & Role \\
+    \hline
+    CAMS-REG-ANT NetCDF & GNFR~C area emissions $E_{\mathrm{CAMS}}(c,p)$,
+      cell geometry, country index \\
+    CORINE CLC 2018 & Reference grid, classes 111/112/121 for morphology \\
+    Hotmaps (heat \& GFA) & $H_{\ast}$, $G_{\ast}$ building proxies \\
+    GAINS \texttt{dom\_share\_ENE\_*} & National fuel--appliance shares \\
+    Eurostat custom workbook & $F_{\mathrm{enduse}}$ from household end-use
+      shares (Table~3) \\
+    EMEP-style EF tables & $\mathrm{EF}_p(f,a)$ by fuel and appliance \\
+    NUTS geometry & National bounding window for the CLC reference grid \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{Limitations}
+
+\paragraph{Sector purity.} GNFR~C may include other stationary combustion than
+dwellings and services; the proxy cannot separate processes that CAMS does not
+split.
+
+\paragraph{Uniform national GAINS structure.} Appliance shares are applied
+uniformly within each country; there is no subnational GAINS disaggregation.
+
+\paragraph{Eurostat and commercial classes.} Household end-use factors do not
+describe commercial energy use; commercial classes rely on unity end-use
+factors unless extended later.
+
+\paragraph{EF matching.} Automatic string matching between GAINS and EMEP rows
+can mis-assign rare fuels; the hint table and manual EF tables should be
+audited for the countries of interest.
+
+\paragraph{CAMS cell versus national window.} Pixels outside the national CLC
+window or CAMS cells that do not intersect the window receive no allocation from
+those cells; boundary effects follow the same logic as for other CORINE-based
+proxies.
+
+Further tabulated detail (model classes, Eurostat labels, EMEP fuel hints)
+appears in Appendix~\ref{app:rescom_downscaling}.

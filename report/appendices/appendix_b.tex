@@ -1,0 +1,489 @@
+% ==============================================================================
+% Appendix B — Supplementary Figures and Tables
+% ==============================================================================
+
+\chapter{Supplementary Material}
+\section{Tables}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Indicative GNFR to IPCC (1996) sector codes}
+  \label{tab:gnfr_ipcc_mapping}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{ll}
+    \hline
+    IPCC code(s) & Description \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Power Generation ; A\_PublicPower}} \vspace{0.1cm} \\
+     1A1a & Energy industry  \\
+     1A1 & Power generation  \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Industrial processes ; B\_Industry}} \vspace{0.1cm} \\
+     1A(1b,1c,5b1),1B(1b,2a5,2a6,2b5),2C1b & Oil refineries and transformation / industry combustion \\
+     1A1b;1B2a5 & Petroleum refining and distribution \\
+     1A2 & Combustion in manufacturing industry \\
+     2A & Non-metallic mineral processes  \\
+     2B & Chemical processes \\
+     2\_3; 2B; 2D; 1A1b,1B2a5 & Industrial processes and product use\\
+     2C(1a \ldots 1f,2) & Iron and steel\\
+     2C3--2C5 & Aluminum, magnesium and steel production \\
+     2G & Non-energy use of fuels \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Residential ; C\_OtherStationary Comb}} \vspace{0.1cm}\\
+    1A4 & Residential and other stationary combustion \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Fugitive emissions from solid fuels ;D\_Fugitive}} \vspace{0.1cm}\\
+    1B(1a,2a1 \ldots 2a4, 2c); 7A & Fuel exploitation \\
+    --- & Manufacturing of solid fuels and fugitive emissions \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Solvents ; E\_Solvents}}\vspace{0.1cm} \\
+    3 & Solvents production and application \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Road transportation ; F\_RoadTransport}}  \vspace{0.1cm}\\ 
+    1A3b & Road transportation \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Ships ; G\_Shipping}}\vspace{0.1cm} \\
+    1A3d\_1C2 & Ships \\ 
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Non-road ground transportation ; I\_OffRoad}} \vspace{0.1cm} \\
+    1A3c\_1A3e & Non-road ground transportation \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Solid Waste and Waste Water ; J\_Waste}} \vspace{0.1cm} \\
+    6A, 6D & Waste incineration \\
+    6B & Solid waste disposal \\
+    6C & Waste water \\
+    \hline
+    \hline
+    \multicolumn{2}{@{}c@{}}{\textit{Agriculture ; K\_AgriLivestock \& L\_AgriOther }}\vspace{0.1cm} \\  
+     4B & Manure management (K)\\
+     4A & Enteric fermentation (L) \\
+     4C\_4D1\_4D2\_4D4 & Agricultural soils (L)  \\
+     4F & Agricultural waste / field burning (L)\\
+    
+    
+    \hline
+  \end{tabular}
+  \medskip
+
+  \footnotesize
+  See \cite{cams_glob_ant} and \cite{ipcc_efdb}.
+\end{table}
+
+
+
+\begin{table}[h]
+\centering
+\caption{CAMS-REG-ANT v8.1: total emissions by pollutant for GNFR K (AgriLivestock) and L (AgriOther), summing area and point sources. Units: kg yr$^{-1}$.}
+\label{tab:cams_kl_totals}
+\begin{tabular}{lrr}
+\hline
+Pollutant & K (AgriLivestock) & L (AgriOther) \\
+\hline
+CH$_4$ & $1.529 \times 10^{10}$ & $6.434 \times 10^{8}$ \\
+CO & $0$ & $1.413 \times 10^{9}$ \\
+NH$_3$ & $3.172 \times 10^{9}$ & $3.243 \times 10^{9}$ \\
+NMVOC & $2.612 \times 10^{9}$ & $7.561 \times 10^{8}$ \\
+NO$_x$ & $7.319 \times 10^{6}$ & $1.071 \times 10^{8}$ \\
+PM$_{10}$ & $2.745 \times 10^{8}$ & $4.742 \times 10^{8}$ \\
+PM$_{2.5}$ & $5.542 \times 10^{7}$ & $1.483 \times 10^{8}$ \\
+SO$_x$ & $0$ & $6.351 \times 10^{6}$ \\
+CO$_{2}$ (fossil) & $0$ & $1.099 \times 10^{10}$ \\
+CO$_{2}$ (biofuel) & $0$ & $2.490 \times 10^{10}$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Tables for agriculutral sector}
+
+\begin{table}[htbp]
+  \centering
+  \begin{threeparttable}
+    \caption{Mineral nitrogen rates $R_k$ from \texttt{synthetic\_N\_rate.json} (key \texttt{rates}). Units: kg~N~ha$^{-1}$. }
+    \label{tab:synthetic-n-rates}
+    \scriptsize
+    \setlength{\tabcolsep}{6pt}
+    \begin{tabular}{@{}lrr@{\hspace{2em}}lr@{}}
+      \toprule
+      Category $k$ & $R_k$ & & Category $k$ & $R_k$ \\
+      \midrule
+      wheat & 116 & & rapeseed & 146 \\
+      maize\_grain & 169 & & soya & 52 \\
+      rice & 118 & & cotton & 101 \\
+      barley & 99 & & tobacco & 29 \\
+      rye & 29 & & other\_industrial & 144 \\
+      oats & 43 & & dry\_pulse & 15 \\
+      other\_cereal & 52 & & tomato & 125 \\
+      potato & 77 & & other\_veg & 103 \\
+      sugar\_beet & 123 & & fodder\_crop & 51 \\
+      sunflower & 51 & & olive & 58 \\
+      vineyard & 28 & & fruit\_tree & 67 \\
+      citrus & 67 & & nuts\_tree & 56 \\
+      temporary\_grass & 90 & & permanent\_grass & 43 \\
+      shrub\_grass & 10 & & fallow & 0 \\
+      \bottomrule
+    \end{tabular}
+    
+    \begin{tablenotes}
+      \footnotesize
+      \item \textit{Note:} This data was derived from \citet{einarsson_2021}. The data can be accessed \href{https://figshare.com/articles/dataset/EuropeAgriDB_v1_0_Source_code_and_data/16540314}{here} and the code \texttt{synth\_rate\_n.py} creates the tables presented above.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\begin{threeparttable}
+\caption{NH$_3$ housing emission factors used for livestock categories. Values in gN head$^{-1}$ day$^{-1}$ are derived from \citet{Misselbrook_2000} using standard liveweight assumptions consistent with IPCC guidelines \cite{IPPC_2006_V10}.}
+\label{tab:livestock_housing_factors}
+\begin{tabular}{lcccc}
+\toprule
+Animal & gN/LU/day & Liveweight (kg) & gN/head/day & IPCC table \\
+\midrule
+Bovine  & 34.3  & 600  & 41.16 & T10A-4 \\
+Pigs    & 80.0  & 50   & 8.00  & T10A-7 \\
+Poultry & 150.0 & 1.8  & 0.54  & T10A-9 \\
+Sheep   & 3.0   & 48.5 & 0.291 & T10A-9 \\
+Goats   & 3.0   & 38.5 & 0.231 & T10A-9 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item Per-head emission factors are obtained as
+\[
+EF_{\mathrm{animal}} \; [\mathrm{gN \, head}^{-1}\mathrm{day}^{-1}]
+=
+EF_{\mathrm{animal}} \; [\mathrm{gN \, LU}^{-1}\mathrm{day}^{-1}]
+\times \frac{\mathrm{Liveweight}}{500},
+\]
+assuming the conventional definition \(1\ \mathrm{LU} = 500\ \mathrm{kg}\) liveweight.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \begin{threeparttable}
+  \caption{Eligible crop types for the biomass-burning proxy (\(\mathcal{C}_{\mathrm{emep}}\), NFR~4.F).}
+  \label{tab:emep-s-values}
+  \small
+  \begin{tabular}{@{}llcl@{}}
+    \hline
+    Crop & LC1 & \(s\) & Note \\
+         &      & (kg/kg) &      \\
+    \hline
+    Wheat (common)        & B11 & 1.3 & \\
+    Wheat (durum)         & B12 & 1.3 & a \\
+    Barley                & B13 & 1.2 & \\
+    Rye                   & B14 & 1.6 & \\
+    Oats                  & B15 & 1.3 & \\
+    Maize (grain)         & B16 & 1.0 & \\
+    Rice                  & B17 & 1.4 & \\
+    Triticale             & B18 & 1.2 & b \\
+    Other cereals         & B19 & 1.2 & c \\
+    Soya                  & B33 & 2.1 & \\
+    Dry pulses            & B41 & 1.7 & d \\
+    \hline
+    \multicolumn{4}{@{}l@{}}{\textit{Non-eligible crops (\(s = 0\))}} \\
+    Root crops            & B21--B23          & 0 & \\
+    Oilseeds excl.\ soya  & B31, B32, B34--B37 & 0 & \\
+    Vegetables, flowers   & B42--B45          & 0 & \\
+    Fodder crops          & B51--B55          & 0 & \\
+    Permanent crops       & B71--B84          & 0 & \\
+    Fallow, grassland     & BX1, BX2, E       & 0 & \\
+    \hline
+  \end{tabular}
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Source: residue-to-yield ratios from EMEP/EEA Guidebook 2023, Table~3-2; LUCAS 2022 LC1 codes from \texttt{Agriculture/config/synthetic\_N\_rate.json}. All LC1 codes not listed as eligible receive \(s = 0\).
+    \item[a] Same \(s\) as common wheat.
+    \item[b] Not reported in EMEP Table~3-2; assigned the barley value.
+    \item[c] EU production-weighted cereal mean.
+    \item[d] Mean of peas (\(1.5\)) and beans (\(2.1\)).
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \begin{threeparttable}
+  \caption{NMVOC-emitting crop categories and assigned per-hectare emission factors.}
+  \label{tab:nmvoc-ef}
+  \small
+  \begin{tabular}{@{}p{4.8cm}p{2.4cm}ccp{3.2cm}@{}}
+    \toprule
+    Crop category (Th\"unen) & LUCAS LC1 & EF class & EF & Note \\
+                             &           &          & (kg ha$^{-1}$ yr$^{-1}$) & \\
+    \midrule
+    Wheat                    & B11, B12  & wheat & 0.32 & a \\
+    Rye                      & B14       & rye   & 1.03 & a \\
+    Oilseed rape             & B32       & rape  & 1.34 & b \\
+    Clover, grass mixtures, alfalfa & B51--B55 & grass & 0.41 & c \\
+    Pastures and meadows     & E10, E20  & grass & 0.41 & c \\
+    \addlinespace
+    Barley                   & B13       & wheat & 0.32 & d \\
+    Oat                      & B15       & wheat & 0.32 & d \\
+    Triticale                & B18       & wheat & 0.32 & d \\
+    Cereals, whole-plant harvest & B19   & wheat & 0.32 & d \\
+    Grain maize              & B16       & wheat & 0.32 & d \\
+    Maize for silage         & B16       & wheat & 0.32 & d \\
+    Rice                     & B17       & wheat & 0.32 & d \\
+    Tuber crops              & B21--B23  & wheat & 0.32 & d \\
+    Pulses                   & B41       & wheat & 0.32 & d \\
+    \midrule
+    \multicolumn{5}{@{}l@{}}{\textit{Non-emitting categories (\(EF = 0\))}} \\
+    Permanent crops          & B71--B84  & --    & 0    & e \\
+    Other oilseeds           & B31, B33--B37 & -- & 0   & e \\
+    Vegetables and flowers   & B42--B45  & --    & 0    & e \\
+    Fallow                   & BX1, BX2  & --    & 0    & e \\
+    Shrub grassland          & E30       & --    & 0    & e \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Source: three base EFs from EMEP/EEA Guidebook Table~3.3 \citep{EEA_guidebook}; crop assignment follows the Th{\"u}nen NIR methodology (Section~2.8, Table~11 in \citet{thuenen_nmvoc}).
+    \item[a] Measured EF reported for the crop class in the Guidebook (K\"onig/Lamb).
+    \item[b] Measured EF reported for rape (K\"onig, 1995).
+    \item[c] Grass EF at 15\textdegree C.
+    \item[d] No crop-specific EF available; wheat EF assigned following the Th{\"u}nen categorization.
+    \item[e] Categories treated as non-emitting in this proxy.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+\section{GNFR~C residential and commercial downscaling (reference tables)}
+\label{app:rescom_downscaling}
+
+This section complements Section~\ref{sec:rescom}. Eurostat row strings follow
+the custom extract labelling; sheet names may differ slightly between downloads
+and are set in the run configuration.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Aggregated model classes $k$ for GAINS-to-proxy mapping (GNFR~C).}
+  \label{tab:rescom_model_classes}
+  \begin{tabular}{p{3.5cm}p{9.5cm}}
+    \hline
+    Class & Intended use \\
+    \hline
+    \texttt{R\_FIREPLACE} & Residential fireplaces (household or agriculture
+      forestry other sector in GAINS) \\
+    \texttt{R\_HEATING\_STOVE} & Residential heating stoves \\
+    \texttt{R\_COOKING\_STOVE} & Cooking stoves, three-stone stoves \\
+    \texttt{R\_BOILER\_MAN} & Single-house or medium boilers, manual firing,
+      non-commercial contexts \\
+    \texttt{R\_BOILER\_AUT} & Single-house or medium boilers, automatic firing,
+      non-commercial contexts \\
+    \texttt{C\_BOILER\_MAN} & Medium boilers, manual, commercial \\
+    \texttt{C\_BOILER\_AUT} & Medium boilers, automatic, commercial \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Eurostat household end-use row labels (Table~3) used to match
+    national shares; short synonyms may also be configured.}
+  \label{tab:rescom_eurostat_table3}
+  \footnotesize
+  \begin{tabular}{@{}p{0.92\textwidth}@{}}
+    \hline
+    Label (full string) \\
+    \hline
+    Final consumption - other sectors - households - energy use - space heating \\
+    Final consumption - other sectors - households - energy use - space cooling \\
+    Final consumption - other sectors - households - energy use - water heating \\
+    Final consumption - other sectors - households - energy use - cooking \\
+    Final consumption - other sectors - households - energy use - lighting and electrical appliances \\
+    Final consumption - other sectors - households - energy use - other end use \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Eurostat Table~1 fuel column headers (custom extract) for
+    residential fuel mix; reserved for future weighting of national structure.}
+  \label{tab:rescom_eurostat_table1}
+  \footnotesize
+  \begin{tabular}{@{}p{0.92\textwidth}@{}}
+    \hline
+    Column header \\
+    \hline
+    Solid fossil fuels, peat, peat products, oil shale and oil sands \\
+    Natural gas \\
+    Oil and petroleum products \\
+    Renewables and biofuels \\
+    Electricity \\
+    Heat \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Illustrative GAINS fuel $\rightarrow$ EMEP \texttt{tables.fuel}
+    substring hints used to break ties in emission-factor row matching.}
+  \label{tab:rescom_emep_fuel_hints}
+  \footnotesize
+  \begin{tabular}{p{4.5cm}p{7.5cm}}
+    \hline
+    GAINS fuel contains & EMEP fuel field contains \\
+    \hline
+    Natural gas & Natural gas \\
+    Gas oil & Gas oil \\
+    LPG & Natural gas \\
+    Brown coal / Hard coal / Derived coal & Coal fuels \\
+    lignite & Coal fuels \\
+    Biogas & Natural gas \\
+    \hline
+  \end{tabular}
+
+  \medskip
+  \footnotesize
+  Additional hints may be added for biomass-rich fuels once guidebook rows are
+  aligned explicitly; ambiguous solid-fuel rows should be checked against
+  \texttt{EMEP\_emission\_factors.json}.
+\end{table}
+
+\section{GNFR~E solvent downscaling (reference tables)}
+\label{app:solvents_downscaling}
+
+This section complements Section~\ref{sec:solvents}. It summarises the
+archetype construction and the subsector-to-archetype mixing adopted for
+the solvent and product use block.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Archetype activity surfaces and component weights used for
+    GNFR~E solvent downscaling.}
+  \label{tab:solvents_archetypes}
+  \footnotesize
+  \begin{tabular}{p{2.2cm}p{8.8cm}}
+    \hline
+    Archetype & Components and weights \\
+    \hline
+    household &
+    population (0.70), residential urban share (0.30) \\
+    service &
+    urban fabric (0.40), service-oriented land (0.35), service land use from
+    OpenStreetMap (0.25) \\
+    industrial &
+    industrial land from CORINE (0.35), industrial land use from
+    OpenStreetMap (0.35), industrial building proxy (0.30) \\
+    infrastructure &
+    road length (0.35), weighted road length by road hierarchy (0.35),
+    transport-related area (0.20), roof or built-surface proxy (0.10) \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Nine solvent subsectors and their $\beta$ weights over the
+    four archetype activity surfaces.}
+  \label{tab:solvents_subsectors_beta}
+  \footnotesize
+  \begin{tabular}{p{3.2cm}cccc}
+    \hline
+    Subsector & household & service & industrial & infrastructure \\
+    \hline
+    2D3a domestic solvent use & 1.00 & 0.00 & 0.00 & 0.00 \\
+    2D3b road paving & 0.00 & 0.00 & 0.00 & 1.00 \\
+    2D3c asphalt roofing & 0.00 & 0.00 & 0.20 & 0.80 \\
+    2D3d coating application & 0.40 & 0.20 & 0.40 & 0.00 \\
+    2D3e degreasing and cleaning & 0.00 & 0.30 & 0.70 & 0.00 \\
+    2D3f dry cleaning & 0.00 & 1.00 & 0.00 & 0.00 \\
+    2D3g chemical products & 0.00 & 0.00 & 1.00 & 0.00 \\
+    2D3h printing & 0.00 & 0.70 & 0.30 & 0.00 \\
+    2D3i other solvent use & 0.50 & 0.30 & 0.20 & 0.00 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{GNFR~J waste downscaling (reference tables)}
+\label{app:waste_downscaling}
+
+This section complements Section~\ref{sec:waste}. It summarises the
+operational family aggregation adopted for GNFR~J and the main spatial
+datasets used to build the pollutant-specific waste weighting rasters.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Operational proxy families used for GNFR~J waste downscaling
+    and the underlying CEIP/NRD subsectors.}
+  \label{tab:waste_families}
+  \footnotesize
+  \begin{tabular}{p{3.4cm}p{4.1cm}p{5.0cm}}
+    \hline
+    Proxy family & CEIP/NRD subsectors & Interpretation \\
+    \hline
+    Solid waste treatment &
+    5A, 5B1, 5B2 &
+    Solid waste disposal on land, composting, and anaerobic digestion on biogas facilities \\
+    Wastewater &
+    5D1, 5D2, 5D3 &
+    Domestic, industrial, and other wastewater handling \\
+    Residual diffuse waste &
+    5C2, 5E &
+    Open waste burning and residual ``other waste'' processes \\
+    \hline
+  \end{tabular}
+
+  \medskip
+  \footnotesize
+  Incineration-like subsectors 5C1a and 5C1b(i--vi) are excluded from the
+  default area-weighting workflow to avoid double counting with point-source
+  treatment of waste incineration facilities.
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Spatial proxy families and principal geospatial support layers
+    used for GNFR~J waste weighting.}
+  \label{tab:waste_proxy_inputs}
+  \footnotesize
+  \begin{tabular}{p{3.4cm}p{4.5cm}p{4.6cm}}
+    \hline
+    Proxy family & Main spatial inputs & Intended role \\
+    \hline
+    Solid waste treatment &
+    CORINE class~132, CORINE class~121, optional OpenStreetMap waste features &
+    Landfill-type support with secondary industrial/commercial support and optional geometric refinement \\
+    Wastewater &
+    UWWTD agglomerations, UWWTD treatment plants, GHSL population, Copernicus imperviousness, optional industrial land &
+    Settlement- and infrastructure-based support for domestic and industrial wastewater handling \\
+    Residual diffuse waste &
+    GHSL population, GHSL SMOD / rural settlement classes, Copernicus imperviousness &
+    Diffuse settlement-related support with added emphasis on rural and low-density population \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{Additional Emission Maps}
+\label{app:emission_maps}
+
+\todo[inline]{Place supplementary emission maps here (e.g., all GNFR sectors,
+both cities, all pollutants) that are too detailed for the main body.}
+
+\section{Model Evaluation Statistics}
+\label{app:eval_stats}
+
+\todo[inline]{Include extended evaluation tables for all monitoring stations and
+pollutants evaluated.}
+
+\section{Scenario Emission Budgets}
+\label{app:scenario_budgets}
+
+\todo[inline]{Provide full emission budget tables for each scenario compared to
+the baseline, for both cities.}

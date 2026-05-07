@@ -1,0 +1,172 @@
+_deprecated_xlsx_layout_keys: table_3_country_rows and table_1_sheet were used by
+  the removed XLSX scraper; the pipeline now uses the Eurostat API (nrg_d_hhq / nrg_bal_s).
+year: 2021
+table_3_country_rows:
+  header_row_0based: 11
+  country_column_0based: 0
+  first_metric_column_0based: 4
+table_1_sheet: Table 1_2021
+table_1_fuel_column_headers:
+- Solid fossil fuels, peat, peat products, oil shale and oil sands
+- Natural gas
+- Oil and petroleum products
+- Renewables and biofuels
+- Electricity
+- Heat
+iso3_to_geo_labels:
+  BEL:
+  - Belgium
+  - BE
+  BGR:
+  - Bulgaria
+  - BG
+  CZE:
+  - Czechia
+  - CZ
+  DNK:
+  - Denmark
+  - DK
+  DEU:
+  - Germany
+  - DE
+  EST:
+  - Estonia
+  - EE
+  IRL:
+  - Ireland
+  - IE
+  GRC:
+  - Greece
+  - EL
+  - GR
+  - GRC
+  ESP:
+  - Spain
+  - ES
+  FRA:
+  - France
+  - FR
+  HRV:
+  - Croatia
+  - HR
+  ITA:
+  - Italy
+  - IT
+  CYP:
+  - Cyprus
+  - CY
+  LVA:
+  - Latvia
+  - LV
+  LTU:
+  - Lithuania
+  - LT
+  LUX:
+  - Luxembourg
+  - LU
+  HUN:
+  - Hungary
+  - HU
+  MLT:
+  - Malta
+  - MT
+  NLD:
+  - Netherlands
+  - NL
+  AUT:
+  - Austria
+  - AT
+  POL:
+  - Poland
+  - PL
+  PRT:
+  - Portugal
+  - PT
+  ROU:
+  - Romania
+  - RO
+  SVN:
+  - Slovenia
+  - SI
+  SVK:
+  - Slovakia
+  - SK
+  FIN:
+  - Finland
+  - FI
+  SWE:
+  - Sweden
+  - SE
+  ISL:
+  - Iceland
+  - IS
+  NOR:
+  - Norway
+  - 'NO'
+  BIH:
+  - Bosnia and Herzegovina
+  - BA
+  MNE:
+  - Montenegro
+  - ME
+  MDA:
+  - Moldova
+  - MD
+  MKD:
+  - North Macedonia
+  - MK
+  ALB:
+  - Albania
+  - AL
+  SRB:
+  - Serbia
+  - RS
+  TUR:
+  - Türkiye
+  - TR
+  ARM:
+  - Armenia
+  - AM
+  KOS:
+  - Kosovo
+  - XK
+class_to_metric:
+  R_FIREPLACE: space_heating
+  R_HEATING_STOVE: space_heating
+  R_COOKING_STOVE: cooking
+  R_BOILER_MAN:
+  - space_heating
+  - water_heating
+  R_BOILER_AUT:
+  - space_heating
+  - water_heating
+  C_BOILER_MAN: default
+  C_BOILER_AUT: default
+default_commercial_factor: 1.0
+default_residential_if_missing: 1.0
+metric_row_synonyms:
+  space_heating:
+  - Final consumption - other sectors - households - energy use - space heating
+  - space heating
+  space_cooling:
+  - Final consumption - other sectors - households - energy use - space cooling
+  - space cooling
+  water_heating:
+  - Final consumption - other sectors - households - energy use - water heating
+  - water heating
+  cooking:
+  - Final consumption - other sectors - households - energy use - cooking
+  - cooking
+  lighting_appliances:
+  - Final consumption - other sectors - households - energy use - lighting and electrical
+    appliances
+  - lighting and electrical appliances
+  other_end_use:
+  - Final consumption - other sectors - households - energy use - other end use
+  - other end use
+parse_notes:
+- Table 3 sheet name in residential_cams_downscale.config.json (e.g. Table 3_2023).
+- 'Synonyms match row labels: long Eurostat strings first, then short tails.'
+- table_1_fuel_column_headers documents Table 1 columns for future fuel-mix weighting
+  (not yet applied in M).
+- R_BOILER_* uses mean(space_heating, water_heating) when both parsed.

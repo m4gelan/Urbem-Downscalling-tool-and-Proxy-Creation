@@ -1,0 +1,31 @@
+sector: A_PublicPower
+enabled: true
+mode: mixed
+output_dir: OUTPUT/Proxy_weights/A_PublicPower
+output_filename: publicpower_areasource.tif
+pad_m: 5000.0
+lon_col: lon
+lat_col: lat
+weight_col: capacity_g
+cams_emission_category_indices: [1]
+cams_source_type_indices: [2]
+pollutant_var: co
+pollutant_name: CO
+point_matching:
+  enabled: true
+  facility_pool: jrc_public_power
+  jrc_country_name: Greece
+  exclude_hydro: true
+cams_country_iso3: GRC
+
+area_proxy:
+  corine_codes: [3, 121]
+  corine_band: 1
+  weight_model: eligibility_pop_blend #takes also weight_model: corine_pop_product for weights : eligibility x population
+  blend_eligibility_coef: 0.7
+  blend_population_coef: 0.3
+  pop_exponent: 1.0
+  pop_floor: 0.0
+  population_resampling: bilinear
+  fallback_if_no_corine: pop_in_cell
+  show_progress: true

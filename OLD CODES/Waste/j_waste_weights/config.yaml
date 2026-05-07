@@ -1,0 +1,104 @@
+# =============================================================================
+# CAMS J_Waste within-cell weights — edit paths for your machine (project root).
+# =============================================================================
+
+paths:
+  # CAMS-REG-ANT v8.1 NetCDF (same family as Solvents / urbem_interface)
+  cams_nc: "data/given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf/CAMS-REG-v8_1_emissions_year2019.nc"
+  # CEIP / NRD national table — USER MUST CHECK column names and units in Excel
+  ceip_xlsx: "data/Waste/CEIP_Waste.xlsx"
+  ceip_sheet: null  # null = first sheet
+  ceip_year: 2019
+  # Sector token → family mapping (defaults in ceip_sector_codes.yaml)
+  ceip_sector_codes_yaml: "Waste/j_waste_weights/ceip_sector_codes.yaml"
+  # NUTS regions (same style as Solvents) — country boundaries EPSG:3035
+  nuts_gpkg: "Data/geometry/NUTS_RG_20M_2021_3035.gpkg"
+  # CORINE CLC 2018 100m GeoTIFF
+  corine: "data/CORINE/U2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif"
+  # Fine grid: set ref_tif OR leave null and use corine_window below
+  ref_tif: "SourceProxies/outputs/EL/Residential_sourcearea.tif"
+  # JRC population 100m
+  population_tif: "data/Population/JRC-ESTAT_Census_Population_2021_100m.tif"
+  # GHSL SMOD
+  ghsl_smod_tif: "data/Population/GHS_SMOD/GHS_SMOD_E2030_GLOBE_R2023A_54009_1000_V2_0.tif"
+  # Copernicus HRL imperviousness (directory or .tif); partial coverage ok
+  imperviousness: "data/Waste/wekeo_hrl_imp/greece_imp_100m_mosaic.tif"
+  # UWWTD
+  uwwtd_agglomerations_gpkg: "data/Waste/UWWTD_Agglomerations.gpkg"
+  uwwtd_plants_gpkg: "data/Waste/UWWTD_TreatmentPlants.gpkg"
+  # OSM — optional refinement for solid proxy (pre-extracted GPKG from data/OSM/build_osm_waste_layers.py)
+  osm_waste_gpkg: "data/Waste/osm_waste_layers.gpkg"
+  # OSM source PBF if you run the extractor yourself
+  osm_landuse_pbf: "data/OSM/OSM_landuse_buildings_Greece.osm.pbf"
+  # Optional: GeoTIFF mask (0–1), aligned or reprojected to ref grid; null = disabled
+  point_source_mask_tif: null
+
+# If ref_tif is null, build window from CORINE + NUTS-2 country code (e.g. EL for Greece)
+corine_window:
+  nuts_cntr: "EL"
+  pad_m: 5000.0
+
+output:
+  dir: "SourceProxies/outputs/EL"
+  weights_tif_area: "Waste_sourcearea.tif"
+  weights_tif_point: "Waste_pointarea.tif"
+  write_intermediates: false
+
+cams:
+  # GNFR J (Waste) 1-based emission_category_index in CAMS v8.1
+  gnfr_j_index: 13
+  # CAMS NetCDF country_id (ISO3) for area vs point geographic cell masks
+  country_iso3: "GRC"
+  pollutants_nc:
+    - ch4
+    - co
+    - nh3
+    - nmvoc
+    - nox
+    - pm10
+    - pm2_5
+    - sox
+
+ceip:
+  pollutant_aliases:
+    PM25: PM2_5
+    PM2.5: PM2_5
+    NOX: NOx
+    NMVOC: NMVOC
+
+proxy:
+  crs_target: "EPSG:3035"
+  normalization:
+    method: quantile_minmax
+    q_low: 0.01
+    q_high: 0.99
+  solid:
+    weight_clc_132: 1.0
+    weight_clc_121: 0.35
+    weight_osm: 0.5
+    # Buffer (m, EPSG:3035) around OSM point amenities before rasterizing
+    osm_point_buffer_m: 50.0
+  wastewater:
+    wwtp_buffer_m: 800.0
+    wwtp_kernel_sigma_px: 2.0
+    weight_agglo_cover: 0.45
+    weight_wwtp: 0.35
+    weight_pop: 0.35
+    weight_imperv: 0.25
+    weight_industrial_clc: 0.08
+    industrial_clc_codes: [131, 132, 133]
+  residual:
+    # GHSL SMOD L2: 11–13 = low-density rural / rural cluster (USER MUST CHECK legend)
+    smod_rural_codes: [11, 12, 13, 21, 22]
+    weight_pop: 0.5
+    weight_rural_smod: 0.35
+    weight_imperv: 0.15
+  point_source_mask:
+    mode: multiply
+    alpha: 1.0
+
+composite:
+  include_incineration: false
+
+logging:
+  level: INFO

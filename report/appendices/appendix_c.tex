@@ -1,0 +1,191 @@
+% ==============================================================================
+% Appendix C — Description of datasets
+% ==============================================================================
+
+\chapter{Description of datasets}
+\label{app:datasets}
+
+This section documents the main external datasets used across the spatial
+proxy construction pipeline.
+
+\subsection{European boundaries}
+\label{app:boundaries}
+
+The European boundaries are used to clip the datasets to the European domain. The boundaries are provided by the European Comission and are available at the NUTS-2 level.
+They are provided by Geographic Information System of the (European) Commission.
+The dataset is used across the different proxy sectors for clipping, aggregation and reporting
+We present in ~\ref{fig:GRC-NUTS2} the different regions of greece from the dataset.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/Dataset/greece_nuts2.png}
+    \caption{NUTS-2 regions of Greece as used for spatial domain definition and reporting.}
+    \label{fig:GRC-NUTS2}
+\end{figure}
+
+The file can be accessed at this adress : 
+\hyperref[app:boundaries]{https://gisco-services.ec.europa.eu/distribution/v2/nuts/gpkg/NUTS_RG_03M_2021_3035.gpkg}
+On the \hyperref[GISCO]{https://gisco-services.ec.europa.eu/distribution/v2/nuts/nuts-2021-files.html} website. No account is required.
+
+\subsection{CORINE Land Cover}
+
+The CORINE Land Cover is used to identify the different land cover types across the European domain.
+It is provided by the European Environment Agency (EEA) and is available at the 100 m resolution.
+It is directly used by CAMS for different sectors to identify land type and thus emissions from different sectors. Especially, the industrial land cover and and agriculture. \ref{}
+And it thus higly relevant to downscale emissions from different sectors to the fine-scale pixels.
+Below we present a table ~\ref{tab:CLC-codes} of CORINE land cover types and their corresponding codes.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{|c|l|c|l|}
+        \hline
+        \textbf{Code} & \textbf{Description} & \textbf{Code} & \textbf{Description} \\
+        \hline
+        111 & Continuous urban fabric & 321 & Natural grasslands \\
+        112 & Discontinuous urban fabric & 322 & Moors and heathland \\
+        121 & Industrial or commercial units & 323 & Sclerophyllous vegetation \\
+        122 & Road and rail networks and associated land & 324 & Transitional woodland-shrub \\
+        123 & Port areas & 331 & Beaches dunes sands \\
+        124 & Airports & 332 & Bare rocks \\
+        131 & Mineral extraction sites & 333 & Sparsely vegetated areas \\
+        132 & Dump sites & 334 & Burnt areas \\
+        133 & Construction sites & 335 & Glaciers and perpetual snow \\
+        141 & Green urban areas & 411 & Inland marshes \\
+        142 & Sport and leisure facilities & 412 & Peat bogs \\
+        211 & Non-irrigated arable land & 421 & Salt marshes \\
+        212 & Permanently irrigated land & 422 & Salines \\
+        213 & Rice fields & 423 & Intertidal flats \\
+        221 & Vineyards & 511 & Water courses \\
+        222 & Fruit trees and berry plantations & 512 & Water bodies \\
+        223 & Olive groves & 521 & Coastal lagoons \\
+        231 & Pastures & 522 & Estuaries \\
+        241 & Annual crops associated with permanent crops & 523 & Sea and ocean \\
+        242 & Complex cultivation patterns & 999 & NODATA \\
+        243 & Land principally occupied by agriculture & & \\
+        & with significant areas of natural vegetation & & \\
+        244 & Agro-forestry areas & & \\
+   
+        311 & Broad-leaved forest & & \\
+        312 & Coniferous forest & & \\
+        313 & Mixed forest & & \\
+        \hline
+    \end{tabular}
+    \caption{CORINE land cover types and their corresponding codes (\texttt{CLC2018\_CLC2018\_V2018\_20\_QGIS.txt}).}
+    \label{tab:CLC-codes}
+\end{table}
+
+The dataset is used across the different proxy sectors for clipping, aggregation and reporting
+
+
+
+\subsubsection*{European open power-plant register}
+\label{app:powerplant_register}
+
+The point-source Public Power proxy uses a European open register of
+power-generation units. The dataset is provided at unit level rather than only
+at plant level, and includes geographic coordinates, country, operating
+status, installed capacity, and generation type. It combines information from
+ENTSO-E and other open sources into a harmonised European table, but should be
+understood as an open reference register rather than a complete census of all
+facilities.
+
+Only combustion-based public-power units are retained for the proxy, because
+the objective is to localise stack-related emissions from electricity and heat
+production. Hydro, wind, solar, and other non-combustion generation types are
+excluded. The main fields used are therefore the unit coordinates, the country
+identifier, and the generation-type classification. The dataset is used only
+as a localisation support for point emissions; it does not provide plant-level
+emissions directly.
+
+\subsubsection*{LUCAS (Land Use/Cover Area frame Survey)}
+\label{app:lucas}
+LUCAS is a pan-European in-situ field survey conducted by Eurostat at a stratified systematic grid of approximately 1~km spacing, with approximately 270\,000--340\,000 field observations per survey wave \citep{lucas_dataset}. The 2022 wave, used throughout this work, covers EU-27 member states plus selected candidate countries. Each survey point records:
+\begin{itemize}
+  \item \textbf{Land cover} (\texttt{SURVEY\_LC1}): a hierarchical code identifying the dominant cover type (e.g.\ B11 = wheat, E10 = permanent grass, B17 = rice). Level-1 codes B* denote cropland, E* denote grassland and heath.
+  \item \textbf{Land use} (\texttt{SURVEY\_LU1}): functional category (U111 = agriculture including animal production, U112 = fallow, U113 = kitchen garden, U120 = forestry).
+  \item \textbf{Grazing} (\texttt{SURVEY\_GRAZING}): integer indicator (0 = no signs, 1 = grazing observed, 2 = no signs at time of observation).
+  \item \textbf{INSPIRE patch fractions}: \texttt{SURVEY\_INSPIRE\_ARABLE} (arable fraction, \%), \texttt{SURVEY\_INSPIRE\_ORGCON} (organic deposit fraction, \%), \texttt{SURVEY\_INSPIRE\_PLCC4} (herbaceous cover, \%), \texttt{SURVEY\_INSPIRE\_PLCC7} (bare/unconsolidated, \%).
+  \item \textbf{Crop residue management}: \texttt{SURVEY\_LM\_CROP\_RESID} (presence code) and \texttt{SURVEY\_LM\_CROP\_RESID\_PERC} (estimated residue \%).
+\end{itemize}
+LUCAS points are intersected with the CORINE Land Cover raster at each coordinate; only points falling on agricultural CORINE classes (raster codes 12--22) are retained in the proxy pipeline. The survey is the only systematic in-situ observational basis for inferring land-management intensity at sub-NUTS-2 resolution across all EU member states simultaneously.
+
+\subsection{LUCAS 2018 Topsoil}
+\label{app:lucas_topsoil}
+\subsubsection*{Eurostat Agricultural Census Livestock Counts (C21)}
+\label{app:c21}
+The C21 dataset is Eurostat's Farm Structure Survey (FSS/SAPM) livestock count data, harmonised at NUTS-2 resolution and provided as a GeoPackage (\texttt{C21.gpkg}). It records the number of livestock heads (thousands) by species and NUTS-2 region, for reference years aligned to the EU Farm Structure Survey cycles (most recent: 2020). Species layers used in this work are bovines (total and dairy), pigs (under and over 50~kg), sheep, goats, and poultry. Counts are multiplied by IPCC-2006 species-specific emission factors to derive stage-2 census intensity weights $\omega_{n,c}$ for enteric fermentation (Section~\ref{sec:mu-rho-enteric}) and livestock housing (Section~\ref{sec:proxy-housing}). Column names within the GeoPackage are mapped via \texttt{c21\_census\_field\_map.json} to avoid hardcoding in Python.
+
+\subsubsection*{GFED4.1s (Global Fire Emissions Database version 4.1 with small fires)}
+\label{app:CGEF4.1s}
+GFED4.1s \citep{vanderwerf2017,giglio2013} is a global monthly 0.25\textdegree{} gridded fire emissions product covering 1997--2015. It is based on MODIS burned area (Collection~5 MCD45/MCD64), active fire counts, and a biogeochemical model (CASA). For each month and pixel, the dataset provides:
+\begin{itemize}
+  \item \textbf{Total dry matter burned} (\texttt{emissions/MM/DM}), kg~DM~m$^{-2}$~month$^{-1}$.
+  \item \textbf{Source-type fractions} (\texttt{emissions/MM/partitioning/DM\_AGRI} and five analogous fields), unitless $\in [0,1]$, summing to exactly 1.0 per pixel per month. The six types are: agricultural waste burning (\textsc{agri}), boreal forest (\textsc{borf}), deforestation (\textsc{defo}), peat (\textsc{peat}), savanna and grassland (\textsc{sava}), and temperate forest (\textsc{temf}).
+  \item \textbf{Grid-cell area} (\texttt{ancill/grid\_cell\_area}), m$^2$.
+  \item \textbf{Burned fraction} (\texttt{burned\_area/MM/burned\_fraction}), fraction of grid cell burned per month.
+\end{itemize}
+The annual files are in HDF5 format, located at \texttt{data/Agriculture/fire\_emissions\_v4\_R1\_1293/data/GFED4.1s\_<year>.hdf5}. The one-time preprocessing script \texttt{Agriculture/preprocess/build\_gfed41s\_agri\_mean.py} reads all 19 annual files, computes the multi-year mean agricultural DM per pixel (Eq.~\ref{eq:gfed-score}), and builds the pixel-to-NUTS-2 lookup table. Output artefacts are saved to \texttt{data/Agriculture/} as NumPy binary and Parquet files. The 19-year climatological mean (1997--2015) stabilises the spatial pattern against inter-annual fire anomalies: over the EU domain, the coefficient of variation of annual AGRI DM across years is approximately 34\,\%.
+
+\subsubsection*{CEIP/NRD waste emissions}
+\label{app:waste_ceip}
+
+The waste downscaling workflow uses a country-level CEIP/NRD workbook of
+waste-sector emissions with pollutant and subsector detail. The relevant
+subsectors are 5A, 5B1, 5B2, 5C2, 5D1, 5D2, 5D3, and 5E, while the
+incineration-like 5C1$\ast$ rows are retained only for bookkeeping and are
+excluded from the default area-weighting logic. The main fields required by the
+processing code are country identifier, year, pollutant, subsector code, and
+reported total. These records are aggregated to derive country- and
+pollutant-specific family shares for solid waste treatment, wastewater, and
+residual diffuse waste. The workbook is therefore used as an apportionment
+source for the proxy mixture, not as a gridded emissions product.
+
+\subsubsection*{UWWTD agglomerations and treatment plants}
+\label{app:waste_uwwtd}
+
+The Urban Waste Water Treatment Directive (UWWTD) layers provide the main
+infrastructure support for the wastewater family. Two complementary datasets are
+used: agglomerations, which delineate the serviced wastewater population
+footprint, and treatment plants, which locate the corresponding treatment
+infrastructure. In the proxy workflow, agglomeration polygons provide diffuse
+service-area support, while treatment plants act as local infrastructure
+anchors. The datasets are used only as spatial indicators of wastewater
+handling; they do not provide pollutant-resolved emissions per facility or per
+agglomeration for direct downscaling.
+
+\subsubsection*{GHSL population and settlement model}
+\label{app:waste_ghsl}
+
+The waste proxy workflow uses the GHSL population grid and the GHSL Degree of
+Urbanisation / SMOD settlement classification as harmonised European settlement
+support. The population layer provides a continuous indicator of human presence,
+which is relevant both for domestic wastewater generation and for diffuse
+waste-related activity. The SMOD layer distinguishes dense urban, peri-urban,
+and rural settlement structures and is used mainly in the residual diffuse
+waste family to emphasise rural and low-density settlement environments where
+open waste burning and other diffuse waste processes are more plausible than in
+large specialised facilities.
+
+\subsubsection*{Copernicus imperviousness}
+\label{app:waste_imperviousness}
+
+The Copernicus High Resolution Layer on imperviousness is used as a built-surface
+indicator complementing population and settlement classes. In the wastewater and
+residual diffuse waste families, imperviousness acts as a fine-scale proxy for
+sealed or strongly urbanised surfaces where waste-related activity is more
+likely than in natural land-cover classes. The layer is used only as a relative
+spatial support. Missing coverage is treated explicitly in the implementation
+and recorded through diagnostic masks so that the weighting workflow remains
+transparent where only partial tile coverage is available.
+
+\subsubsection*{OpenStreetMap waste-related features}
+\label{app:waste_osm}
+
+OpenStreetMap data are used only as optional geometric refinement for the solid
+waste family. Relevant tags include landfill- or waste-related land use and
+amenity classes where such features can be extracted consistently from the
+available OSM source. Because completeness and tagging practice vary across
+space, OSM does not define the waste proxy on its own; instead, it refines the
+CORINE-based support where compatible features are present. The workflow is
+therefore robust to missing or partial OSM coverage, but the geometric detail is
+better where the underlying OSM extract is more complete.

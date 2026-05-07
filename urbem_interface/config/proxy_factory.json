@@ -1,0 +1,27 @@
+{
+  "_comment": "Lives under urbem_interface/config/. path_base: repo-root Input/. output_dir: relative to path_base -> Output/proxy/<country>.",
+
+  "path_base": "../../Input",
+
+  "output_dir": "../Output/proxy/default",
+
+  "paths": {
+    "corine_raster": "CORINE/U2018_CLC2018_V2020_20u1.tif",
+    "corine_gdb": "CORINE/U2018_CLC2018_V2020_20u1.gdb",
+    "eprtr_gpkg": "E_PRTR/ied_SiteMap.gpkg",
+    "shipping_routes_shp": "Shipping_Routes/shipping_routes_wgs.shp",
+    "population_raster": "Population/GHS_POP_E2015_GLOBE_R2019A_4326_30ss_V1_0.tif"
+  },
+
+  "crs": {
+    "projected": "EPSG:3035",
+    "wgs84": "EPSG:4326",
+    "corine": "EPSG:3035"
+  },
+
+  "proxies_interface_json": "../urbem_interface/config/proxies.json",
+  "population_output_filename": "Proxy_Population.tif",
+
+  "keep_intermediate_shp": false
+
+}

@@ -1,0 +1,18 @@
+version: 1
+
+defaults:
+  output_dir: OUTPUT/Proxy_visualization
+  color_mode: per_cams_cell
+  add_metadata_hover: true
+
+presets:
+  A_PublicPower: {}
+  B_Industry: {}
+  C_OtherCombustion: {}
+  D_Fugitive: {}
+  E_Solvents: {}
+  G_Shipping: {}
+  I_Offroad: {}
+  J_Waste: {}
+  K_Agriculture: {}
+

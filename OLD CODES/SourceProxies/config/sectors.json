@@ -1,0 +1,89 @@
+{
+  "country": {
+    "cams_iso3": "GRC",
+    "nuts_cntr": "EL"
+  },
+  "paths": {
+    "cams_nc": "data/given_CAMS/CAMS-REG-ANT_v8.1_TNO_ftp/netcdf/CAMS-REG-v8_1_emissions_year2019.nc",
+    "corine": "data/CORINE/U2018_clc2018_v2020_20u1_raster100m/DATA/U2018_CLC2018_V2020_20u1.tif",
+    "landscan": "data/PublicPower/landscan/landscan-global-2020.tif",
+    "nuts_gpkg": "Data/geometry/NUTS_RG_20M_2021_3035.gpkg",
+    "jrc_csv": "data/PublicPower/JRC/JRC_OPEN_UNITS.csv",
+    "weights_long": "Agriculture/results/weights_long.csv"
+  },
+  "corine": {
+    "band": 1,
+    "public_power_corine_codes": [121, 3],
+    "pad_m": 5000
+  },
+  "landscan": {
+    "resampling": "bilinear",
+    "pop_exponent": 1.0,
+    "pop_floor": 0.0
+  },
+  "output_dir": "SourceProxies/outputs/EL",
+  "sectors": [
+    {
+      "id": "public_power_area",
+      "builder": "public_power_area",
+      "filename": "PublicPower_sourcearea.tif"
+    },
+    {
+      "id": "agriculture_area",
+      "builder": "agriculture_area",
+      "filename": "Agriculture_sourcearea.tif",
+      "pollutants": ["NH3"],
+      "ag_clc_codes": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+    },
+    {
+      "id": "fugitive_area",
+      "builder": "fugitive_area",
+      "filename": "Fugitive_areasource.tif",
+      "fugitive_config": "PROXY/config/fugitive/area_source.yaml"
+    },
+    {
+      "id": "industry_area",
+      "builder": "industry_area",
+      "filename": "Industry_areasource.tif",
+      "industry_config": "Industry/config/industry_area.yaml"
+    },
+    {
+      "id": "public_power_point",
+      "builder": "public_power_point",
+      "filename": "PublicPower_sourcepoint.tif",
+      "point_mode": "binary",
+      "jrc_country_override": null,
+      "exclude_hydro": true,
+      "combustion_only": true
+    },
+    {
+      "id": "solvents_eprtr_point",
+      "builder": "solvents_eprtr_point_link",
+      "filename": "Solvents_E_cams_to_eprtr.tif",
+      "eprtr_csv": "data/E_PRTR/eptr_csv/F1_4_Air_Releases_Facilities.csv",
+      "eprtr_pollutant": "Non-methane volatile organic compounds (NMVOC)",
+      "eprtr_sector_code": 9,
+      "eprtr_annex_codes": ["9(c)", "9(e)"],
+      "eprtr_min_reporting_year_exclusive": 2019
+    },
+    {
+      "id": "waste_j",
+      "builder": "waste_area",
+      "filename": "Waste_sourcearea.tif",
+      "point_filename": "Waste_pointarea.tif",
+      "waste_config": "Waste/j_waste_weights/config.yaml"
+    },
+    {
+      "id": "shipping_area",
+      "builder": "shipping_area",
+      "filename": "Shipping_areasource.tif",
+      "shipping_config": "Shipping/config/shipping_area.yaml"
+    },
+    {
+      "id": "offroad_area",
+      "builder": "offroad_area",
+      "filename": "Offroad_Sourcearea.tif",
+      "offroad_config": "Offroad/config/offroad_area.yaml"
+    }
+  ]
+}

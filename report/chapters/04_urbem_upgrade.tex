@@ -1,0 +1,31 @@
+% ==============================================================================
+% Chapter 4 — UrbEm Tool Upgrade
+% ==============================================================================
+
+\chapter{Upgrade of the UrbEm Downscaling Tool}
+\label{ch:urbem}
+
+This chapter presents the upgrade of the proxy-development component of
+UrbEm. The objective is to construct spatial weights that translate
+CAMS sectoral emissions into high-resolution distributions suitable for
+urban air-quality modelling. The former workflow provided an operational
+set of land-use and activity proxies, but its sector-level structure was
+not sufficient for a systematic treatment of point sources, residual
+area sources, and sectors whose emissions depend on several distinct
+processes. The upgraded methodology therefore distinguishes explicitly
+between point-source matching and area-source proxy construction, and it
+organises the latter into generic, combined-dataset, and highly
+customised approaches. The chapter first establishes this common
+methodological framework before presenting the detailed sectoral
+implementations.
+
+\input{chapters/04A_proxies/04A0_method}
+\input{chapters/04A_proxies/04A1_point_sources}
+\input{chapters/04A_proxies/04A2_area_generic}
+\input{chapters/04A_proxies/04A3_area_combined}
+
+
+% Further sectoral proxy blocks can be added here, for example:
+% \input{chapters/04A_proxies/04A2_PublicPower}
+% \input{chapters/04A_proxies/04A2_OffRoad_proxies}
+% \input{chapters/04A_proxies/04A4_Waste_proxies}

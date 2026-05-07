@@ -1,0 +1,58 @@
+# CEIP/NFR sector tokens (normalized: alphanumeric uppercase) -> group id G1..G4
+# 1B2b is assigned to G4 only (not G3).
+
+groups:
+  G1:
+    name: coal_solid_fuels
+    ceip_sectors:
+      - "1B1A"
+      - "1B1B"
+      - "1B1C"
+    corine_classes: [131, 121]
+    osm_rules:
+      any_of:
+        - {industrial: "mine"}
+        - {resource: "coal"}
+        - {landuse: "quarry"}
+        - {landuse: "industrial"}
+  G2:
+    name: oil_transport_upstream
+    ceip_sectors:
+      - "1B2AI"
+    corine_classes: [123, 121]
+    osm_rules:
+      any_of:
+        - {man_made: "pipeline"}
+        - {landuse: "port"}
+        - {industrial: "depot"}
+        - {industrial: "oil"}
+  G3:
+    name: storage_refining_distribution
+    ceip_sectors:
+      - "1B2AIV"
+      - "1B2AV"
+    corine_classes: [121, 122]
+    osm_rules:
+      any_of:
+        - {industrial: "refinery"}
+        - {man_made: "storage_tank"}
+        - {man_made: "tank"}
+        - {industrial: "fuel_storage"}
+        - {industrial: "depot"}
+        - {amenity: "fuel"}
+  G4:
+    name: gas_flaring_residual
+    ceip_sectors:
+      - "1B2B"
+      - "1B2C"
+      - "1B2D"
+    corine_classes: [121, 131]
+    osm_rules:
+      any_of:
+        - {man_made: "flare"}
+        - {man_made: "chimney"}
+        - {power: "plant"}
+        - {power: "generator"}
+        - {power: "substation"}
+        - {industrial: "gas"}
+        - {resource: "gas"}

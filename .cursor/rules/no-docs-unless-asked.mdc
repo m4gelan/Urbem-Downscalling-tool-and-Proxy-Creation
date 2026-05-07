@@ -1,0 +1,10 @@
+---
+description: Do not add or edit documentation (README, etc.) unless the user explicitly asks
+alwaysApply: true
+---
+
+# Documentation
+
+Do not add, expand, or edit documentation files (e.g. README, README.md, *.md docs, WINDOWS_SETUP.md, comments that are purely documentary) unless the user explicitly asks for it.
+
+Only add or change documentation when the user requests it (e.g. "document this", "add to README", "write a guide").

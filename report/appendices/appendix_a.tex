@@ -1,0 +1,225 @@
+% ==============================================================================
+% Appendix A — UrbEm Domain Configuration
+% ==============================================================================
+
+\chapter{UrbEm Domain Configuration Parameters}
+\label{app:domain}
+
+This appendix lists the domain definition parameters used when running the
+upgraded \urbem{} tool for each city.
+
+\section{Ioannina Domain}
+\label{app:domain_ioannina}
+
+\todo[inline]{Fill in after finalising the domain.}
+
+\begin{table}[h]
+  \centering
+  \caption{UrbEm domain configuration for Ioannina.}
+  \label{tab:domain_ioannina}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parameter}          & \textbf{Value} \\
+    \midrule
+    Coordinate reference system & UTM Zone XX N (EPSG:XXXXX) \\
+    $x_{\min}$ (m)              & --- \\
+    $x_{\max}$ (m)              & --- \\
+    $y_{\min}$ (m)              & --- \\
+    $y_{\max}$ (m)              & --- \\
+    Grid cell size              & \SI{1000}{\metre} \\
+    Grid dimensions             & --- $\times$ --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Kozani Domain}
+\label{app:domain_kozani}
+
+\todo[inline]{Fill in after finalising the domain.}
+
+\begin{table}[h]
+  \centering
+  \caption{UrbEm domain configuration for Kozani.}
+  \label{tab:domain_kozani}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parameter}          & \textbf{Value} \\
+    \midrule
+    Coordinate reference system & UTM Zone XX N (EPSG:XXXXX) \\
+    $x_{\min}$ (m)              & --- \\
+    $x_{\max}$ (m)              & --- \\
+    $y_{\min}$ (m)              & --- \\
+    $y_{\max}$ (m)              & --- \\
+    Grid cell size              & \SI{1000}{\metre} \\
+    Grid dimensions             & --- $\times$ --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{GNFR Sector and Proxy Mapping}
+\label{app:gnfr_proxy}
+% ... in your document body ...
+
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\begin{longtable}{@{}llrrr@{}}
+% --- First Page Header ---
+\caption[CAMS-REG v8.1 emissions for Greece in 2019]{CAMS\mbox{-}REG v8.1 annual emissions for Greece, by GNFR sector and pollutant (F1--F4 road categories aggregated). Area/point split follows CAMS source types; masses are summed over all listed sources in the domain. $w_{\mathrm{area}}$ is the share of area sources in the sector--pollutant total.}
+\label{tab:greece_cams_emis_2019} \\
+\toprule
+GNFR & Pollutant & \multicolumn{1}{c}{Area} & \multicolumn{1}{c}{Point} & $w_{\mathrm{area}}$ \\
+ & & \multicolumn{1}{c}{(Gg)} & \multicolumn{1}{c}{(Gg)} & \\
+\midrule
+\endfirsthead
+
+% --- Subsequent Page Headers ---
+\multicolumn{5}{l}{\textit{\tablename\ \thetable{} continued from previous page}} \\
+\toprule
+GNFR & Pollutant & \multicolumn{1}{c}{Area} & \multicolumn{1}{c}{Point} & $w_{\mathrm{area}}$ \\
+ & & \multicolumn{1}{c}{(Gg\,a$^{-1}$)} & \multicolumn{1}{c}{(Gg\,a$^{-1}$)} & \\
+\midrule
+\endhead
+
+% --- Footer for pages that are NOT the last page ---
+\midrule
+\multicolumn{5}{r}{\textit{Continued on next page}} \\
+\endfoot
+
+% --- Final Footer ---
+\bottomrule
+\endlastfoot
+
+% --- Data ---
+\textbf{A\_PublicPower} & CH4 & 3.60e-04 & 0.4128 & 0.1\% \\
+ & CO & 0.0594 & 13.2777 & 0.4\% \\
+ & NH3 & 0 & 0 & --- \\
+ & NMVOC & 0.4043 & 1.0084 & 28.6\% \\
+ & NOx & 45.6288 & 24.2892 & 65.3\% \\
+ & PM10 & 0.037 & 2.1926 & 1.7\% \\
+ & PM$_{2.5}$ & 0.029 & 1.4121 & 2.0\% \\
+ & SOx & 7.2841 & 27.9193 & 20.7\% \\
+ & CO$_2$ (ff+bf) & 951.9167 & 26534.5083 & 3.5\% \\
+\midrule
+\addlinespace[2pt]
+\textbf{B\_Industry} & CH4 & 0.2685 & 0.2071 & 56.5\% \\
+ & CO & 28.3714 & 12.2487 & 69.8\% \\
+ & NH3 & 2.06 & 0.1336 & 93.9\% \\
+ & NMVOC & 6.0554 & 6.2267 & 49.3\% \\
+ & NOx & 8.8085 & 14.9965 & 37.0\% \\
+ & PM10 & 14.8924 & 0.8622 & 94.5\% \\
+ & PM$_{2.5}$ & 3.1958 & 0.5605 & 85.1\% \\
+ & SOx & 5.9383 & 12.3379 & 32.5\% \\
+ & CO$_2$ (ff+bf) & 4227.7919 & 11567.7515 & 26.8\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{C\_OtherCombustion} & CH4 & 8.4784 & 0 & 100.0\% \\
+ & CO & 103.3299 & 0 & 100.0\% \\
+ & NH3 & 1.5509 & 0 & 100.0\% \\
+ & NMVOC & 13.0601 & 0 & 100.0\% \\
+ & NOx & 7.9134 & 0 & 100.0\% \\
+ & PM10 & 16.4232 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 16.0196 & 0 & 100.0\% \\
+ & SOx & 3.0814 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 8380.6632 & 0 & 100.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{D\_Fugitive} & CH4 & 4.6138 & 24.2066 & 16.0\% \\
+ & CO & 0 & 2.0724 & 0.0\% \\
+ & NH3 & 0 & 0.0253 & 0.0\% \\
+ & NMVOC & 2.6943 & 5.7141 & 32.0\% \\
+ & NOx & 0 & 0 & --- \\
+ & PM10 & 0 & 1.1498 & 0.0\% \\
+ & PM$_{2.5}$ & 0 & 0.1725 & 0.0\% \\
+ & SOx & 0 & 0 & --- \\
+ & CO$_2$ (ff+bf) & 4.0933 & 4.949 & 45.3\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{E\_Solvents} & CH4 & 0 & 0 & --- \\
+ & CO & 1.5268 & 0 & 100.0\% \\
+ & NH3 & 0.1148 & 0 & 100.0\% \\
+ & NMVOC & 52.3532 & 0.1298 & 99.8\% \\
+ & NOx & 0.0499 & 0 & 100.0\% \\
+ & PM10 & 1.4431 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 1.2111 & 0 & 100.0\% \\
+ & SOx & 0.001 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 157.8692 & 0 & 100.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{F\_Road (F1--F4)} & CH4 & 2.6261 & 0 & 100.0\% \\
+ & CO & 188.3118 & 0 & 100.0\% \\
+ & NH3 & 1.3326 & 0 & 100.0\% \\
+ & NMVOC & 40.4904 & 0 & 100.0\% \\
+ & NOx & 75.8756 & 0 & 100.0\% \\
+ & PM10 & 3.8973 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 2.9176 & 0 & 100.0\% \\
+ & SOx & 0.0915 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 15613.3457 & 0 & 100.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{G\_Shipping} & CH4 & 0 & 0 & --- \\
+ & CO & 0 & 0 & --- \\
+ & NH3 & 0 & 0 & --- \\
+ & NMVOC & 0 & 0 & --- \\
+ & NOx & 0 & 0 & --- \\
+ & PM10 & 0 & 0 & --- \\
+ & PM$_{2.5}$ & 0 & 0 & --- \\
+ & SOx & 0 & 0 & --- \\
+ & CO$_2$ (ff+bf) & 0 & 0 & --- \\
+ \midrule
+\addlinespace[2pt]
+\textbf{H\_Aviation} & CH4 & 0 & 0.0029 & 0.0\% \\
+ & CO & 0 & 1.362 & 0.0\% \\
+ & NH3 & 0 & 0 & --- \\
+ & NMVOC & 0 & 0.1481 & 0.0\% \\
+ & NOx & 0 & 2.4026 & 0.0\% \\
+ & PM10 & 0 & 0.0211 & 0.0\% \\
+ & PM$_{2.5}$ & 0 & 0.0211 & 0.0\% \\
+ & SOx & 0 & 0.1464 & 0.0\% \\
+ & CO$_2$ (ff+bf) & 0 & 588.9305 & 0.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{I\_Offroad} & CH4 & 0.0567 & 0 & 100.0\% \\
+ & CO & 12.7787 & 0 & 100.0\% \\
+ & NH3 & 0.0015 & 0 & 100.0\% \\
+ & NMVOC & 1.8514 & 0 & 100.0\% \\
+ & NOx & 6.8446 & 0 & 100.0\% \\
+ & PM10 & 0.3365 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 0.3355 & 0 & 100.0\% \\
+ & SOx & 0.0336 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 486.3083 & 0 & 100.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{J\_Waste} & CH4 & 163.3629 & 18.7117 & 89.7\% \\
+ & CO & 75.5271 & 0 & 100.0\% \\
+ & NH3 & 0.2582 & 0 & 100.0\% \\
+ & NMVOC & 2.4264 & 0.1197 & 95.3\% \\
+ & NOx & 6.002 & 0 & 100.0\% \\
+ & PM10 & 5.9303 & 8.07e-05 & 100.0\% \\
+ & PM$_{2.5}$ & 5.5925 & 1.22e-05 & 100.0\% \\
+ & SOx & 0.2291 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 3.3603 & 0 & 100.0\% \\
+ \midrule
+\addlinespace[2pt]
+\textbf{K\_Agri\_Livestock} & CH4 & 171.1058 & 0 & 100.0\% \\
+ & CO & 0 & 0 & --- \\
+ & NH3 & 23.4084 & 0 & 100.0\% \\
+ & NMVOC & 8.4982 & 0 & 100.0\% \\
+ & NOx & 0 & 0 & --- \\
+ & PM10 & 2.114 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 0.4838 & 0 & 100.0\% \\
+ & SOx & 0 & 0 & --- \\
+ & CO$_2$ (ff+bf) & 0 & 0 & --- \\
+ \midrule
+\addlinespace[2pt]
+\textbf{L\_Agri\_Other} & CH4 & 6.2108 & 0 & 100.0\% \\
+ & CO & 6.041 & 0 & 100.0\% \\
+ & NH3 & 36.9228 & 0 & 100.0\% \\
+ & NMVOC & 4.4433 & 0 & 100.0\% \\
+ & NOx & 0.2083 & 0 & 100.0\% \\
+ & PM10 & 5.3285 & 0 & 100.0\% \\
+ & PM$_{2.5}$ & 0.7263 & 0 & 100.0\% \\
+ & SOx & 0.0257 & 0 & 100.0\% \\
+ & CO$_2$ (ff+bf) & 122.8008 & 0 & 100.0\% \\
+\end{longtable}
+\endgroup

@@ -1,0 +1,181 @@
+# Raster pixel = contiguous class index 1..N (EEA CLC2018 8-bit style, QGIS legend row order).
+# Position n (0-based list index) is the Level-3 CLC code for raster value (n + 1).
+# ``classes`` adds human-readable labels; ``index`` must match list order (n + 1) and ``l3`` must match ``l3_codes[n]``.
+l3_codes:
+- 111
+- 112
+- 121
+- 122
+- 123
+- 124
+- 131
+- 132
+- 133
+- 141
+- 142
+- 211
+- 212
+- 213
+- 221
+- 222
+- 223
+- 231
+- 241
+- 242
+- 243
+- 244
+- 311
+- 312
+- 313
+- 321
+- 322
+- 323
+- 324
+- 331
+- 332
+- 333
+- 334
+- 335
+- 411
+- 412
+- 421
+- 422
+- 423
+- 511
+- 512
+- 521
+- 522
+- 523
+classes:
+- index: 1
+  l3: 111
+  label: Continuous urban fabric
+- index: 2
+  l3: 112
+  label: Discontinuous urban fabric
+- index: 3
+  l3: 121
+  label: Industrial or commercial units
+- index: 4
+  l3: 122
+  label: Road and rail networks and associated land
+- index: 5
+  l3: 123
+  label: Port areas
+- index: 6
+  l3: 124
+  label: Airports
+- index: 7
+  l3: 131
+  label: Mineral extraction sites
+- index: 8
+  l3: 132
+  label: Dump sites
+- index: 9
+  l3: 133
+  label: Construction sites
+- index: 10
+  l3: 141
+  label: Green urban areas
+- index: 11
+  l3: 142
+  label: Sport and leisure facilities
+- index: 12
+  l3: 211
+  label: Non-irrigated arable land
+- index: 13
+  l3: 212
+  label: Permanently irrigated land
+- index: 14
+  l3: 213
+  label: Rice fields
+- index: 15
+  l3: 221
+  label: Vineyards
+- index: 16
+  l3: 222
+  label: Fruit trees and berry plantations
+- index: 17
+  l3: 223
+  label: Olive groves
+- index: 18
+  l3: 231
+  label: Pastures
+- index: 19
+  l3: 241
+  label: Annual crops associated with permanent crops
+- index: 20
+  l3: 242
+  label: Complex cultivation patterns
+- index: 21
+  l3: 243
+  label: Land principally occupied by agriculture with significant natural vegetation
+- index: 22
+  l3: 244
+  label: Agro-forestry areas
+- index: 23
+  l3: 311
+  label: Broad-leaved forest
+- index: 24
+  l3: 312
+  label: Coniferous forest
+- index: 25
+  l3: 313
+  label: Mixed forest
+- index: 26
+  l3: 321
+  label: Natural grasslands
+- index: 27
+  l3: 322
+  label: Moors and heathland
+- index: 28
+  l3: 323
+  label: Sclerophyllous vegetation
+- index: 29
+  l3: 324
+  label: Transitional woodland-shrub
+- index: 30
+  l3: 331
+  label: Beaches dunes sands
+- index: 31
+  l3: 332
+  label: Bare rocks
+- index: 32
+  l3: 333
+  label: Sparsely vegetated areas
+- index: 33
+  l3: 334
+  label: Burnt areas
+- index: 34
+  l3: 335
+  label: Glaciers and perpetual snow
+- index: 35
+  l3: 411
+  label: Inland marshes
+- index: 36
+  l3: 412
+  label: Peat bogs
+- index: 37
+  l3: 421
+  label: Salt marshes
+- index: 38
+  l3: 422
+  label: Salines
+- index: 39
+  l3: 423
+  label: Intertidal flats
+- index: 40
+  l3: 511
+  label: Water courses
+- index: 41
+  l3: 512
+  label: Water bodies
+- index: 42
+  l3: 521
+  label: Coastal lagoons
+- index: 43
+  l3: 522
+  label: Estuaries
+- index: 44
+  l3: 523
+  label: Sea and ocean
