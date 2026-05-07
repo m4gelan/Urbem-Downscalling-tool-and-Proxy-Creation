@@ -40,7 +40,7 @@ report/
 *.png
 *.jpg
 *.html
-
+*.pdf
 
 # Archives
 *.zip
