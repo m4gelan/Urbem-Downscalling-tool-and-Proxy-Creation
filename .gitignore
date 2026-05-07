@@ -8,6 +8,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+.cursor
 
 # Data / datasets (keep local; usually large or licensed)
 data/
