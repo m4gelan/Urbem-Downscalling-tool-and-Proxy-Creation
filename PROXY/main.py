@@ -10,6 +10,7 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from PROXY.core.alpha import AlphaRequest, compute_alpha
 from PROXY.core.dataloaders import load_path_config, load_yaml
@@ -196,6 +197,53 @@ def _sector_area_weight_tif_for_link(root: Path, sector_cfg: dict) -> Path | Non
     return p if p.is_file() else None
 
 
+def _link_ref_weights_tif_for_match_points(
+    root: Path,
+    *,
+    path_cfg: dict[str, Any],
+    sector_cfg: dict[str, Any],
+    cli_link_ref: Path | None,
+) -> tuple[Path | None, str]:
+    """Raster whose CRS/transform defines pixels for the optional 2-band link GeoTIFF.
+
+    CSV / Parquet matching does **not** need any reference grid — only
+    :func:`PROXY.core.point_link_geotiff.write_cams_facility_link_geotiff` does.
+    Resolution order: CLI ``--link-ref-tif``, sector ``point_matching.link_ref_weights_tif``,
+    sector area proxy GeoTIFF, then ``paths.yaml`` CORINE or population rasters.
+    """
+    if cli_link_ref is not None:
+        p = cli_link_ref if cli_link_ref.is_absolute() else (root / cli_link_ref)
+        p = p.resolve()
+        if p.is_file():
+            return p, f"--link-ref-tif ({p.name})"
+        print(f"[match-points] WARNING: --link-ref-tif not found: {p}", flush=True)
+    pm = sector_cfg.get("point_matching") if isinstance(sector_cfg.get("point_matching"), dict) else {}
+    rel = pm.get("link_ref_weights_tif")
+    if rel:
+        q = Path(str(rel))
+        q = q if q.is_absolute() else (root / q)
+        q = q.resolve()
+        if q.is_file():
+            return q, f"point_matching.link_ref_weights_tif ({q.name})"
+    area_p = _sector_area_weight_tif_for_link(root, sector_cfg)
+    if area_p is not None:
+        return area_p.resolve(), f"sector area proxy ({area_p.name})"
+    pc = path_cfg.get("proxy_common") or {}
+    for label, key in (
+        ("proxy_common.corine_tif", "corine_tif"),
+        ("proxy_common.population_tif", "population_tif"),
+    ):
+        raw = pc.get(key)
+        if not raw:
+            continue
+        q = Path(str(raw))
+        q = q if q.is_absolute() else (root / q)
+        q = q.resolve()
+        if q.is_file():
+            return q, f"{label} fallback ({q.name})"
+    return None, ""
+
+
 def _match_points_cmd(args: argparse.Namespace) -> int:
     cfg = load_path_config(Path(args.config))
     root = Path(__file__).resolve().parents[1]
@@ -209,14 +257,24 @@ def _match_points_cmd(args: argparse.Namespace) -> int:
         sector_cfg_path = root / str(sector_entry["config"])
         sector_cfg = load_yaml(sector_cfg_path)
     link_ref: Path | None = None
+    link_ref_reason = ""
     if not getattr(args, "no_link_geotiff", False):
-        link_ref = _sector_area_weight_tif_for_link(root, sector_cfg)
+        cli_ref = getattr(args, "link_ref_tif", None)
+        link_ref, link_ref_reason = _link_ref_weights_tif_for_match_points(
+            root,
+            path_cfg=cfg.resolved,
+            sector_cfg=sector_cfg,
+            cli_link_ref=Path(cli_ref) if cli_ref else None,
+        )
         if link_ref is None:
             print(
-                "[match-points] link GeoTIFF skipped: area weight raster not found "
-                f"(build the sector area proxy first; expected under output_dir + output_filename).",
+                "[match-points] link GeoTIFF skipped: no reference raster "
+                "(sector area GeoTIFF missing; set --link-ref-tif, point_matching.link_ref_weights_tif, "
+                "or ensure paths.yaml proxy_common.corine_tif / population_tif exists).",
                 flush=True,
             )
+        else:
+            print(f"[match-points] link GeoTIFF reference grid: {link_ref_reason}", flush=True)
     fac_df, pool_id, fac_src = load_facility_candidates_for_sector(
         repo_root=root,
         paths_resolved=cfg.resolved,
@@ -852,6 +910,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-link-geotiff",
         action="store_true",
         help="Do not write the 2-band CAMS↔facility link GeoTIFF next to the match CSV.",
+    )
+    p_match.add_argument(
+        "--link-ref-tif",
+        type=Path,
+        default=None,
+        help=(
+            "Optional GeoTIFF whose CRS/transform defines pixels for the link raster "
+            "(defaults: sector area proxy, then paths.yaml corine_tif / population_tif)."
+        ),
     )
     p_match.set_defaults(func=_match_points_cmd)
 

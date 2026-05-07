@@ -13,6 +13,8 @@ venv/
 data/
 INPUT/
 Output/
+OLD CODES/
+report/
 
 # Common data / geospatial formats
 *.csv
@@ -35,6 +37,10 @@ Output/
 *.grib
 *.grb
 *.nc
+*.png
+*.jpg
+*.html
+
 
 # Archives
 *.zip

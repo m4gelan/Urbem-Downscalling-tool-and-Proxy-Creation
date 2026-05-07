@@ -2,7 +2,9 @@ sector: H_Aviation
 enabled: true
 mode: mixed
 output_dir: OUTPUT/Proxy_weights/H_Aviation
-# Area proxy grid (reference for match-points link GeoTIFF); build before ``match-points``.
+# Area proxy grid (optional). If missing, ``match-points`` still runs; the 2-band link GeoTIFF
+# uses ``point_matching.link_ref_weights_tif`` or ``--link-ref-tif``, then CORINE / population
+# from ``paths.yaml`` as reference grid.
 output_filename: aviation_areasource.tif
 # Two-band CAMS vs match-location masses use ``point_matching.link_geotiff_filename``.
 output_filename_point: aviation_pointsource.tif

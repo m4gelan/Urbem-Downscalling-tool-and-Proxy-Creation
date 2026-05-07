@@ -37,6 +37,15 @@ Each retained node gets `osm_source = node_buffer`, **match_location** = node co
 
 ## Outputs (under `OUTPUT/Proxy_weights/H_Aviation/`)
 
+The **match table and QA** only need CAMS + OSM; they do **not** require a sector area GeoTIFF.
+
+The **2-band link raster** (`aviation_pointsource.tif`) must burn masses onto *some* grid. It uses, in order:
+
+1. `python -m PROXY.main match-points --sector H_Aviation --link-ref-tif <path/to/ref.tif>`
+2. `point_matching.link_ref_weights_tif` in this sector YAML
+3. The sector **area** weight GeoTIFF if it exists (`output_dir` + `output_filename`)
+4. **`paths.yaml` → `proxy_common.corine_tif`**, then **`population_tif`**
+
 | Artifact | Description |
 |----------|-------------|
 | `H_Aviation_point_matches_<year>.csv` | Matches + aviation aliases (`match_lon`, `distance_m`, `stage`, …). |
@@ -46,13 +55,13 @@ Each retained node gets `osm_source = node_buffer`, **match_location** = node co
 | `aviation_pointsource.tif` | Two-band link raster on the area grid (CAMS mass vs match_location mass). |
 | `H_Aviation_point_matches_<year>_map.png` | Optional matplotlib diagnostic (lines CAMS → match). |
 
-Run matching after the **area** reference GeoTIFF exists:
+Run matching (no area proxy required for CSV/QA; link TIF uses CORINE or override if area TIF missing):
 
 ```bash
 python -m PROXY.main match-points --sector H_Aviation --year 2019 --cams-iso3 GRC
 ```
 
-Folium context map (requires `aviation_areasource.tif`, match CSV, and `aviation_pointsource.tif`):
+Folium context map (requires a **link** GeoTIFF + match CSV; the link uses the same reference grid as above):
 
 ```bash
 python -m PROXY.main visualize --point-link-only --point-link --sector H_Aviation
