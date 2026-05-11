@@ -12,7 +12,7 @@ import yaml
 from rasterio.enums import Resampling
 
 from PROXY.core.cams.grid import build_cam_cell_id
-from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER, remap_legacy_ceip_relpath
+from PROXY.core.alpha import DEFAULT_GNFR_GROUP_ORDER, remap_legacy_ceip_relpath
 from PROXY.core.dataloaders import resolve_path
 from PROXY.core.diagnostics import RasterStatsLogger, max_valid_cam_cell_id
 from PROXY.core.logging_tables import log_wide_group_alpha_table
@@ -219,6 +219,7 @@ def merge_ceip_group_sector_cfg(
     osm_key: str,
     output_path: Path,
     default_pollutants: tuple[str, ...] = DEFAULT_CEIP_GROUP_POLLUTANTS,
+    profile_sector_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Merge path config + sector YAML into the structure consumed by
@@ -229,7 +230,7 @@ def merge_ceip_group_sector_cfg(
       :data:`DEFAULT_CEIP_GROUP_POLLUTANTS` is the cross-sector fallback order).
     * ``group_order`` in the merged dict comes from ``ceip_group_order`` or
       ``group_order`` in sector YAML (list of keys matching ``groups:`` in the CEIP
-      profile); if unset, :data:`PROXY.core.ceip.DEFAULT_GNFR_GROUP_ORDER` is used.
+      profile); if unset, :data:`PROXY.core.alpha.DEFAULT_GNFR_GROUP_ORDER` is used.
     """
     sp = sector_cfg.get(sector_paths_key) or {}
     ceip_ov = sector_cfg.get("ceip") if isinstance(sector_cfg.get("ceip"), dict) else {}
@@ -262,7 +263,27 @@ def merge_ceip_group_sector_cfg(
         or ceip_ov.get("ceip_years")
         or sp.get("ceip_years", sector_cfg.get("ceip_years")),
         "osm_group_gpkg": resolve_path(root, path_cfg["osm"][osm_key]),
+        "alpha_method_audit_dir": str(output_path.parent.resolve()),
     }
+    rules_rel = (
+        ceip_ov.get("rules_yaml")
+        or ceip_ov.get("ceip_rules_yaml")
+        or sp.get("ceip_rules_yaml")
+    )
+    if rules_rel:
+        paths_dict["ceip_rules_yaml"] = resolve_path(
+            root, remap_legacy_ceip_relpath(str(rules_rel))
+        )
+    elif profile_sector_id:
+        try:
+            from PROXY.core.alpha.ceip_index_loader import default_ceip_profile_relpath
+
+            rr = default_ceip_profile_relpath(root, profile_sector_id, "rules_yaml")
+            rp = resolve_path(root, Path(rr))
+            if rp.is_file():
+                paths_dict["ceip_rules_yaml"] = rp
+        except KeyError:
+            pass
     for opt_key in ("viirs_nightfire_csv", "gcmt_xlsx", "goget_xlsx"):
         rel = sp.get(opt_key)
         if rel:
@@ -433,15 +454,20 @@ def run_gnfr_group_pipeline(
     Shared GNFR **group** pipeline (B industry, D fugitive): CEIP α tensor × per-group
     spatial proxy, one multiband GeoTIFF per pollutant.
 
+    CEIP ``alpha`` is built **only** for ``country_iso3_fallback`` (sector YAML
+    ``cams_country_iso3``): one national split vector per pollutant. That vector is
+    applied across the full reference window when blending with spatial proxies (the
+    NUTS raster may list many neighbours in the padded bbox).
+
     Stages: CAMS cell id → warp CORINE + pop → load OSM (optional multi-layer) →
     :func:`build_all_group_pg` (OSM/CORINE/sector score + population blend) →
     per-group normalize within cells → for each pollutant band, sum over groups
-    (α[country, g, p] · w_g) and normalize that band in cells. Writes weights TIF
+    (α[focus_country, g, p] · w_g) and normalize that band in cells. Writes weights TIF
     and CSV sidecars under the output directory from ``cfg``.
 
     ``cfg["group_order"]`` lists CEIP group keys (order = tensor axis / alpha columns).
     """
-    from PROXY.core.ceip.reported_group_alpha import load_ceip_and_alpha
+    from PROXY.core.alpha.reported_group_alpha import load_ceip_and_alpha
     # Prepare paths and settings for the shared GNFR group pipeline.
     # - Extract necessary file paths and output directory from the configuration.
     # - Determine CEIP group order and validate its uniqueness.
@@ -476,13 +502,23 @@ def run_gnfr_group_pipeline(
     corine_path = _ensure_corine_path(root, cfg, ref)
     pop_path = resolve_path(root, paths["population_tif"])
     osm_path = resolve_path(root, paths["osm_group_gpkg"])
+    from PROXY.core.alpha.ceip_profile_merge import load_merged_ceip_profile
+
     nuts_path = resolve_path(root, paths["nuts_gpkg"])
     groups_yaml = resolve_path(
         root, remap_legacy_ceip_relpath(str(paths["ceip_groups_yaml"]))
     )
+    rules_raw = paths.get("ceip_rules_yaml")
+    rules_yaml: Path | None = None
+    if rules_raw:
+        rp = Path(str(rules_raw))
+        if not rp.is_absolute():
+            rp = resolve_path(root, rp)
+        if rp.is_file():
+            rules_yaml = rp
+    merged_doc = load_merged_ceip_profile(groups_yaml, rules_yaml)
+    groups_raw: dict[str, Any] = dict((merged_doc or {}).get("groups") or {})
     ceip_workbook = resolve_path(root, paths["ceip_workbook"])
-
-    # Get proxy config and diagnostics logger
     pcfg = cfg.get("proxy") or {}
     log_stats = bool(pcfg.get("log_input_stats", True))
     diag = RasterStatsLogger(logger, tag=diag_tag)
@@ -516,8 +552,11 @@ def run_gnfr_group_pipeline(
             ("OSM GPKG", osm_path),
             ("NUTS", nuts_path),
             ("CEIP workbook", ceip_workbook),
-            ("groups YAML", groups_yaml),
+            ("CEIP groups YAML", groups_yaml),
+            ("CEIP rules YAML", rules_yaml if rules_yaml is not None else Path()),
         ):
+            if label == "CEIP rules YAML" and (rules_yaml is None or not pth):
+                continue
             logger.info(
                 "[%s] %s: exists=%s size_MiB=%.3f path=%s",
                 diag_tag,
@@ -575,9 +614,7 @@ def run_gnfr_group_pipeline(
     if osm_gdf.crs is None:
         raise ValueError(f"OSM GeoPackage has no CRS: {osm_path}")
 
-    # Load group definitions from YAML and verify all required groups are present
-    with groups_yaml.open(encoding="utf-8") as f:
-        groups_raw: dict[str, Any] = dict((yaml.safe_load(f) or {}).get("groups") or {})
+    # Load group definitions from merged CEIP profile (groups + optional rules YAML).
     # Main GNFR group pipeline core: 
     #  - Verifies group definitions (YAML) contain all needed keys
     #  - Rasterizes NUTS polygons to country ID/ISO3 reference index, logs, picks fallback
@@ -602,15 +639,12 @@ def run_gnfr_group_pipeline(
     if not iso3_list:
         raise ValueError("No countries in NUTS rasterization list.")
     logger.info(
-        "%s pipeline [4/8]: NUTS/ISO3 — %d countries in alpha list (e.g. first few: %s)",
+        "%s pipeline [4/8]: NUTS/ISO3 — %d countries in reference window "
+        "(CEIP alpha tensor: focus country %s only)",
         output_prefix,
         len(iso3_list),
-        ", ".join(iso3_list[:5]) + ("…" if len(iso3_list) > 5 else ""),
+        fb_iso,
     )
-    # Fallback index for country mapping (for pixels with unmapped NUTS)
-    fb_ri = iso3_list.index(fb_iso) if fb_iso in iso3_list else 0
-    ri = np.where(country_id.astype(np.int64) > 0, country_id.astype(np.int64) - 1, fb_ri).astype(np.int64)
-    ri = np.clip(ri, 0, len(iso3_list) - 1)
     if log_stats:
         diag.log_cam_and_country(cam_cell_id, country_id)
 
@@ -618,8 +652,10 @@ def run_gnfr_group_pipeline(
     logger.info(
         "%s pipeline [5/8]: load CEIP workbook, build group × pollutant alpha tensor…", output_prefix
     )
+    fb_iso_u = str(fb_iso).strip().upper()
+    iso_ceip = [fb_iso_u]
     alpha, _fb_code, wide_alpha = load_ceip_and_alpha(
-        cfg, iso3_list, sector_key=sector_key, focus_country_iso3=fb_iso
+        cfg, iso_ceip, sector_key=sector_key, focus_country_iso3=fb_iso
     )
     alpha = np.asarray(alpha, dtype=np.float32)
     alpha_cols = tuple(f"alpha_{g}" for g in group_order)
@@ -638,7 +674,7 @@ def run_gnfr_group_pipeline(
         _debug_log_alpha_vs_pollutants(
             alpha,
             pollutants,
-            iso3_list,
+            iso_ceip,
             fb_iso,
             sector_key=str(sector_key),
             logger=logger,
@@ -716,7 +752,7 @@ def run_gnfr_group_pipeline(
     for j, name in enumerate(pollutants):
         acc.fill(0.0)
         for gi, gid in enumerate(group_order):
-            np.multiply(alpha[ri, gi, j], w_by_g[gid], out=tmp)
+            np.multiply(alpha[0, gi, j], w_by_g[gid], out=tmp)
             np.add(acc, tmp, out=acc)
         band, _ = normalize_within_cams_cells(
             acc,
@@ -764,8 +800,9 @@ def run_gnfr_group_pipeline(
     )
 
     wide_alpha.to_csv(out_dir / f"{output_prefix}_alpha_country_pollutant.csv", index=False)
-    fb_counts = wide_alpha.groupby("fallback_code").size().reset_index(name="n_rows")
-    fb_counts.to_csv(out_dir / f"{output_prefix}_fallback_counts.csv", index=False)
+    if "method" in wide_alpha.columns:
+        m_counts = wide_alpha.groupby("method").size().reset_index(name="n_rows")
+        m_counts.to_csv(out_dir / f"{output_prefix}_method_counts.csv", index=False)
 
     # --- Write CSV with fallback statistics: for each group, count of pixels using OSM/CLC fallback per CAMS cell
     pop_fb_rows: list[dict[str, Any]] = []

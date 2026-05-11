@@ -19,6 +19,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 _root_boot = Path(__file__).resolve().parents[2]
 if str(_root_boot) not in sys.path:
     sys.path.insert(0, str(_root_boot))
@@ -81,8 +83,6 @@ def _distinct_signal_rgba(
     percentile stretch so negatives are not dropped entirely; pairs well with a higher
     ``lo_pct`` on export so weak values stay transparent.
     """
-    import numpy as np
-
     a = np.asarray(z, dtype=np.float64)
     h, w = a.shape
     rgba = np.zeros((h, w, 4), dtype=np.uint8)
@@ -137,8 +137,6 @@ def _signal_strength_t(
     positive_only: bool = True,
 ) -> object:
     """Return HxW float64 strengths in [0, 1] (same normalization core as ``_distinct_signal_rgba``)."""
-    import numpy as np
-
     a = np.asarray(z, dtype=np.float64)
     h, w = a.shape
     out = np.zeros((h, w), dtype=np.float64)
@@ -192,8 +190,6 @@ def _composite_rgb_industry_clc_osm(
 
     Blend: ``out = base * (1 - a) + solid_rgb * a`` with ``a = cover_scale * strength``.
     """
-    import numpy as np
-
     base_f = np.asarray(base_rgb_uint8, dtype=np.float32)
     if base_f.ndim != 3 or base_f.shape[2] != 3:
         raise ValueError("base must be HxWx3")
@@ -255,8 +251,6 @@ def _composite_rgb_industry_clc_osm(
 
 def _dim_rgb_uint8(rgb: object, factor: float) -> object:
     """Darken basemap RGB so saturated overlays remain readable."""
-    import numpy as np
-
     x = np.asarray(rgb, dtype=np.float32)
     if x.ndim != 3 or x.shape[2] != 3:
         return rgb
@@ -279,8 +273,6 @@ def _basemap_rgb_underlay(
     use_basemap: bool,
 ) -> object:
     """RGB background: OSM tiles if ``use_basemap`` else light gray."""
-    import numpy as np
-
     if use_basemap:
         transparent = np.zeros((gh, gw, 4), dtype=np.uint8)
         return _composite_rgba_over_osm(
@@ -299,8 +291,6 @@ def _basemap_rgb_underlay(
 
 def _scalar_stats_lines(name: str, arr: object, *, pos_thr: float | None = 1e-12) -> list[str]:
     """Human-readable one-line stats for float rasters (stderr debug)."""
-    import numpy as np
-
     a = np.asarray(arr, dtype=np.float64).ravel()
     fin = np.isfinite(a)
     n = int(a.size)
@@ -346,8 +336,6 @@ def _save_industry_group_combined(
     flat_basemap_rgb_dim: float = 0.92,
     debug_combined_layers: bool = False,
 ) -> None:
-    import numpy as np
-
     base = _basemap_rgb_underlay(
         gh=gh,
         gw=gw,
@@ -470,8 +458,6 @@ def _per_cell_drop_lowest_positive_pct(
     """Turn off ``valid`` for pixels whose raw weight is below the ``lo_pct`` percentile of
     positives **within the same CAMS cell** (needs at least ``min_pos`` positive samples).
     """
-    import numpy as np
-
     w = np.asarray(w_arr, dtype=np.float64)
     cid = np.asarray(cell_id)
     if cid.shape != w.shape:
@@ -587,7 +573,7 @@ def main() -> int:
     out_dir = (args.out_dir.resolve() if args.out_dir else Path.cwd().resolve())
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    from PROXY.core.ceip.loader import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha.ceip_index_loader import DEFAULT_GNFR_GROUP_ORDER
     from PROXY.core.dataloaders import resolve_path
     from PROXY.core.dataloaders.discovery import discover_cams_emissions
     from PROXY.core.cams.mask import cams_gnfr_country_source_mask
@@ -604,7 +590,6 @@ def main() -> int:
     from PROXY.visualization.industry_context import build_industry_proxy_rgba_overlays
     from PROXY.visualization.overlay_utils import read_weight_wgs84_only, scalar_to_rgba
     from rasterio.transform import xy as transform_xy
-    import numpy as np
     import xarray as xr
 
     wt_resolved = resolve_under_root(wt, args.root)
@@ -745,7 +730,7 @@ def main() -> int:
         k_osm = f"Industry · OSM_{gid}"
         k_clc = _industry_corine_scalar_title(gid, groups_raw)
         if k_clc is None:
-            print(f"WARNING: skip {gid}: no corine_classes in industry_groups.yaml.", file=sys.stderr)
+            print(f"WARNING: skip {gid}: no corine_classes in B_Industry CEIP profile.", file=sys.stderr)
             continue
         if k_osm not in scalars or k_clc not in scalars or p_pop_arr is None:
             print(

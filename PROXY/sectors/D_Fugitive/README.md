@@ -27,7 +27,7 @@ python -m PROXY.main build --sector D_Fugitive --country EL
 | **Builder** | `builder.py` | Resolves paths, builds the **reference window** (`reference_window_profile`), merges YAML into the structure expected by the pipeline (`merge_ceip_group_sector_cfg` in `PROXY.sectors._shared.gnfr_groups`), calls `run_fugitive_pipeline`. |
 | **Thin wrapper** | `pipeline.py` | `run_fugitive_pipeline` → `run_gnfr_group_pipeline` with `sector_key="D_Fugitive"` and default OSM loader (industry passes a multi-layer GPKG reader). |
 | **Core algorithm** | `PROXY.sectors._shared.gnfr_groups` | `run_gnfr_group_pipeline`: CAMS ids, rasters, α from CEIP, per-group and per-pollutant normalization, multiband write. |
-| **CEIP / α** | `PROXY.core.ceip.reported_group_alpha` | `load_ceip_and_alpha` (GNFR group sectors; workbook paths come from merged config). Re-exported from `PROXY.core.ceip`. |
+| **CEIP / α** | `PROXY.core.alpha.ceip.reported_group_alpha` | `load_ceip_and_alpha` (GNFR group sectors; workbook paths come from merged config). Re-exported from `PROXY.core.alpha.ceip`. |
 
 Methodology details: `PROXY/docs/sector_methodology.md` (GNFR D / fugitive section, if present).
 

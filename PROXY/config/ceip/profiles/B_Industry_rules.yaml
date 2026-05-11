@@ -1,0 +1,143 @@
+# GNFR B Industry: proxy/OSM/CORINE weights per group.
+groups:
+  G1:
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.85
+    w_clc_in_sector: 0.15
+    w_pop_in_p: 0.03
+    corine_classes:
+    - 121
+    osm_rules:
+      any_of:
+      - man_made: works
+        product: oil
+      - man_made: works
+        product: fuel
+      - man_made: works
+        product: petroleum
+      - industrial: refinery
+      - industrial: oil
+      - industrial: petroleum
+      - industrial: fuel
+      - man_made: storage_tank
+        content: oil
+      - man_made: storage_tank
+        content: fuel
+      - man_made: storage_tank
+        content: diesel
+      - man_made: storage_tank
+        content: gasoline
+      - man_made: storage_tank
+        content: petroleum
+      - landuse: depot
+      - industrial: fuel_depot
+      - amenity: fuel_depot
+  G2:
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.6
+    w_clc_in_sector: 0.4
+    w_pop_in_p: 0.1
+    corine_classes:
+    - 121
+    osm_rules:
+      any_of:
+      - landuse: industrial
+      - building: industrial
+      - building: factory
+      - building: warehouse
+      - man_made: works
+      - industrial: factory
+      - industrial: engineering
+      - industrial: machine_shop
+      - industrial: manufacture
+      - industrial: textile
+      - industrial: food
+      - industrial: sawmill
+      - power: plant
+        plant_source: gas
+      - power: plant
+        plant_source: oil
+      - power: plant
+        plant_source: biomass
+  G3:
+    osm_point_buffer_m: 3000
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.7
+    w_clc_in_sector: 0.3
+    w_pop_in_p: 0.05
+    corine_classes:
+    - 131
+    osm_rules:
+      any_of:
+      - landuse: quarry
+      - man_made: mineshaft
+      - industrial: cement
+      - industrial: lime
+      - industrial: glass
+      - industrial: ceramic
+      - industrial: brick
+      - man_made: works
+        product: cement
+      - man_made: works
+        product: lime
+      - man_made: works
+        product: glass
+      - man_made: works
+        product: ceramic
+      - man_made: works
+        product: brick
+  G4:
+    osm_point_buffer_m: 300
+    osm_line_buffer_m: 100
+    osm_polygon_buffer_m: 25
+    w_osm_in_sector: 0.75
+    w_clc_in_sector: 0.25
+    w_pop_in_p: 0.05
+    corine_classes:
+    - 121
+    osm_rules:
+      any_of:
+      - industrial: chemical
+      - industrial: pharmaceutical
+      - industrial: fertilizer
+      - industrial: petrochemical
+      - man_made: works
+        product: chemical
+      - man_made: works
+        product: fertilizer
+      - man_made: works
+        product: pharmaceutical
+      - man_made: works
+        product: plastic
+      - landuse: industrial
+        name: chemical
+      - landuse: industrial
+        name: pharma
+      - landuse: industrial
+        name: fertilizer
+      - industrial: steel
+      - industrial: iron
+      - industrial: metal
+      - industrial: foundry
+      - industrial: aluminium
+      - industrial: smelting
+      - industrial: rolling_mill
+      - man_made: works
+        product: steel
+      - man_made: works
+        product: iron
+      - man_made: works
+        product: aluminium
+      - man_made: works
+        product: aluminum
+      - man_made: works
+        product: copper
+      - man_made: works
+        product: zinc
+      - man_made: works
+        product: metal

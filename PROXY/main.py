@@ -37,11 +37,9 @@ def _ensure_gtiff_srs_source_epsg() -> None:
 def _configure_logging(level_name: str) -> None:
     """Install a root logging handler so every sector's ``logger.info(...)`` is visible.
 
-    The J_Waste pipeline calls ``logging.basicConfig`` itself when invoked, which is why
-    its messages show up under the legacy single-sector run; other sectors rely on the root
-    logger already being configured. This helper installs the same format used by J_Waste so
-    downstream output stays consistent whether or not J_Waste is in the selected set. Called
-    once per CLI invocation; if handlers already exist we only promote the level.
+    Uses the same format as :func:`PROXY.sectors.J_Waste.pipeline._setup_logging` so
+    log lines stay consistent when the waste pipeline runs standalone or under ``build``.
+    If handlers already exist (e.g. CLI configured logging first), only the level is updated.
     """
     try:
         level = getattr(logging, level_name.upper())
@@ -131,6 +129,10 @@ def _build_cmd(args: argparse.Namespace) -> int:
         sector_cfg_path = root / str(entry["config"])
         sector_cfg = load_yaml(sector_cfg_path)
         sector_cfg["build_part"] = str(getattr(args, "part", "both")).strip().lower()
+        if str(key) == "C_OtherCombustion":
+            sector_cfg.setdefault("run", {})["enable_offroad"] = bool(
+                getattr(args, "enable_offroad", True)
+            )
         out_dir = root / str(sector_cfg["output_dir"])
         out_name = str(sector_cfg.get("output_filename", f"{key}_areasource.tif"))
         sector_cfg["output_path"] = out_dir / out_name
@@ -374,6 +376,24 @@ _AREA_PREVIEW_SECTORS = frozenset(
     }
 )
 
+_AREA_PREVIEW_HTML_MODULES: dict[str, tuple[str, str]] = {
+    "A_PublicPower": ("PROXY.visualization.public_power_area_map", "write_public_power_area_html"),
+    "I_Offroad": ("PROXY.visualization.offroad_area_map", "write_offroad_area_html"),
+    "C_OtherCombustion": (
+        "PROXY.visualization.other_combustion_area_map",
+        "write_other_combustion_area_html",
+    ),
+    "D_Fugitive": ("PROXY.visualization.fugitive_area_map", "write_fugitive_area_html"),
+    "B_Industry": ("PROXY.visualization.industry_area_map", "write_industry_area_html"),
+    "E_Solvents": ("PROXY.visualization.solvents_area_map", "write_solvents_area_html"),
+    "J_Waste": ("PROXY.visualization.waste_area_map", "write_waste_area_html"),
+    "G_Shipping": ("PROXY.visualization.shipping_area_map", "write_shipping_area_html"),
+    "K_Agriculture": ("PROXY.visualization.agriculture_area_map", "write_k_agriculture_area_html"),
+}
+assert frozenset(_AREA_PREVIEW_HTML_MODULES) == _AREA_PREVIEW_SECTORS, (
+    "_AREA_PREVIEW_HTML_MODULES keys must match _AREA_PREVIEW_SECTORS"
+)
+
 _AREA_DEFAULT_WEIGHT_TIFS = {
     "A_PublicPower": "publicpower_areasource.tif",
     "I_Offroad": "offroad_areasource.tif",
@@ -485,86 +505,48 @@ def _write_area_preview_html(
         "region": region,
         "override_bbox": override_bbox,
     }
+    if sector_key not in _AREA_PREVIEW_SECTORS:
+        raise ValueError(
+            f"no area HTML preview for sector={sector_key!r} "
+            f"(supported: {sorted(_AREA_PREVIEW_SECTORS)})"
+        )
+    mod_path, fn_name = _AREA_PREVIEW_HTML_MODULES[sector_key]
+    writer = getattr(importlib.import_module(mod_path), fn_name)
     if sector_key == "A_PublicPower":
-        from PROXY.visualization.public_power_area_map import write_public_power_area_html
-
-        return write_public_power_area_html(
+        return writer(
             **_common,
             area_proxy=sector_cfg.get("area_proxy") or {},
         )
     if sector_key == "I_Offroad":
-        from PROXY.visualization.offroad_area_map import write_offroad_area_html
-
         _kw = {**_common, "population_tif": None}
-        return write_offroad_area_html(
+        return writer(
             **_kw,
             area_proxy=sector_cfg.get("area_proxy") or {},
             path_cfg=path_cfg,
         )
     if sector_key == "C_OtherCombustion":
-        from PROXY.visualization.other_combustion_area_map import write_other_combustion_area_html
-
         _kw = {k: v for k, v in _common.items() if k != "population_tif"}
-        return write_other_combustion_area_html(
+        return writer(
             **_kw,
             sector_cfg=sector_cfg,
             path_cfg=path_cfg,
         )
-    if sector_key == "D_Fugitive":
-        from PROXY.visualization.fugitive_area_map import write_fugitive_area_html
-
-        return write_fugitive_area_html(
+    if sector_key in ("D_Fugitive", "B_Industry"):
+        return writer(
             **_common,
             sector_cfg=sector_cfg,
             path_cfg=path_cfg,
         )
-    if sector_key == "B_Industry":
-        from PROXY.visualization.industry_area_map import write_industry_area_html
-
-        return write_industry_area_html(
-            **_common,
-            sector_cfg=sector_cfg,
-            path_cfg=path_cfg,
-        )
-    if sector_key == "E_Solvents":
-        from PROXY.visualization.solvents_area_map import write_solvents_area_html
-
-        return write_solvents_area_html(
+    if sector_key in ("E_Solvents", "J_Waste", "G_Shipping", "K_Agriculture"):
+        return writer(
             **_common,
             sector_cfg=sector_cfg,
             path_cfg=path_cfg,
             country=country_code,
         )
-    if sector_key == "J_Waste":
-        from PROXY.visualization.waste_area_map import write_waste_area_html
-
-        return write_waste_area_html(
-            **_common,
-            sector_cfg=sector_cfg,
-            path_cfg=path_cfg,
-            country=country_code,
-        )
-    if sector_key == "G_Shipping":
-        from PROXY.visualization.shipping_area_map import write_shipping_area_html
-
-        return write_shipping_area_html(
-            **_common,
-            sector_cfg=sector_cfg,
-            path_cfg=path_cfg,
-            country=country_code,
-        )
-    if sector_key == "K_Agriculture":
-        from PROXY.visualization.agriculture_area_map import write_k_agriculture_area_html
-
-        return write_k_agriculture_area_html(
-            **_common,
-            sector_cfg=sector_cfg,
-            path_cfg=path_cfg,
-            country=country_code,
-        )
-    raise ValueError(
-        f"no area HTML preview for sector={sector_key!r} "
-        f"(supported: {sorted(_AREA_PREVIEW_SECTORS)})"
+    raise AssertionError(
+        f"area preview kwargs branch missing for sector_key={sector_key!r} "
+        f"(registry out of sync with dispatch if/elif)"
     )
 
 
@@ -922,6 +904,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "J_Waste only: write both area+point GeoTIFFs (both), only waste_areasource.tif (area), "
             "or only waste_pointsource.tif (point). Other sectors ignore this (always full area build)."
+        ),
+    )
+    p_build.add_argument(
+        "--enable-offroad",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "C_OtherCombustion only: stationary + off-road branch blend (default: on). "
+            "Use --no-enable-offroad for legacy stationary-only weights."
         ),
     )
     p_build.set_defaults(func=_build_cmd)

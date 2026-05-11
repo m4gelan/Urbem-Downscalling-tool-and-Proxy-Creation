@@ -17,6 +17,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 # Default: central Athens / inner Attica (WGS84, degrees)
 DEFAULT_BBOX_WGS84 = (23.50, 37.85, 23.95, 38.08)
 
@@ -73,7 +75,6 @@ def _reproject_basemap_to_overlay_grid(
     dst_transform,
     dst_shape: tuple[int, int],
 ) -> object:
-    import numpy as np
     import rasterio
     from rasterio.transform import from_bounds
     from rasterio.warp import reproject, Resampling
@@ -106,8 +107,6 @@ def _reproject_basemap_to_overlay_grid(
 
 
 def _alpha_composite_rgb_under_rgba(base_rgb: object, overlay_rgba: object) -> object:
-    import numpy as np
-
     base_f = np.asarray(base_rgb, dtype=np.float32)
     # Basemap path uses floats in [0, 1]; chained composites pass uint8 [0, 255].
     if base_f.ndim == 3 and base_f.shape[2] == 3 and float(np.nanmax(base_f)) > 1.5:
@@ -133,8 +132,6 @@ def _composite_rgba_over_osm(
     zoom_adjust: int | None,
 ) -> object:
     import contextily as ctx
-    import numpy as np
-
     gh, gw = int(dst_shape[0]), int(dst_shape[1])
     if np.asarray(rgba).shape[:2] != (gh, gw):
         raise ValueError(f"RGBA shape mismatch vs ({gh}, {gw})")
@@ -175,8 +172,6 @@ def _plot_cams_grid(ax, grid_fc: dict, *, color: str = "#0d47a1", lw: float = 1.
 
 
 def _percentile_vmin_vmax(z: object, *, lo_q: float = 2.0, hi_q: float = 98.0) -> tuple[float, float] | None:
-    import numpy as np
-
     a = np.asarray(z, dtype=np.float64)
     m = np.isfinite(a) & (a > 0)
     if not np.any(m):
@@ -209,8 +204,6 @@ def _save_png(
     import matplotlib.pyplot as plt
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import Normalize
-    import numpy as np
-
     arr = np.asarray(img)
     gh, gw = int(arr.shape[0]), int(arr.shape[1])
     if arr.ndim != 3 or arr.shape[2] not in (3, 4):
@@ -275,8 +268,6 @@ def _rgba_solid_corine(
     scalars: dict[str, object], shape: tuple[int, int]
 ) -> tuple[object | None, list[tuple[str, tuple[int, int, int]]] | None]:
     """CLC 121 vs 132 on one map (132 draws over 121 where both)."""
-    import numpy as np
-
     gh, gw = shape
     k121 = "J_Waste · solid: corine_clc_121"
     k132 = "J_Waste · solid: corine_clc_132"
@@ -302,8 +293,6 @@ def _rgba_solid_osm_stack(
     scalars: dict[str, object], shape: tuple[int, int]
 ) -> tuple[object | None, list[tuple[str, tuple[int, int, int]]] | None]:
     """All solid OSM context masks with distinct colours (stable key order; later keys paint over earlier)."""
-    import numpy as np
-
     gh, gw = shape
     keys = sorted(k for k in scalars if k.startswith("J_Waste · solid: osm_"))
     if not keys:
@@ -417,7 +406,6 @@ def main() -> int:
     )
     from PROXY.visualization.overlay_utils import read_weight_wgs84_only
     from PROXY.visualization.waste_context import build_waste_proxy_rgba_overlays
-    import numpy as np
     import xarray as xr
 
     wt_resolved = resolve_under_root(wt, args.root)

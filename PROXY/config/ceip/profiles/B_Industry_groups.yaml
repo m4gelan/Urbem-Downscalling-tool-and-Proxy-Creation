@@ -1,0 +1,79 @@
+# GNFR B Industry: NFR mapping per group (merged with B_Industry_rules.yaml).
+groups:
+  G1:
+    name: refineries_petroleum
+    ceip_sectors:
+    - 1A1b
+    - 1A1c
+    - 1B1b
+    - 1B2a5
+    - 1B2a6
+    - 1B2b5
+    - 2C1b
+  G2:
+    name: manufacturing_combustion_residual
+    ceip_sectors:
+    - 1A2gvii
+    - 1A2gviii
+    - 1A2a
+    - 1A2b
+    - 1A2c
+    - 1A2d
+    - 1A2e
+    - 1A2f
+    - 2D3a
+    - 2D3b
+    - 2D1
+    - 2D2
+    - 2G
+    - 2H1
+    - 2H2
+    - 2H3
+    - 2I
+    - 2J
+    - 2K
+    - 2L
+  G3:
+    name: mineral
+    ceip_sectors:
+    - 2A4a
+    - 2A4b
+    - 2A4c
+    - 2A4d
+    - 2A5a
+    - 2A5b
+    - 2A5c
+    - 2A1
+    - 2A2
+    - 2A3
+    - 2A6
+  G4:
+    name: chemical_metal
+    ceip_sectors:
+    - 2B10a
+    - 2B10b
+    - 2B8a
+    - 2B8b
+    - 2B8c
+    - 2B8d
+    - 2B8e
+    - 2B8f
+    - 2B9a
+    - 2B9b
+    - 2B1
+    - 2B2
+    - 2B3
+    - 2B4
+    - 2B5
+    - 2B6
+    - 2B7
+    - 2C7a
+    - 2C7b
+    - 2C7c
+    - 2C7d
+    - 2C1
+    - 2C2
+    - 2C3
+    - 2C4
+    - 2C5
+    - 2C6

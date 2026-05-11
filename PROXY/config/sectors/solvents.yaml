@@ -33,7 +33,7 @@ solvents:
   ceip_year: 2020
   paths:
     ceip_workbook: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
-    ceip_subsector_map_yaml: PROXY/config/ceip/profiles/solvents_subsectors.yaml
+    ceip_subsector_map_yaml: PROXY/config/ceip/profiles/E_Solvents_groups.yaml
   # Optional OSM PBF fallbacks if solvent GPKG is incomplete:
   # osm_roads_pbf: data/OSM/roads.osm.pbf
   # osm_landuse_buildings_pbf: data/OSM/landuse_buildings.osm.pbf

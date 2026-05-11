@@ -2,7 +2,7 @@
 
 **Role**: build α used by :func:`PROXY.sectors._shared.gnfr_groups.run_gnfr_group_pipeline`
 for GNFR **group** sectors (``B_Industry``, ``D_Fugitive``) and by GNFR **E** solvents via
-:func:`load_ceip_and_alpha_solvents` (2.D.3 subsectors from ``solvents_subsectors.yaml``).
+:func:`load_ceip_and_alpha_solvents` (2.D.3 subsectors from ``E_Solvents_groups.yaml``).
 
 **Inputs**: merged ``cfg`` (workbook path, profile YAML, ``pollutants``, ordered ids,
 optional ``ceip_years`` and pollutant aliases), plus ``iso3_list``.
@@ -22,20 +22,29 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import yaml
 
-from PROXY.core.alpha import read_alpha_workbook
-from PROXY.core.alpha.fallback import AlphaSource, format_provenance, resolve_alpha
 from PROXY.core.alpha.reported import (
     normalize_inventory_sector,
     parse_float_or_nan,
     resolve_iso3_reported,
+    resolve_reporting_key,
     short_country,
     to_iso3,
 )
-from PROXY.core.ceip.loader import DEFAULT_GNFR_GROUP_ORDER, remap_legacy_ceip_relpath
+from PROXY.core.alpha.workbook import read_alpha_workbook
 from PROXY.core.dataloaders import resolve_path
 
+from .alpha_method_engine import (
+    build_alpha_tensor_methods,
+    method_matrix_from_wide,
+)
+from .ceip_index_loader import DEFAULT_GNFR_GROUP_ORDER, remap_legacy_ceip_relpath
+from .ceip_profile_merge import load_merged_ceip_profile
+
 logger = logging.getLogger(__name__)
+
+_parse_float = parse_float_or_nan
 
 
 _ISO3_TO_SHORT: dict[str, str] = {"GRC": "EL"}
@@ -43,69 +52,6 @@ _ISO3_TO_SHORT: dict[str, str] = {"GRC": "EL"}
 
 def _short_country(iso3: str) -> str:
     return short_country(iso3, _ISO3_TO_SHORT)
-
-
-def _apply_fallback_yaml(
-    alpha: np.ndarray,
-    fallback: np.ndarray,
-    iso3_list: list[str],
-    pollutants: list[str],
-    *,
-    sector_key: str,
-    group_order: tuple[str, ...],
-    focus_country_iso3: str | None = None,
-) -> None:
-    """Rewrite the uniform-fallback leaves of ``alpha`` using the shared YAML resolver.
-
-    Phase 2.3/2.4: when ``build_alpha_tensor`` marked a (country, pollutant) entry as
-    ``fallback_code == 3`` (all-uniform 1/n), consult
-    ``PROXY/config/ceip/alpha/fallback/`` via :func:`core.alpha.fallback.resolve_alpha`. If
-    the YAML files are empty the resolver returns the same 0.25 values and this is a
-    no-op. Any YAML override is applied in place and logged with the provenance source.
-
-    Reported-workbook values (fallback_code 0/1/2) are never touched.
-
-    ``focus_country_iso3`` (e.g. ``GRC``): log non-uniform YAML provenance at INFO only
-    for that ISO3; other countries log at DEBUG so full-country CAMS builds stay readable.
-    """
-    subsectors = list(group_order)
-    focus_u = str(focus_country_iso3).strip().upper() if focus_country_iso3 else ""
-    n_yaml_rows = 0
-    for ri, iso in enumerate(iso3_list):
-        if not iso:
-            continue
-        iso_u = str(iso).strip().upper()
-        country_short = _short_country(iso)
-        for j, pol in enumerate(pollutants):
-            if int(fallback[ri, j]) < 3:
-                continue
-            n_yaml_rows += 1
-            res = resolve_alpha(
-                sector=sector_key,
-                country=country_short,
-                pollutant=str(pol),
-                subsectors=subsectors,
-            )
-            for gi, gid in enumerate(subsectors):
-                val = res.values.get(gid)
-                if val is None:
-                    continue
-                alpha[ri, gi, j] = float(val)
-            if any(s is not AlphaSource.UNIFORM_FALLBACK for s in res.source.values()):
-                msg = "[alpha] sector=%s country=%s pollutant=%s %s"
-                args_t = (sector_key, country_short, pol, format_provenance(res))
-                if not focus_u or iso_u == focus_u:
-                    logger.info(msg, *args_t)
-                else:
-                    logger.debug(msg, *args_t)
-    if focus_u and n_yaml_rows:
-        logger.info(
-            "%s: CEIP YAML fallback processed for %d (country x pollutant) uniform-tier entries; "
-            "[alpha] provenance at INFO for country_iso3=%s only, DEBUG for other countries.",
-            sector_key,
-            n_yaml_rows,
-            focus_u,
-        )
 
 
 def _to_iso3(code: str) -> str:
@@ -126,14 +72,11 @@ def _resolve_iso3_reported(
 def _sector_to_group(
     sector_norm: str, tok2g: dict[str, str]
 ) -> str | None:
-    """Match ``ceip_groups.yaml`` tokens (``read_ceip_long`` logic)."""
+    """Match ``ceip_groups.yaml`` tokens; **longest NFR-prefix wins** (same as :func:`_group_id_for_ceip_inventory_token`)."""
     tok = str(sector_norm).strip().upper()
     if not tok:
         return None
-    for k, g in tok2g.items():
-        if tok == k or tok.startswith(k):
-            return g
-    return None
+    return _group_id_for_ceip_inventory_token(tok, tok2g)
 
 
 def read_reported_emissions_fugitive_long(
@@ -149,8 +92,7 @@ def read_reported_emissions_fugitive_long(
     in ``ceip_groups.yaml`` to G1..G4, and return **long** means of annual emissions:
 
     (country, pollutant, group) with ``E`` = mean over years of (sum of ``TOTAL`` in that
-    year for that group/pollutant/country), matching the multi-year share logic in
-    ``alpha.read_ceip_shares`` (long / triple cases).
+    year for that group/pollutant/country).
     """
     if not xlsx_path.is_file():
         raise FileNotFoundError(
@@ -175,8 +117,8 @@ def read_reported_emissions_fugitive_long(
     rows: list[dict[str, Any]] = []
     for _, r in raw.iterrows():
         cc_raw = r.get("COUNTRY")
-        iso3 = _resolve_iso3_reported(str(cc_raw), cntr_code_to_iso3)
-        if not iso3 or len(iso3) != 3:
+        rkey = resolve_reporting_key(str(cc_raw), cntr_code_to_iso3)
+        if not rkey:
             continue
         sn = str(r.get("SECTOR_NORM", normalize_inventory_sector(r.get("SECTOR", "")))).strip()
         gid = _sector_to_group(sn, tok2g)
@@ -194,7 +136,7 @@ def read_reported_emissions_fugitive_long(
             u = "TOTAL"
         rows.append(
             {
-                "country_iso3": iso3.upper(),
+                "country_iso3": str(rkey).upper(),
                 "pollutant": u,
                 "group": gid,
                 "E": float(v),
@@ -204,7 +146,7 @@ def read_reported_emissions_fugitive_long(
     if not rows:
         raise ValueError(
             f"No CEIP rows matched ceip_groups.yaml sectors in {xlsx_path}. "
-            "Check NFR sector codes in the workbook vs PROXY/config/ceip/profiles/fugitive_groups.yaml."
+            "Check NFR sector codes in the workbook vs merged D_Fugitive CEIP profile (D_Fugitive_groups.yaml + D_Fugitive_rules.yaml)."
         )
     dfp = pd.DataFrame(rows)
     # Per calendar year, sum emissions that fall in the same (country, pollutant, group).
@@ -260,8 +202,8 @@ def read_reported_emissions_subsector_long(
     rows: list[dict[str, Any]] = []
     for _, r in raw.iterrows():
         cc_raw = r.get("COUNTRY")
-        iso3 = _resolve_iso3_reported(str(cc_raw), cntr_code_to_iso3)
-        if not iso3 or len(iso3) != 3:
+        rkey = resolve_reporting_key(str(cc_raw), cntr_code_to_iso3)
+        if not rkey:
             continue
         sn = str(r.get("SECTOR_NORM", normalize_inventory_sector(r.get("SECTOR", "")))).strip()
         sub = _sector_to_subsector(sn, tok2sub, sub_s)
@@ -279,7 +221,7 @@ def read_reported_emissions_subsector_long(
             u = "TOTAL"
         rows.append(
             {
-                "country_iso3": iso3.upper(),
+                "country_iso3": str(rkey).upper(),
                 "pollutant": u,
                 "subsector": sub,
                 "E": float(v),
@@ -289,7 +231,7 @@ def read_reported_emissions_subsector_long(
     if not rows:
         raise ValueError(
             f"No reported-emission rows matched solvents CEIP profile in {xlsx_path}. "
-            "Check NFR codes vs PROXY/config/ceip/profiles/solvents_subsectors.yaml."
+            "Check NFR codes vs PROXY/config/ceip/profiles/E_Solvents_groups.yaml."
         )
     dfp = pd.DataFrame(rows)
     gsum = dfp.groupby(
@@ -303,26 +245,25 @@ def read_reported_emissions_subsector_long(
     return m
 
 
-def _parse_float(v: Any) -> float:
-    return parse_float_or_nan(v)
-
-
 def load_group_mapping(
     yaml_path: Path,
     group_order: tuple[str, ...] | None = None,
+    *,
+    rules_yaml_path: Path | None = None,
 ) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
     """Return (token_upper -> group id, raw ``groups`` dict from YAML).
 
     ``group_order`` restricts which top-level keys are read and fixes iteration order
     (must match ``cfg["group_order"]`` and the alpha tensor axis). Defaults to
     :data:`DEFAULT_GNFR_GROUP_ORDER`.
-    """
-    import yaml
 
+    When ``rules_yaml_path`` is set and exists, merges ``groups`` + ``rules`` documents
+    (same as :func:`profile_merge.load_merged_ceip_profile`) before
+    building NFR token lookups.
+    """
     order = group_order if group_order is not None else DEFAULT_GNFR_GROUP_ORDER
-    with yaml_path.open(encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    groups: dict[str, Any] = {str(k): v for k, v in dict(raw.get("groups") or {}).items()}
+    merged = load_merged_ceip_profile(yaml_path, rules_yaml_path)
+    groups: dict[str, Any] = {str(k): v for k, v in dict(merged.get("groups") or {}).items()}
     tok2g: dict[str, str] = {}
     for gid in order:
         spec = groups.get(str(gid))
@@ -344,14 +285,12 @@ def load_subsector_mapping_from_yaml(
 ) -> dict[str, str]:
     """
     Build NFR token ``->`` subsector id from ``subsectors:`` in
-    ``PROXY/config/ceip/profiles/solvents_subsectors.yaml``.
+    ``PROXY/config/ceip/profiles/E_Solvents_groups.yaml``.
 
     ``subsector_order`` matches ``cfg["subsectors"]``; when the same token appears under
     multiple YAML subsectors, the **last** subsector in ``subsector_order`` wins (same
     idea as iterating ``cfg["subsectors"]`` first-to-last over the profile).
     """
-    import yaml
-
     with yaml_path.open(encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     subs: dict[str, Any] = {
@@ -394,6 +333,20 @@ def _pick_col(cols: dict[str, str], *names: str) -> str | None:
     return None
 
 
+def _group_id_for_ceip_inventory_token(tok: str, tok2g: dict[str, str]) -> str | None:
+    """Map a normalised CEIP inventory sector string to a GNFR group id.
+
+    Uses **longest NFR-prefix match** among keys in ``tok2g`` (same idea as
+    :func:`_sector_to_subsector`), so the result does not depend on dict insertion order.
+    """
+    for k in sorted(tok2g.keys(), key=lambda x: -len(str(x))):
+        g = tok2g[k]
+        sk = str(k)
+        if tok == sk or tok.startswith(sk):
+            return g
+    return None
+
+
 def read_ceip_long(
     xlsx_path: Path,
     *,
@@ -402,6 +355,12 @@ def read_ceip_long(
     tok2g: dict[str, str],
     pollutant_aliases: dict[str, str],
 ) -> pd.DataFrame:
+    """Read one year from a CEIP-style workbook into long ``(country, pollutant, group, E)`` rows.
+
+    Inventory sector codes are mapped to GNFR groups via ``tok2g`` using **longest
+    NFR-prefix match** (:func:`_group_id_for_ceip_inventory_token`), aligned with
+    :func:`_sector_to_subsector` for solvents.
+    """
     if not xlsx_path.is_file():
         raise FileNotFoundError(f"CEIP fugitive workbook not found: {xlsx_path}")
     try:
@@ -433,11 +392,7 @@ def read_ceip_long(
             continue
         iso3 = iso3.upper()
         tok = normalize_inventory_sector(str(r[c_sector]))
-        gid = None
-        for k, g in tok2g.items():
-            if tok == k or tok.startswith(k):
-                gid = g
-                break
+        gid = _group_id_for_ceip_inventory_token(tok, tok2g)
         if gid is None:
             continue
         v = _parse_float(r[c_total])
@@ -456,92 +411,6 @@ def read_ceip_long(
     return pd.DataFrame(rows)
 
 
-def build_alpha_tensor(
-    long_df: pd.DataFrame,
-    iso3_list: list[str],
-    pollutants: list[str],
-    group_order: tuple[str, ...],
-) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
-    """
-    Return ``(alpha, fallback_per_pol, wide_debug)``.
-
-    ``alpha`` shape ``(n_iso, n_groups, n_pol)`` with ``n_groups = len(group_order)``.
-
-    Per country and pollutant: if group totals sum to zero, fall back to CEIP
-    ``TOTAL`` rows by group for that country; if still zero, fall back to the
-    country’s group totals summed across **all** pollutants (excluding the
-    synthetic ``TOTAL`` pollutant label); if still zero, use uniform ``1/n_groups``.
-
-    ``fallback_code`` in the wide table is per (country, pollutant): 0 none,
-    1 used TOTAL rows, 2 used all-pollutant sum, 3 uniform.
-    """
-    n_iso = len(iso3_list)
-    n_pol = len(pollutants)
-    n_g = len(group_order)
-    gid_to_i = {str(g): i for i, g in enumerate(group_order)}
-    uni = 1.0 / float(max(n_g, 1))
-
-    agg = long_df.groupby(["country_iso3", "pollutant", "group"], as_index=False)["E"].sum()
-    tot = long_df[long_df["pollutant"] == "TOTAL"].groupby(["country_iso3", "group"], as_index=False)["E"].sum()
-    agg_nop = agg[agg["pollutant"] != "TOTAL"].groupby(["country_iso3", "group"], as_index=False)["E"].sum()
-
-    alpha = np.full((n_iso, n_g, n_pol), uni, dtype=np.float64)
-    fallback = np.zeros((n_iso, n_pol), dtype=np.int32)
-
-    pol_norm = agg["pollutant"].str.upper().str.replace(".", "_", regex=False)
-
-    for j, pl in enumerate([p.upper().replace(".", "_") for p in pollutants]):
-        sub = agg.loc[pol_norm == pl]
-        for ri in range(n_iso):
-            iso = str(iso3_list[ri]).strip().upper()
-            if not iso:
-                continue
-            vec = np.zeros(n_g, dtype=np.float64)
-            for _, row in sub[sub["country_iso3"] == iso].iterrows():
-                gi = gid_to_i.get(str(row["group"]))
-                if gi is not None:
-                    vec[gi] += float(row["E"])
-            if float(vec.sum()) > 0:
-                alpha[ri, :, j] = vec / vec.sum()
-                continue
-            vec2 = np.zeros(n_g, dtype=np.float64)
-            for _, row in tot[tot["country_iso3"] == iso].iterrows():
-                gi = gid_to_i.get(str(row["group"]))
-                if gi is not None:
-                    vec2[gi] += float(row["E"])
-            if float(vec2.sum()) > 0:
-                alpha[ri, :, j] = vec2 / vec2.sum()
-                fallback[ri, j] = 1
-                continue
-            vec3 = np.zeros(n_g, dtype=np.float64)
-            for _, row in agg_nop[agg_nop["country_iso3"] == iso].iterrows():
-                gi = gid_to_i.get(str(row["group"]))
-                if gi is not None:
-                    vec3[gi] += float(row["E"])
-            if float(vec3.sum()) > 0:
-                alpha[ri, :, j] = vec3 / vec3.sum()
-                fallback[ri, j] = 2
-            else:
-                alpha[ri, :, j] = uni
-                fallback[ri, j] = 3
-
-    wide_rows: list[dict[str, Any]] = []
-    for j, pl in enumerate(pollutants):
-        for ri in range(n_iso):
-            if not iso3_list[ri]:
-                continue
-            row_d: dict[str, Any] = {
-                "country_iso3": iso3_list[ri],
-                "pollutant": pl.lower(),
-                "fallback_code": int(fallback[ri, j]),
-            }
-            for gi, gname in enumerate(group_order):
-                row_d[f"alpha_{gname}"] = float(alpha[ri, gi, j])
-            wide_rows.append(row_d)
-    wide = pd.DataFrame(wide_rows)
-    return alpha, fallback, wide
-
-
 def load_ceip_and_alpha_solvents(
     cfg: dict[str, Any],
     iso3_list: list[str],
@@ -549,7 +418,7 @@ def load_ceip_and_alpha_solvents(
     focus_country_iso3: str | None = None,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame, dict[str, Any]]:
     """
-    GNFR E solvents: ``Reported_Emissions_*.xlsx`` + ``solvents_subsectors.yaml`` -> α tensor.
+    GNFR E solvents: ``Reported_Emissions_*.xlsx`` + ``E_Solvents_groups.yaml`` -> α tensor.
 
     Same pipeline as :func:`load_ceip_and_alpha` (mean over years, ``build_alpha_tensor``
     TOTAL / cross-pollutant fallbacks, YAML fill for uniform tier), with subsector ids
@@ -597,18 +466,18 @@ def load_ceip_and_alpha_solvents(
         cntr_code_to_iso3=cntr,
     )
     long_for_tensor = long_df.rename(columns={"subsector": "group"})
-    alpha, fb, wide = build_alpha_tensor(long_for_tensor, iso3_list, pollutants, sub_order)
-    _apply_fallback_yaml(
-        alpha,
-        fb,
+    _ = focus_country_iso3
+    alpha, wide, audit = build_alpha_tensor_methods(
+        long_for_tensor,
         iso3_list,
         pollutants,
+        sub_order,
         sector_key="E_Solvents",
-        group_order=sub_order,
-        focus_country_iso3=focus_country_iso3,
+        cfg=cfg,
     )
+    fb = method_matrix_from_wide(wide, iso3_list, pollutants)
     logger.info(
-        "E_Solvents CEIP alpha (reported emissions): %s years=%s iso=%d subsectors=%d pollutants=%d",
+        "E_Solvents CEIP alpha (reported emissions + alpha_methods): %s years=%s iso=%d subsectors=%d pollutants=%d",
         xlsx.name,
         "all" if years_filter is None else years_filter,
         len(iso3_list),
@@ -620,13 +489,14 @@ def load_ceip_and_alpha_solvents(
         "path": str(xlsx),
         "ceip_years": years_filter,
         "ceip_subsector_map_yaml": str(submap_path),
+        "alpha_method_audit": audit,
     }
     return alpha, fb, wide, meta
 
 
 def load_ceip_and_alpha(
     cfg: dict[str, Any],
-    iso3_list: list[str],
+    iso3_list: list[str] | None,
     *,
     sector_key: str = "D_Fugitive",
     focus_country_iso3: str | None = None,
@@ -639,7 +509,15 @@ def load_ceip_and_alpha(
     group_order = tuple(str(x).strip() for x in (cfg.get("group_order") or ()))
     if not group_order:
         group_order = DEFAULT_GNFR_GROUP_ORDER
-    tok2g, _ = load_group_mapping(ypath, group_order)
+    rules_rel = paths.get("ceip_rules_yaml")
+    rules_path: Path | None = None
+    if rules_rel:
+        rp = Path(str(rules_rel))
+        if not rp.is_absolute():
+            rp = resolve_path(root, rp)
+        if rp.is_file():
+            rules_path = rp
+    tok2g, _ = load_group_mapping(ypath, group_order, rules_yaml_path=rules_path)
     xlsx = resolve_path(
         root,
         paths.get("ceip_workbook") or paths.get("ceip_xlsx", ""),
@@ -668,19 +546,35 @@ def load_ceip_and_alpha(
             years_filter=years_filter,
             cntr_code_to_iso3=cntr,
         )
+    if iso3_list is None:
+        iso3_list = sorted(
+            {
+                str(x).strip().upper()
+                for x in long_df["country_iso3"].unique()
+                if str(x).strip()
+            }
+        )
     pollutants = [str(p) for p in cfg["pollutants"]]
-    alpha, fb, wide = build_alpha_tensor(long_df, iso3_list, pollutants, group_order)
-    _apply_fallback_yaml(
-        alpha,
-        fb,
+    _ = focus_country_iso3
+    alpha, wide, audit = build_alpha_tensor_methods(
+        long_df,
         iso3_list,
         pollutants,
+        group_order,
         sector_key=sector_key,
-        group_order=group_order,
-        focus_country_iso3=focus_country_iso3,
+        cfg=cfg,
     )
+    fb = method_matrix_from_wide(wide, iso3_list, pollutants)
+    out_dir = paths.get("alpha_method_audit_dir")
+    if out_dir and audit is not None and not audit.empty:
+        ap = Path(out_dir) / f"{sector_key}_alpha_method_audit.csv"
+        try:
+            ap.parent.mkdir(parents=True, exist_ok=True)
+            audit.to_csv(ap, index=False)
+        except OSError as exc:
+            logger.warning("Could not write %s: %s", ap, exc)
     logger.info(
-        "%s CEIP alpha (reported emissions): %s years=%s iso=%d groups=%d pollutants=%d",
+        "%s CEIP alpha (reported emissions + alpha_methods): %s years=%s iso=%d groups=%d pollutants=%d",
         sector_key,
         xlsx.name,
         "all" if years_filter is None else years_filter,
@@ -692,7 +586,6 @@ def load_ceip_and_alpha(
 
 
 __all__ = [
-    "build_alpha_tensor",
     "load_ceip_and_alpha",
     "load_ceip_and_alpha_solvents",
     "load_group_mapping",

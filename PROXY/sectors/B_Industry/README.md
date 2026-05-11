@@ -24,7 +24,7 @@ python -m PROXY.main build --sector B_Industry --country EL
 | **Builder** | `builder.py` | Resolves paths, builds the **reference window** (`reference_window_profile`), merges YAML into the structure expected by the pipeline (`merge_ceip_group_sector_cfg` in `PROXY.sectors._shared.gnfr_groups`), calls `run_industry_pipeline`. |
 | **Thin wrapper** | `pipeline.py` | `run_industry_pipeline` → `run_gnfr_group_pipeline` with `sector_key="B_Industry"`, industry OSM loader (all GPKG layers). |
 | **Core algorithm** | `PROXY.sectors._shared.gnfr_groups` | `run_gnfr_group_pipeline`: CAMS ids, rasters, α from CEIP, per-group and per-pollutant normalization, multiband write. |
-| **CEIP / α** | `PROXY.core.ceip.reported_group_alpha` | `load_ceip_and_alpha` (shared GNFR group CEIP α; sector-specific workbook paths come from config). Also `from PROXY.core.ceip import load_ceip_and_alpha`. |
+| **CEIP / α** | `PROXY.core.alpha.ceip.reported_group_alpha` | `load_ceip_and_alpha` (shared GNFR group CEIP α; sector-specific workbook paths come from config). Also `from PROXY.core.alpha.ceip import load_ceip_and_alpha`. |
 
 Methodology details: `PROXY/docs/sector_methodology.md` (B_Industry section).
 

@@ -33,7 +33,8 @@ visualization:
   context_layer_opacity: 0.82
 
 industry_paths:
-  ceip_groups_yaml: PROXY/config/ceip/profiles/industry_groups.yaml
+  ceip_groups_yaml: PROXY/config/ceip/profiles/B_Industry_groups.yaml
+  ceip_rules_yaml: PROXY/config/ceip/profiles/B_Industry_rules.yaml
   ceip_years: null
   cntr_code_to_iso3:
     EL: GRC

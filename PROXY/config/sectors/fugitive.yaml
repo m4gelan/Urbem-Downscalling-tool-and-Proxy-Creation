@@ -32,7 +32,8 @@ visualization:
   context_layer_opacity: 0.82
 
 fugitive_paths:
-  ceip_groups_yaml: PROXY/config/ceip/profiles/fugitive_groups.yaml
+  ceip_groups_yaml: PROXY/config/ceip/profiles/D_Fugitive_groups.yaml
+  ceip_rules_yaml: PROXY/config/ceip/profiles/D_Fugitive_rules.yaml
   ceip_years: null
   viirs_nightfire_csv: INPUT/Proxy/ProxySpecific/Fugitive/VNF_npp_d20210101_noaa_v30.csv
   gcmt_xlsx: INPUT/Proxy/ProxySpecific/Fugitive/Global-Coal-Mine-Tracker-May-2025-V2.xlsx

@@ -25,7 +25,9 @@ def log_wide_group_alpha_table(
         logger.info("%s CEIP alpha table: no rows for country_iso3=%s", sector, iso)
         return
     cols = ["pollutant", *group_cols]
-    if "fallback_code" in sub.columns:
+    if "method" in sub.columns:
+        cols.append("method")
+    elif "fallback_code" in sub.columns:
         cols.append("fallback_code")
     use = [c for c in cols if c in sub.columns]
     block = sub[use].to_string(index=False)
@@ -54,6 +56,7 @@ def log_waste_family_weights(
             "w_solid",
             "w_ww",
             "w_res",
+            "method",
             "fallback_tier",
         )
         if c in sub.columns

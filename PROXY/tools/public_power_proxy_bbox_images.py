@@ -11,6 +11,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -44,7 +46,6 @@ def _reproject_basemap_to_overlay_grid(
     dst_shape: tuple[int, int],
 ) -> object:
     """Warp OSM RGB (EPSG:3857) onto the same EPSG:4326 pixel grid as the proxy layers."""
-    import numpy as np
     import rasterio
     from rasterio.transform import from_bounds
     from rasterio.warp import reproject, Resampling
@@ -85,8 +86,6 @@ def _alpha_composite_rgb_under_rgba(
     overlay_rgba: object,
 ) -> object:
     """Porter–Duff 'over': overlay on top of basemap RGB."""
-    import numpy as np
-
     over = np.asarray(overlay_rgba, dtype=np.float32) / 255.0
     alpha = np.clip(over[..., 3:4], 0.0, 1.0)
     rgb_o = over[..., :3]
@@ -107,8 +106,6 @@ def _composite_rgba_over_osm(
     zoom_adjust: int | None,
 ) -> object:
     import contextily as ctx
-    import numpy as np
-
     gh, gw = int(dst_shape[0]), int(dst_shape[1])
     if np.asarray(rgba).shape[:2] != (gh, gw):
         raise ValueError(f"RGBA shape mismatch vs dst_shape ({gh}, {gw})")
@@ -163,8 +160,6 @@ def _weight_log_cbar_range(
     w_nodata: float | None,
 ) -> tuple[float, float] | None:
     """Min/max of log10(weight) over positive finite pixels (matches ``scalar_to_rgba`` log mode)."""
-    import numpy as np
-
     z = np.asarray(w_arr, dtype=np.float64)
     finite = np.isfinite(z)
     if w_nodata is not None:
@@ -199,8 +194,6 @@ def _save_layer_png(
     import matplotlib.pyplot as plt
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import Normalize
-    import numpy as np
-
     rgba = np.asarray(img)
     gh, gw = int(rgba.shape[0]), int(rgba.shape[1])
     if rgba.ndim != 3 or rgba.shape[2] not in (3, 4):
@@ -369,7 +362,6 @@ def main() -> int:
     )
     from PROXY.visualization.corine_rgba import corine_clc_overlay_rgba
     from PROXY.visualization.overlay_utils import read_weight_corine_population_via_weight_grid_wgs84, scalar_to_rgba
-    import numpy as np
     import xarray as xr
 
     wt_resolved = resolve_under_root(wt, args.root)

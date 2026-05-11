@@ -2,8 +2,8 @@
 GNFR D fugitive area proxies: weighted mixture of CORINE, OSM subsets, population,
 VIIRS Nightfire (Gaussian kernel), GEM Coal Mine Tracker disks, and GOGET disks.
 
-Loaded from ``proxy_mixture`` under each group in ``fugitive_groups.yaml``
-(``PROXY/config/ceip/profiles/fugitive_groups.yaml``).
+Loaded from ``proxy_mixture`` under each group in the merged D_Fugitive CEIP profile
+(``D_Fugitive_groups.yaml`` + ``D_Fugitive_rules.yaml``).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from rasterio import features
 from rasterio.enums import MergeAlg
 from shapely.geometry import Point, mapping
 
-from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
+from PROXY.core.alpha import DEFAULT_GNFR_GROUP_ORDER
 from PROXY.core.dataloaders import resolve_path
 from PROXY.core.osm_corine_proxy import (
     adapt_corine_classes_for_grid,
@@ -558,8 +558,6 @@ def mixture_kinds_for_groups(
     group_order: tuple[str, ...] | None,
 ) -> set[str]:
     """Union of all ``proxy_mixture`` ``kind`` values in order."""
-    from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
-
     groups = {str(k): v for k, v in dict(group_specs.get("groups") or {}).items()}
     order = group_order if group_order is not None else tuple(groups.keys()) or DEFAULT_GNFR_GROUP_ORDER
     needed: set[str] = set()
@@ -695,8 +693,6 @@ def build_fugitive_group_pg(
     instead of the population proxy. Pixel-level fallback ``acc_score < 1e-10`` for mixture rows that
     include ``population`` is unchanged.
     """
-    from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
-
     groups = {str(k): v for k, v in dict(group_specs.get("groups") or {}).items()}
     order = group_order if group_order is not None else tuple(groups.keys()) or DEFAULT_GNFR_GROUP_ORDER
 
@@ -738,7 +734,7 @@ def build_fugitive_group_pg(
         mix = spec.get("proxy_mixture")
         if not mix:
             raise ValueError(
-                f"Group {gid!r} has no proxy_mixture — update fugitive_groups.yaml for the new fugitive model."
+                f"Group {gid!r} has no proxy_mixture — update D_Fugitive_rules.yaml (merged CEIP profile) for the new fugitive model."
             )
 
         acc_score = np.zeros(clc.shape, dtype=np.float32)

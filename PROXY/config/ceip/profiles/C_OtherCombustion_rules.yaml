@@ -1,0 +1,112 @@
+# GNFR C — off-road spatial rules and optional alpha/beta overrides (merged over C_OtherCombustion_groups.yaml).
+# Do not duplicate ``groups:`` here unless you intend to deep-merge into CEIP group ids.
+
+offroad:
+  lambda_osm: 1.0
+  forest_corine_classes: [311, 312, 313]
+  residential_corine_codes: [112]
+  commercial_clc_code: 121
+  blend_eligibility_coef: 0.75
+  blend_population_coef: 0.25
+  pop_floor: 0.0
+  # Passed through to eligibility_pop_blend when residential window has no positive scores
+  fallback_uniform_if_empty: true
+  osm_commercial:
+    any_of:
+      - landuse: commercial
+      - landuse: retail
+      - landuse: civic
+      - landuse: institutional
+      - amenity: townhall
+      - amenity: courthouse
+
+# Optional: per-pollutant overrides (output keys e.g. nox, pm2_5). Omitted or null => use CEIP only.
+# When set, each pollutant must have alpha_stat + alpha_off == 1 and beta_F + beta_R + beta_B == 1.
+alpha_beta_override: null
+
+# Seven-band spatial proxy X_k = S_k * L_k (stock x load). Keys must match MODEL_CLASSES in code.
+# Carriers: POP -> B_res; H_NRES -> max(0, H_nres) per pixel. No Eurostat/GAINS in X.
+appliance_proxy:
+  ghs_rural_classes: [11, 12, 13]
+  epsilon: 1.0e-12
+  R_FIREPLACE:
+    stock:
+      carrier: POP
+      corine_weights:
+        "111": 0.2
+        "112": 1.0
+        rural_res: 0.6
+    load:
+      type: product
+      terms:
+        - { name: H_RES, exponent: 0.6 }
+        - { name: HDD, exponent: 0.4 }
+  R_HEATING_STOVE:
+    stock:
+      carrier: POP
+      corine_weights:
+        "111": 0.2
+        "112": 1.0
+        rural_res: 0.6
+    load:
+      type: product
+      terms:
+        - { name: H_RES, exponent: 0.6 }
+        - { name: HDD, exponent: 0.4 }
+  R_COOKING_STOVE:
+    stock:
+      carrier: POP
+      corine_weights:
+        "111": 1.0
+        "112": 1.0
+        rural_res: 0.8
+    load:
+      type: constant
+      value: 1.0
+  R_BOILER_MAN:
+    stock:
+      carrier: POP
+      corine_weights:
+        "111": 0.3
+        "112": 1.0
+        rural_res: 0.9
+    load:
+      type: variable
+      name: H_RES
+      exponent: 1.0
+  R_BOILER_AUT:
+    stock:
+      carrier: POP
+      corine_weights:
+        "111": 1.0
+        "112": 1.1
+        rural_res: 0.4
+    load:
+      type: variable
+      name: H_RES
+      exponent: 1.0
+  C_BOILER_MAN:
+    stock:
+      carrier: H_NRES
+      corine_weights:
+        "111": 1.0
+        "112": 0.7
+        "121": 1.5
+      commercial_other_weight: 0.3
+    load:
+      type: product
+      terms:
+        - { name: H_NRES, exponent: 0.7 }
+        - { name: HDD, exponent: 0.3 }
+  C_BOILER_AUT:
+    stock:
+      carrier: H_NRES
+      corine_weights:
+        "111": 1.0
+        "112": 0.7
+        "121": 1.5
+      commercial_other_weight: 0.3
+    load:
+      type: variable
+      name: H_NRES
+      exponent: 1.0

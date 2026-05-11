@@ -7,13 +7,18 @@ from typing import Any
 import yaml
 
 
+def _repo_root_contains_proxy_package(candidate: Path) -> bool:
+    """True if ``candidate`` is the workspace root whose ``PROXY/`` folder is this codebase (not e.g. ``core/PROXY``)."""
+    return (candidate / "PROXY" / "core" / "dataloaders" / "config.py").is_file()
+
+
 def project_root(from_path: Path | None = None) -> Path:
     base = from_path or Path(__file__)
     resolved = base.resolve()
     if resolved.is_file():
         resolved = resolved.parent
     for candidate in [resolved, *resolved.parents]:
-        if (candidate / "PROXY").is_dir():
+        if _repo_root_contains_proxy_package(candidate):
             return candidate
     # Fallback for in-package calls.
     return Path(__file__).resolve().parents[3]

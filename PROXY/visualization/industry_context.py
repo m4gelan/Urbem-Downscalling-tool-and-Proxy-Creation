@@ -7,7 +7,6 @@ Layer order matches the GNFR B preview contract: per-group CORINE class masks (Y
 from __future__ import annotations
 
 import sys
-import yaml
 from pathlib import Path
 from typing import Any
 
@@ -63,9 +62,10 @@ def build_industry_proxy_rgba_overlays(
         )
         return []
 
+    from PROXY.core.alpha.ceip_index_loader import load_merged_ceip_profile_for_pipeline_paths
     from PROXY.core.dataloaders import resolve_path
     from PROXY.core.dataloaders.raster import warp_raster_to_ref
-    from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha import DEFAULT_GNFR_GROUP_ORDER
     from PROXY.core.osm_corine_proxy import (
         build_all_group_pg,
         build_p_pop,
@@ -178,8 +178,9 @@ def build_industry_proxy_rgba_overlays(
             dst_nodata=np.nan,
         )
         p_pop = build_p_pop(pop, mini)
-        with gy.open(encoding="utf-8") as gf:
-            group_specs_root = yaml.safe_load(gf) or {}
+        group_specs_root = load_merged_ceip_profile_for_pipeline_paths(
+            root, paths, profile_sector_id="B_Industry"
+        )
         groups_raw: dict = dict(group_specs_root.get("groups") or {})
         osm_gdf = _read_industry_gpkg_all_layers(osm_p)
         pcfg = industry_cfg.get("proxy") or {}

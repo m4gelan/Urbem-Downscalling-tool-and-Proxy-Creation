@@ -1,0 +1,49 @@
+\paragraph{Country axis: the matrix  M(c) .}
+The pipeline groups appliance--fuel combinations from the GAINS activity database into seven model classes (Table~\ref{tab:technologies}): five residential (open fireplace, heating stove, cooking stove, manual boiler, automatic boiler) and two commercial (manual boiler, automatic boiler). Each class aggregates one or more GAINS rows that share the same appliance type and fuel category.
+\begin{table}[h!]
+\centering
+\begin{tabular}{lcc}
+\hline
+\textbf{Appliance} & \textbf{Residential} & \textbf{Commercial} \\
+\hline
+Fireplace        & \checkmark &            \\
+Heating stove    & \checkmark &            \\
+Cooking stove    & \checkmark &            \\
+Manual boiler    & \checkmark & \checkmark \\
+Automatic boiler & \checkmark & \checkmark \\
+\hline
+\end{tabular}
+\caption{Appliance classes derived from the GAINS model.}
+\label{tab:technologies}
+\end{table}
+
+For country $c$ and class $k$, the entry $M_{c,k}^{(c)}$ of the country matrix represents the expected emission of pollutant $p$ per unit of spatial proxy support attributed to class $k$ . It is assembled from three ingredients.
+
+\paragraph{Step 1 — how much energy goes to each end use (Eurostat) - detailed in .}
+Each appliance class is assigned to an end-use bucket: residential space heating, water heating, or cooking for the five residential classes; commercial energy consumption for the two commercial classes. Eurostat household energy statistics provide the share of national final energy consumption belonging to each bucket, denoted $f_{enduse}^{(c)} (k)$. This scalar captures, for instance, the fact that space heating dominates residential energy use in northern Europe but is less dominant in Mediterranean countries, or that the commercial sector accounts for a substantially larger share of total stationary combustion in some countries than in others.
+
+\paragraph{Step 2 — which appliances serve each end use (GAINS).- detailed in .}
+Within a given end-use bucket, different appliances can provide the same service. GAINS activity data give the share of each appliance class k within its bucket denoted $f_{GAINS}^{(c)} (k)$. This captures, for example, the fact that in Poland the space-heating bucket is dominated by manual solid-fuel boilers and stoves, whereas in the Netherlands it is served almost entirely by automatic gas boilers. Formally, $f_{GAINS}^{(c)} (k)$ is the ratio of the total GAINS activity attributed to class $k$ to the total GAINS activity across all classes sharing the same bucket $b(k)$
+
+Within each class $k$, the GAINS database further distinguishes several fuel--appliance rows $r$ : for instance, a heating-stove class may contain separate rows for wood logs, wood pellets, and coal. Each row carries a normalised activity share $s_r \geq 0$ reflecting the contribution of that specific fuel to the class total, with $\sum_{r \in k} s_r = 1$ by construction.
+Together,  $f_{GAINS}^{(c)} (k)$   and  $s_r$  decompose national activity in two nested steps: first, how much of the end-use bucket is covered by appliance class  k ; second, within that class, how activity is distributed across individual fuel--appliance combinations.
+
+
+\paragraph{Step 3 — how much each appliance emits per unit of activity (EMEP/EEA).}
+
+
+The EMEP/EEA Guidebook provides Tier-2 emission factors $EF_{p,r}$  for each fuel--appliance combination $r$ within class $k$.  These factors vary by more than two orders of magnitude: an open wood-burning fireplace emits of the order $10^3$ g.GJ$^{-1}$ of PM$_{2.5}$, while a condensing automatic gas boiler emits below 10 g.GJ$^{-1}$
+
+
+\paragraph{Assembly.}
+The three ingredients are combined into the country matrix as
+\begin{equation}
+  M^{(c)}_{p,k} =
+  f_{\mathrm{enduse}}^{(c)}(k)\cdot
+  f_{\mathrm{GAINS}}^{(c)}(k)\cdot
+  \sum_{r\in k} s_r \cdot \mathrm{EF}_{p,r}
+  \label{eq:othercomb-Mmatrix}
+\end{equation}
+where the inner sum runs over all GAINS fuel--appliance rows $r$  mapped to class  $k$, and $s_r$  is the normalised activity share of row $r$ within the class.
+
+Reading the formula from right to left mirrors the physical reasoning developed above. The weighted sum $\sum_{r \in k} s_r \cdot EF_{p,r}$ yields the fuel-mix-averaged emission intensity of the class. The GAINS fraction $f_{GAINS}^{(c)} (k)$ then scales that intensity by how dominant the class actually is within its end-use bucket in country  c . Finally, the Eurostat factor $f_{\mathrm{enduse}}^{(c)}(k)$ scales the result by how large that end-use bucket is within the national energy balance. A class that is intrinsically clean, rarely used, or serving a minor end-use will carry a small entry in $M^{(c)}$ ; a class that is dirty, dominant, and serving a major end-use --- such as manual wood-burning boilers for space heating in Poland --- will carry a large entry that amplifies whatever spatial signal the corresponding proxy band places on the map.

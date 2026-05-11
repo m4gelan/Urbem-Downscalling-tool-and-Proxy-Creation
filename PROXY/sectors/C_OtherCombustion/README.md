@@ -2,7 +2,30 @@
 
 Spatial **allocation** of GNFR **C** CAMS cell emissions onto the reference grid using
 Hotmaps + CORINE (**X**), GAINS × Eurostat **end-use buckets** × GAINS **appliance splits** × EMEP (**M**),
-then per-cell ``U = X_w @ M.T`` with share normalization and ``np.add.at`` accumulation.
+then per-cell share normalisation and ``np.add.at`` accumulation.
+
+When ``run.enable_offroad`` is true (default), each pollutant’s weights combine a **stationary**
+branch (column normalisation of ``U = X_w @ M.T``) with an **off-road** branch: three
+spatial proxies (forestry CLC, residential CLC112 + population blend, commercial CLC121 + OSM)
+weighted by CEIP reported-emissions α on groups **G1**–**G4** in
+``PROXY/config/ceip/profiles/C_OtherCombustion_groups.yaml``, with tunables in
+``C_OtherCombustion_rules.yaml``. Use ``python -m PROXY.main build --sector C_OtherCombustion --no-enable-offroad``
+for legacy stationary-only behaviour.
+
+**Stationary X (seven bands):** with ``appliance_proxy.enabled: true`` in ``othercombustion.yaml`` (default), ``X_k = S_k × L_k`` uses warped **POP**, **H_res / H_nres**, **HDD** (Hotmaps ``hdd_curr``), **GHS-SMOD** (rural settlement mask vs CLC 111/112/121), and **CLC L3** indicators only — configured under ``appliance_proxy`` in ``C_OtherCombustion_rules.yaml``. Set ``appliance_proxy.enabled: false`` to restore the legacy stack (**Hotmaps heat + GFA** ``R_base`` / ``C_base``, CORINE ``mr`` / ``mc``, optional ``rural_bias``).
+
+## GNFR C: stationary + off-road branches
+
+| Subgroup | NFR (CEIP) | Spatial proxy |
+|----------|------------|----------------|
+| Stationary | ``1A4ai``, ``1A4bi``, ``1A4ci`` (G1) | Default: S×L appliance ``X`` (rules YAML); legacy: Hotmaps×GFA + CORINE ``mr``/``mc`` → ``U`` |
+| Forestry off-road | ``1A4cii`` (G2) | CLC forest classes (default 311–313), uniform fallback |
+| Residential off-road | ``1A4bii`` (G3) | CLC 112 + min–max population blend (shared with PublicPower formula) |
+| Commercial off-road | ``1A4aii`` (G4) | CLC 121 + λ × OSM (``osm_commercial`` rules in rules YAML) |
+
+Per pollutant: ``α_stat = α_G1``, ``α_off = α_G2+α_G3+α_G4``, ``β_F = α_G2/α_off``, etc. (EU pool from ``alpha_methods.yaml``). Optional per-pollutant overrides in ``alpha_beta_override`` in ``C_OtherCombustion_rules.yaml``.
+
+Constants: ``PROXY/sectors/C_OtherCombustion/nfr_codes.py`` (`NFR_STATIONARY`, `NFR_OFFROAD`, `NFR_ALL_C`).
 
 ## Entry point
 
@@ -24,9 +47,10 @@ python -m PROXY.main build --sector C_OtherCombustion --country EL
                              │    U = X_w · Mᵀ  ──► per-pollutant shares × CAMS E ──► rasters
   Eurostat API (nrg_d_hhq, nrg_bal_s) ──► f_enduse[bucket]
                              ▲
-  Hotmaps res / non-res ──► R_base, C_base ──┐
-  CORINE L3 ─────────────► mr, mc ──────────┤──► X[pix,k]
-  Optional pop / GHSL ────► rural_bias ─────┘
+  Appliance mode (default): POP, H_res/H_nres, HDD, GHS-SMOD, CLC L3 ──► S_k, L_k ──► X[pix,k]
+  Legacy mode: Hotmaps res/non-res heat+GFA ──► R_base, C_base ──┐
+  CORINE L3 (legacy) ──► mr, mc ────────────────────────────────┤──► X[pix,k]
+  Optional pop / GHSL (legacy rural_bias only) ────────────────┘
 ```
 
 ## Example (one CAMS cell, toy numbers)
@@ -35,7 +59,7 @@ Everything below is **illustrative**; real runs use full rasters, all pollutants
 
 **Already computed for the whole domain** (before the cell loop):
 
-- **`X`** — reference grid stack of shape `(H, W, 7)` with bands `R_FIREPLACE` … `C_BOILER_AUT` (Hotmaps + CORINE + optional rural bias).
+- **`X`** — reference grid stack of shape `(H, W, 7)` with bands `R_FIREPLACE` … `C_BOILER_AUT` (default: **S×L appliance proxy** from rules YAML; or legacy Hotmaps + CORINE + optional rural bias).
 - **`M`** — matrix of shape `(P, 7)` for that cell’s **ISO3** (`P` = number of output pollutants). Each entry `M[p, k]` comes from GAINS activity × `f_enduse × f_appliance` × EMEP EF for class `k` (see `m_builder/assemble.py`).
 
 **For this one CAMS cell** (`pipeline.py` inner loop):
@@ -79,9 +103,9 @@ Logger name: **`proxy.other_combustion`**. At **INFO**: Eurostat cache/API prove
 
 **Removed**: Table 3 XLSX scraping. Setting `paths.proxy_specific.other_combustion.eurostat_xlsx` raises `ConfigurationError`.
 
-## Rural / urban bias (optional)
+## Rural / urban bias (legacy X only)
 
-YAML block `rural_bias` (see `othercombustion.yaml`). When enabled, uses `paths.population_tif` or `paths.ghsl_smod_tif` (merged from `paths.yaml` in `builder.build`) to scale **R_FIREPLACE** and **R_HEATING_STOVE** bands only.
+YAML block `rural_bias` (see `othercombustion.yaml`). When **legacy** Hotmaps×GFA X is enabled (`appliance_proxy.enabled: false`), uses `paths.population_tif` or `paths.ghsl_smod_tif` to scale **R_FIREPLACE** and **R_HEATING_STOVE** bands only. The default **appliance** X already encodes a GHS×CLC rural term in `S_k`; do not enable `rural_bias` alongside appliance mode to avoid double structure.
 
 ## Further reading
 

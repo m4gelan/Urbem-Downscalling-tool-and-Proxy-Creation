@@ -13,7 +13,7 @@ import numpy as np
 from PROXY.core.alpha import finalize_alpha_matrix
 from PROXY.core.area_allocation import allocate_weights_from_normalized_stack
 from PROXY.core.cams.grid import build_cams_source_index_grid
-from PROXY.core.ceip import load_ceip_and_alpha_solvents
+from PROXY.core.alpha import load_ceip_and_alpha_solvents
 from PROXY.core.corine.raster import clc_group_masks, read_corine_window
 from PROXY.core.dataloaders import resolve_path as project_resolve
 from PROXY.core.logging_tables import log_wide_group_alpha_table
@@ -117,13 +117,6 @@ def run_solvents_area_pipeline(
     cfg["_project_root"] = root
 
     ref = _load_ref_profile(root, cfg)
-    logger.info(
-        "E_Solvents [1/9] reference grid: height=%s width=%s crs=%r domain_bbox_wgs84=%s",
-        ref.get("height"),
-        ref.get("width"),
-        ref.get("crs"),
-        ref.get("domain_bbox_wgs84"),
-    )
 
     alpha_iso, _fb, wide, ceip_meta = load_ceip_and_alpha_solvents(
         cfg, [iso3], focus_country_iso3=iso3

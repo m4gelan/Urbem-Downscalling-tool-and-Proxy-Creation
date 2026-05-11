@@ -46,8 +46,6 @@ def build_nonroad_corine_proxy(
     ind_codes = [int(x) for x in (proxy_cfg.get("corine_ind_codes") or [])]
     ind_codes += [int(x) for x in (proxy_cfg.get("corine_ind_optional") or [])]
 
-    from PROXY.core.corine.raster import corine_binary_mask, corine_binary_mask_adapted
-
     agri_mask = corine_binary_mask(clc_nn, agri_codes)
     if float(np.max(agri_mask)) <= 0 and agri_codes:
         agri_mask2, _ = corine_binary_mask_adapted(clc_nn, agri_codes)

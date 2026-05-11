@@ -1,6 +1,6 @@
 # E_Solvents area pipeline defaults (merged under sector YAML `solvents:`).
-# CEIP workbook -> subsector alphas use `ceip/profiles/solvents_subsectors.yaml`.
-# Country alpha fallbacks: `ceip/alpha/fallback/` (E_Solvents_EL.yaml).
+# CEIP workbook -> subsector alphas use `ceip/profiles/E_Solvents_groups.yaml`.
+# Country alpha fallbacks were removed; use ``alpha_methods.yaml`` per pollutant/method.
 
 country:
   cams_iso3: GRC

@@ -441,7 +441,7 @@ nodata `-9999`. Optional diagnostic rasters (`emodnet_raw`,
   - `osm_offroad_areas` with `offroad_family == "landuse_railway"`.
   - `osm_offroad_pipeline_lines` and `offroad_family == "man_made_pipeline"`
     areas.
-- CEIP workbook (`read_ceip_shares`) for the triple share per country x pollutant.
+- CEIP / `alpha_methods.yaml` via `load_ceip_and_alpha` (`I_Offroad_groups.yaml` G1–G3) for triple shares per pollutant for the focus ISO3.
 - Optional `area_proxy.facilities_tif` for pipeline z-blend.
 - YAML override: `PROXY/config/alpha/fallback/I_Offroad_*.yaml`.
 

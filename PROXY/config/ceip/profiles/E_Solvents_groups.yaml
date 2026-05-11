@@ -3,7 +3,7 @@
 # ``ceip_sectors`` lists so prefix matching can prefer them (builder sorts by length).
 #
 # Archetype weights, beta splits, OSM rules, and CAMS pollutant name mapping live in
-# ``solvents_pipeline.yaml`` (merged with ``sectors/solvents.yaml`` under ``solvents:``).
+# ``E_Solvents_rules.yaml`` (merged with ``sectors/solvents.yaml`` under ``solvents:``).
 
 subsectors:
   d3a_domestic:

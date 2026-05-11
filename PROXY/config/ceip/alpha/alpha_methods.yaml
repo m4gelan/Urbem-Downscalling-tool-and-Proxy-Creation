@@ -1,0 +1,247 @@
+# CEIP / reported-emissions -> group alpha weights (unified method 0–4 per sector x pollutant).
+# Consumed by PROXY.core.alpha.alpha_method_engine.build_alpha_tensor_methods.
+#
+# method:
+#   0 = country-specific split from reported workbook (groups/subsectors/families as wired per sector)
+#   1 = Pool from workbook or mean-national blend. Set ``defaults.pool`` (and optionally per-pollutant ``pool``):
+#       - ``pool: EU27`` or ``pool: EU11`` — single aggregate row (``COUNTRY`` = EU27 / EU11 in the workbook).
+#       - ``pool: [ FRA, DEU, … ]`` — equal-weight mean of normalized national splits for those ISOs; if that fails,
+#         fall back to the aggregate row (legacy ``eu_pool`` if present, else EU27).
+#       Omit ``pool`` entirely ⇒ same as ``pool: EU27``.
+#       Optional ``country_specific: [ … ]`` — listed ISOs use national splits; others use ``pool`` above.
+#   2 = fixed alphas from sector.method_2[pollutant] -> { group_or_subsector_token: weight }
+#   3 = equal weights across groups
+#   4 = mean of alpha vectors from pollutants that used method 0 for the same country & sector (needs >=1)
+#
+# Pollutant keys: lowercase with underscores (nox, pm2_5, co2_total, …).
+#
+# method_2 weights: keys must match the alpha axis for that sector — B/D/C/J use ``G1``…``G4`` (J stops at ``G3``);
+# E uses subsector ids; I_Offroad uses ``G1``…``G3``. Never use optional ``name:`` strings here.
+
+version: 1
+
+sectors:
+
+  # PROXY/config/sectors/industry.yaml — pollutants:
+  B_Industry:
+    gnfr_letter: B
+    defaults:
+      method: 0
+    pollutants:
+      ch4:
+        method: 2
+      co:
+        method: 0
+      nh3:
+        method: 0
+      nmvoc:
+        method: 0
+      nox:
+        method: 0
+      pm10:
+        method: 0
+      pm2_5:
+        method: 0
+      sox:
+        method: 0
+    method_2:
+      ch4:
+        G1: 1
+        G2: 0
+        G3: 0
+        G4: 0
+
+  # PROXY/config/sectors/othercombustion.yaml — pollutants output keys (+ co2_total)
+  C_OtherCombustion:
+    gnfr_letter: C
+    defaults:
+      method: 1
+      pool: EU27
+    pollutants:
+      nh3:
+        method: 1
+      nox:
+        method: 1
+      sox:
+        method: 1
+      nmvoc:
+        method: 1
+      pm2_5:
+        method: 1
+      pm10:
+        method: 1
+      co:
+        method: 1
+      co2_total:
+        method: 1
+
+  # PROXY/config/sectors/fugitive.yaml — pollutants:
+  D_Fugitive:
+    gnfr_letter: D
+    defaults:
+      method: 0
+    pollutants:
+      ch4:
+        method: 2
+      co:
+        method: 0
+      nh3:
+        method: 0
+      nmvoc:
+        method: 0
+      nox:
+        method: 1
+        pool: EU27
+      pm10:
+        method: 0
+      pm2_5:
+        method: 0
+      sox:
+        method: 1
+        pool: EU27
+    method_2:
+      ch4:
+        G1: 1
+        G2: 0
+        G3: 0
+        G4: 0
+
+  # PROXY/config/ceip/profiles/E_Solvents_rules.yaml — pollutants (CAMS names mapped via cams_pollutant_names)
+  E_Solvents:
+    gnfr_letter: E
+    defaults:
+      method: 0
+    pollutants:
+      co:
+        method: 1
+        pool: EU27
+      nh3:
+        method: 1
+        pool: EU27
+      nmvoc:
+        method: 0
+      nox:
+        method: 1
+        pool: EU27
+      pm10:
+        method: 1
+        pool: EU27
+      pm2_5:
+        method: 1
+        pool: EU27
+    
+
+
+  # PROXY/config/ceip/profiles/I_Offroad_rules.yaml (+ groups G1–G3 in I_Offroad_groups.yaml)
+  I_Offroad:
+    gnfr_letter: I
+    defaults:
+      method: 1
+      pool: EU27
+    pollutants:
+      ch4:
+        method: 2
+      co:
+        method: 1
+      nh3:
+        method: 1
+      nmvoc:
+        method: 1
+      nox:
+        method: 1
+      pm10:
+        method: 1
+      pm2_5:
+        method: 1
+      sox:
+        method: 1
+    method_2:
+      ch4:
+        G1: 0.34
+        G2: 0.33
+        G3: 0.33
+
+  # PROXY/config/ceip/profiles/J_Waste_rules.yaml — cams pollutants_nc
+  J_Waste:
+    gnfr_letter: J
+    defaults:
+      method: 0
+    pollutants:
+      ch4:
+        method: 2
+      co:
+        method: 1
+        pool: EU27
+      nh3:
+        method: 1
+        pool: EU27
+      nmvoc:
+        method: 0
+      nox:
+        method: 1
+        pool: EU27
+      pm10:
+        method: 1
+        pool: EU27
+      pm2_5:
+        method: 1
+        pool: EU27
+      sox:
+        method: 1
+        pool: EU27
+    method_2:
+      ch4:
+        G1: 0.3
+        G2: 0.4
+        G3: 0.3
+
+  # K_Agriculture — method 2: fixed mass shares per process_id (same tokens as PROXY/config/agriculture/alpha.config.yaml).
+  # Under method_2, each pollutant key maps process_id -> weight; names must match group_order / subsectors when this sector uses build_alpha_tensor_methods.
+  K_Agriculture:
+    gnfr_letter: K
+    defaults:
+      method: 2
+    pollutants:
+      ch4:
+        method: 2
+      nh3:
+        method: 2
+      nox:
+        method: 2
+      co2:
+        method: 2
+      nmvoc:
+        method: 2
+      co:
+        method: 2
+      pm10:
+        method: 2
+      pm2_5:
+        method: 2
+    method_2:
+      ch4:
+        enteric_grazing: 0.79
+        manure: 0.198
+        rice: 0.012
+      nh3:
+        fertilized_land: 0.541
+        manure: 0.459
+      nox:
+        fertilized_land: 0.936
+        manure: 0.055
+        biomass_burning: 0.009
+      co2:
+        urea_application: 0.468
+        soil_liming: 0.532
+      nmvoc:
+        agricultural_soils: 0.239
+        manure: 0.76
+        biomass_burning: 0.001
+      co:
+        biomass_burning: 1.0
+      pm10:
+        biomass_burning: 0.036
+        livestock_housing: 0.964
+      pm2_5:
+        biomass_burning: 0.146
+        livestock_housing: 0.854

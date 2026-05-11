@@ -1,0 +1,23 @@
+# GNFR D Fugitive: NFR mapping (merged with D_Fugitive_rules.yaml).
+groups:
+  G1:
+    name: coal_solid_fuels
+    ceip_sectors:
+    - 1B1A
+    - 1B1B
+    - 1B1C
+  G2:
+    name: oil_transport_upstream
+    ceip_sectors:
+    - 1B2AI
+  G3:
+    name: storage_refining_distribution
+    ceip_sectors:
+    - 1B2AIV
+    - 1B2AV
+  G4:
+    name: gas_flaring_residual
+    ceip_sectors:
+    - 1B2B
+    - 1B2C
+    - 1B2D

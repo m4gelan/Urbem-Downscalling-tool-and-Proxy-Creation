@@ -51,6 +51,35 @@ def accumulate_emissions_and_weights_for_cell(
     return used_fb
 
 
+def accumulate_emissions_and_precomputed_weights_for_cell(
+    *,
+    weights_by_output: dict[str, np.ndarray],
+    pollutant_specs: list[dict[str, Any]],
+    ds: xr.Dataset,
+    cell_index: int,
+    co2_mode: str,
+    flat_r: np.ndarray,
+    flat_c: np.ndarray,
+    acc: np.ndarray,
+    weights_acc: np.ndarray | None,
+) -> None:
+    """Scatter-add using pre-normalised weight columns (one per pollutant ``output``)."""
+    for pi, spec in enumerate(pollutant_specs):
+        key = str(spec["output"])
+        w_col = np.asarray(weights_by_output[key], dtype=np.float64).ravel()
+        if w_col.shape[0] != flat_r.shape[0]:
+            raise ValueError(
+                f"weight length {w_col.shape[0]} != pixel count {flat_r.shape[0]} for {key!r}"
+            )
+        E = _cams_emission_kg_yr_for_pollutant(ds, cell_index, spec, co2_mode)
+        if not np.isfinite(E):
+            E = 0.0
+        contrib = w_col * E
+        np.add.at(acc[pi], (flat_r, flat_c), contrib.astype(np.float64))
+        if weights_acc is not None:
+            np.add.at(weights_acc[pi], (flat_r, flat_c), w_col)
+
+
 def _cams_emission_kg_yr_for_pollutant(
     ds: xr.Dataset,
     i: int,

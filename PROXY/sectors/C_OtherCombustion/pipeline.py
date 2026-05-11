@@ -1,6 +1,17 @@
 """
 GNFR C other-combustion **pipeline** orchestration (CAMS allocation + GeoTIFF outputs).
 
+Two-branch architecture when ``run.enable_offroad`` is true (default):
+
+* **Stationary** — existing GAINS × Eurostat × EMEP × Hotmaps/CORINE ``U = X @ Mᵀ``
+  normalisation per pollutant.
+* **Off-road** — three spatial proxies (forestry CLC, residential CLC112+population blend,
+  commercial CLC121+OSM) weighted by CEIP α on ``G1``…``G4`` from
+  ``PROXY/config/ceip/profiles/C_OtherCombustion_groups.yaml``, with tunables in
+  ``C_OtherCombustion_rules.yaml`` (merged profile).
+
+When ``enable_offroad`` is false, behaviour matches the legacy stationary-only path.
+
 **Role**: single entry ``run`` / ``run_other_combustion_weight_build`` used by
 ``C_OtherCombustion`` builder; wires validation, Eurostat factors, ``M`` and ``X``,
 and CAMS cell raster accumulation.
@@ -17,15 +28,28 @@ import numpy as np
 import rasterio
 import xarray as xr
 from rasterio.errors import WindowError
+from rasterio.warp import Resampling
 from rasterio.windows import Window, from_bounds
 from shapely.geometry import box
 
 from PROXY.core.cams.domain import country_index_1based as _country_index_1based
 from PROXY.core.cams.domain import domain_mask_wgs84 as _build_domain_mask
 from PROXY.core.cams.gnfr import gnfr_code_to_index as _gnfr_to_index
-from PROXY.core.dataloaders import resolve_path
+from PROXY.core.dataloaders import resolve_path, warp_band_to_ref
 from PROXY.core.io import write_geotiff
 
+from .alpha_beta import (
+    build_ceip_alpha_context,
+    load_merged_c_other_profile,
+    offroad_rules_dict,
+    resolve_rows_for_cell,
+)
+from .allocator import (
+    accumulate_emissions_and_precomputed_weights_for_cell,
+    accumulate_emissions_and_weights_for_cell,
+)
+from .branches import compute_W_B, compute_W_F, compute_W_R, compute_W_stat
+from .combine import assert_weights_sum_to_one, combine_branches
 from .constants import MODEL_CLASSES
 from .exceptions import ConfigurationError
 from .m_builder.assemble import build_m_matrix
@@ -33,10 +57,17 @@ from .m_builder.emep_ef import load_emep
 from .m_builder.enduse_factors import compute_end_use_factors, log_enduse_tables
 from .m_builder.gains_activity import index_gains_files
 from .m_builder.mapping_io import load_gains_mapping
-from .allocator import accumulate_emissions_and_weights_for_cell
+from .nfr_codes import NFR_OFFROAD, NFR_STATIONARY
+from .osm_commercial_mask import filter_osm_gdf_by_rules, rasterize_osm_binary_mask
 from .validation import validate_pipeline_config
 from .x_builder.stack import load_and_build_fields
 from ._log import LOG
+from PROXY.sectors._shared.gnfr_groups import load_industry_osm_all_layers
+
+try:
+    from tqdm import tqdm as _optional_tqdm
+except ImportError:
+    _optional_tqdm = None  # type: ignore[assignment,misc]
 
 
 def _dataframe_to_log_block(df: Any) -> str:
@@ -208,13 +239,10 @@ def run(
         show_progress = bool(run_cfg.get("show_progress", True))
     else:
         show_progress = bool(show_progress)
-    try:
-        from tqdm import tqdm
-    except ImportError:
-        tqdm = None  # type: ignore
 
     fields = load_and_build_fields(repo_root, cfg, ref)
     X = fields["X"]
+    clc_l3 = fields["clc_l3"]
     H, W, K = X.shape
     assert K == len(MODEL_CLASSES)
     _log_X_band_summaries(X)
@@ -234,6 +262,9 @@ def run(
     if out_dir is not None:
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+
+    enable_offroad = bool(run_cfg.get("enable_offroad", True))
+    LOG.info("[other_combustion] enable_offroad=%s", enable_offroad)
 
     ds = xr.open_dataset(nc)
     uniform_fb = 0
@@ -321,9 +352,114 @@ def run(
                 missing_gains,
             )
 
+        alpha_tensor: np.ndarray | None = None
+        iso3_list_ceip: list[str] = []
+        override_rows_dict: dict[str, Any] | None = None
+        off_cfg: dict[str, Any] = {}
+        pop_ref: np.ndarray | None = None
+        O_full: np.ndarray | None = None
+
+        if enable_offroad:
+            iso3_list_ceip = sorted(
+                {_iso3_for_source(int(ii), ci, codes) for ii in idx_cells} - {"UNK", ""}
+            )
+            if iso_for_enduse not in iso3_list_ceip:
+                iso3_list_ceip.append(iso_for_enduse)
+            iso3_list_ceip = sorted(iso3_list_ceip)
+            ceip_block = cfg.get("ceip") or {}
+            p_ceip = paths
+            ceip_wb = resolve_path(repo_root, Path(p_ceip["ceip_workbook"]))
+            ceip_gy = resolve_path(repo_root, Path(p_ceip["ceip_groups_yaml"]))
+            ceip_ry: Path | None = None
+            if p_ceip.get("ceip_rules_yaml"):
+                ceip_ry = resolve_path(repo_root, Path(p_ceip["ceip_rules_yaml"]))
+            years_raw = ceip_block.get("years")
+            years_list: list[int] | None
+            if years_raw is None:
+                years_list = None
+            elif isinstance(years_raw, list):
+                years_list = [int(x) for x in years_raw]
+            else:
+                years_list = [int(years_raw)]
+            alpha_tensor, iso3_list_ceip, override_rows_dict = build_ceip_alpha_context(
+                repo_root=repo_root,
+                ceip_workbook=ceip_wb,
+                ceip_groups_yaml=ceip_gy,
+                ceip_rules_yaml=ceip_ry if ceip_ry is not None and ceip_ry.is_file() else None,
+                pollutant_outputs=pollutant_outputs,
+                iso3_list=list(iso3_list_ceip),
+                cntr_code_to_iso3=ceip_block.get("cntr_code_to_iso3"),
+                ceip_years=years_list,
+                ceip_pollutant_aliases=ceip_block.get("pollutant_aliases"),
+            )
+            # Log the α/β rows once per run (per focus country), not per cell.
+            # These drive the stationary/off-road blend and the off-road subgroup split.
+            rows_focus = resolve_rows_for_cell(
+                alpha=alpha_tensor,
+                iso3_list=iso3_list_ceip,
+                country_iso3=iso_for_enduse,
+                fallback_iso3=iso_for_enduse,
+                pollutant_outputs=pollutant_outputs,
+                override_rows=override_rows_dict,
+            )
+            hdr = "pollutant\talpha_stat\talpha_off\tbeta_F\tbeta_R\tbeta_B"
+            lines = [hdr]
+            for pol in pollutant_outputs:
+                r = rows_focus[pol]
+                lines.append(
+                    f"{pol}\t{r.alpha_stat:.6g}\t{r.alpha_off:.6g}\t{r.beta_F:.6g}\t{r.beta_R:.6g}\t{r.beta_B:.6g}"
+                )
+            LOG.info(
+                "[other_combustion] alpha/beta rows (iso3=%s):\n%s",
+                iso_for_enduse,
+                "\n".join(lines),
+            )
+            merged_prof = load_merged_c_other_profile(repo_root)
+            off_cfg = offroad_rules_dict(merged_prof)
+            pop_tif = paths.get("population_tif")
+            if pop_tif:
+                ppop = resolve_path(repo_root, Path(pop_tif))
+                if ppop.is_file():
+                    pop_ref = warp_band_to_ref(
+                        ppop, ref, resampling=Resampling.bilinear, band=1
+                    ).astype(np.float64)
+                else:
+                    LOG.warning("[other_combustion] population_tif missing for off-road: %s", ppop)
+            if pop_ref is None:
+                pop_ref = np.ones((H, W), dtype=np.float64)
+                LOG.warning(
+                    "[other_combustion] off-road: no population raster — using ones for residential proxy"
+                )
+            osm_p = paths.get("osm_other_combustion_gpkg")
+            if osm_p:
+                osp = resolve_path(repo_root, Path(osm_p))
+                if osp.is_file():
+                    osm_gdf = load_industry_osm_all_layers(osp)
+                    om_rules = off_cfg.get("osm_commercial") or {}
+                    filt = filter_osm_gdf_by_rules(
+                        osm_gdf, om_rules if isinstance(om_rules, dict) else {}
+                    )
+                    O_full = rasterize_osm_binary_mask(
+                        filt,
+                        transform=t_ref,
+                        height=H,
+                        width=W,
+                        crs=crs_s,
+                    )
+                else:
+                    LOG.warning("[other_combustion] OSM gpkg not found: %s", osp)
+            if O_full is None:
+                O_full = np.zeros((H, W), dtype=np.float64)
+            LOG.info(
+                "[other_combustion] off-road: NFR_stationary=%s NFR_offroad=%s CEIP_countries=%d",
+                list(NFR_STATIONARY),
+                list(NFR_OFFROAD),
+                len(iso3_list_ceip),
+            )
+
         cell_iter = idx_cells
-        if show_progress and tqdm is not None:
-            cell_iter = tqdm(
+        if show_progress and _optional_tqdm is not None:
+            cell_iter = _optional_tqdm(
                 idx_cells,
                 desc="CAMS cells (GNFR C other combustion)",
                 unit="cell",
@@ -370,17 +506,107 @@ def run(
             )
             flat_r = rr.ravel()
             flat_c = cc.ravel()
-            cell_used_fb = accumulate_emissions_and_weights_for_cell(
-                U=U,
-                pollutant_specs=pollutant_specs,
-                ds=ds,
-                cell_index=int(i),
-                co2_mode=co2_mode,
-                flat_r=flat_r,
-                flat_c=flat_c,
-                acc=acc,
-                weights_acc=weights_acc,
-            )
+            if not enable_offroad:
+                cell_used_fb = accumulate_emissions_and_weights_for_cell(
+                    U=U,
+                    pollutant_specs=pollutant_specs,
+                    ds=ds,
+                    cell_index=int(i),
+                    co2_mode=co2_mode,
+                    flat_r=flat_r,
+                    flat_c=flat_c,
+                    acc=acc,
+                    weights_acc=weights_acc,
+                )
+            else:
+                assert alpha_tensor is not None and pop_ref is not None and O_full is not None
+                forest_fs = frozenset(
+                    int(x) for x in off_cfg.get("forest_corine_classes", [311, 312, 313])
+                )
+                res_fs = frozenset(
+                    int(x) for x in off_cfg.get("residential_corine_codes", [112])
+                )
+                comm_clc = int(off_cfg.get("commercial_clc_code", 121))
+                lam = float(off_cfg.get("lambda_osm", 1.0))
+                a_blend = float(off_cfg.get("blend_eligibility_coef", 0.7))
+                b_blend = float(off_cfg.get("blend_population_coef", 0.3))
+                p_floor = float(off_cfg.get("pop_floor", 0.0))
+                W_stat, fb_stat = compute_W_stat(U, pollutant_outputs)
+                clw = clc_l3[r0 : r0 + h_win, c0 : c0 + w_win]
+                popw = pop_ref[r0 : r0 + h_win, c0 : c0 + w_win]
+                Ow = O_full[r0 : r0 + h_win, c0 : c0 + w_win]
+                w_F, fb_F = compute_W_F(clw, forest_fs)
+                w_R, fb_R = compute_W_R(
+                    clw,
+                    popw,
+                    code_set=res_fs,
+                    floor=p_floor,
+                    blend_eligibility_coef=a_blend,
+                    blend_population_coef=b_blend,
+                )
+                w_B, fb_B = compute_W_B(
+                    clw, Ow, commercial_clc=comm_clc, lambda_osm=lam
+                )
+                ab_rows = resolve_rows_for_cell(
+                    alpha=alpha_tensor,
+                    iso3_list=iso3_list_ceip,
+                    country_iso3=iso,
+                    fallback_iso3=iso_for_enduse,
+                    pollutant_outputs=pollutant_outputs,
+                    override_rows=override_rows_dict,
+                )
+                W_comb = combine_branches(
+                    W_stat, w_F, w_R, w_B, ab_rows, pollutant_outputs
+                )
+                if processed_cells % 151 == 0:
+                    assert_weights_sum_to_one(W_comb)
+                accumulate_emissions_and_precomputed_weights_for_cell(
+                    weights_by_output=W_comb,
+                    pollutant_specs=pollutant_specs,
+                    ds=ds,
+                    cell_index=int(i),
+                    co2_mode=co2_mode,
+                    flat_r=flat_r,
+                    flat_c=flat_c,
+                    acc=acc,
+                    weights_acc=weights_acc,
+                )
+                cell_used_fb = bool(fb_stat or fb_F or fb_R or fb_B)
+                row0 = ab_rows[pollutant_outputs[0]]
+                # Per-cell diagnostics are extremely verbose; keep them at DEBUG.
+                LOG.debug(
+                    "[other_combustion] cell=%s country=%s NFR_stationary=%s NFR_offroad=%s "
+                    "alpha_stat=%.5g alpha_off=%.5g beta(F,R,B)=(%.5g,%.5g,%.5g) "
+                    "subgroup_fallbacks stat=%s F=%s R=%s B=%s",
+                    int(i),
+                    iso,
+                    list(NFR_STATIONARY),
+                    list(NFR_OFFROAD),
+                    row0.alpha_stat,
+                    row0.alpha_off,
+                    row0.beta_F,
+                    row0.beta_R,
+                    row0.beta_B,
+                    fb_stat,
+                    fb_F,
+                    fb_R,
+                    fb_B,
+                )
+                # Uniform fallback details are also noisy; a summary is logged after the loop.
+                # Keep per-cell warnings at DEBUG for troubleshooting.
+                for tag, fb in (
+                    ("stationary", fb_stat),
+                    ("forestry", fb_F),
+                    ("residential_offroad", fb_R),
+                    ("commercial_offroad", fb_B),
+                ):
+                    if fb:
+                        LOG.debug(
+                            "[other_combustion] cell=%s country=%s subgroup %s used uniform fallback",
+                            int(i),
+                            iso,
+                            tag,
+                        )
             processed_cells += 1
             if cell_used_fb:
                 uniform_fb += 1

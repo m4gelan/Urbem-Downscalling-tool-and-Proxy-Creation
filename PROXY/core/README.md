@@ -57,15 +57,17 @@ Top-level modules (same directory as this README) glue subpackages to common use
 
 ### CEIP / alpha (reported emissions)
 
-- **`ceip/loader.py`** — Load `ceip/index.yaml`, remap legacy profile paths, `default_ceip_profile_relpath`, shared pollutant-alias path.
-- **`ceip/reported_group_alpha.py`** — Read CEIP / workbook long tables, map sectors → groups or subsectors, build alpha tensors, solvents-specific loader.
+- **`alpha/ceip/loader.py`** — Load `config/ceip/index.yaml`, remap legacy profile paths, `default_ceip_profile_relpath`, shared pollutant-alias path.
+- **`alpha/ceip/reported_group_alpha.py`** — Read CEIP / workbook long tables, map sectors → groups or subsectors, build alpha tensors, solvents-specific loader.
+- **`alpha/ceip/alpha_method_engine.py`** — `alpha_methods.yaml` methods 0–4 → α tensors.
+- **`alpha/ceip/profile_merge.py`** — Deep-merge groups + rules YAML profiles.
 - **`alpha/workbook.py`** — Parse multi-sheet / semicolon alpha XLSX to a standard dataframe.
 - **`alpha/workbook_aggregation_spec.py`** — Rebuild GNFR totals + grouped NFR codes for `compute_alpha` from `ceip/profiles/*.yaml` (no duplicate YAML files).
 - **`alpha/compute.py`** — `compute_alpha` workbook diagnostic (country × pollutant α means).
 - **`alpha/fallback.py`** — YAML resolver merging reported values with `ceip/alpha/fallback/*.yaml`.
-- **`alpha/ceip.py`** — Older wide/long CEIP readers and share extraction (`read_ceip_shares`).
-- **`alpha/offroad.py`** — Rail / pipeline / non-road mass fractions and YAML overrides.
 - **`alpha/reported.py`**, **`alpha/aliases.py`**, **`alpha/_common.py`** — Country/sector/pollutant token helpers and small YAML/parse utilities.
+
+GNFR I offroad triple-leg shares: `PROXY.core.alpha.ceip.load_ceip_and_alpha` + `PROXY.sectors.I_Offroad.share_broadcast` (not separate `alpha/` readers).
 
 ### Data loading and discovery
 
@@ -136,7 +138,7 @@ Clear separation; keep both.
 2. `grid.py` + `ref_profile.py` — reference window dict.
 3. `cams/domain.py`, `cams/gnfr.py`, `cams/grid.py` — CAMS cell logic.
 4. `raster/normalize.py` + `raster/align.py` — weights on CAMS cells.
-5. `ceip/loader.py` + `ceip/reported_group_alpha.py` — profile-driven alphas.
+5. `alpha/ceip/loader.py` + `alpha/ceip/reported_group_alpha.py` — profile-driven alphas.
 6. `alpha/fallback.py` — YAML override layer.
 
 ---
@@ -151,14 +153,14 @@ flowchart LR
   cams[cams.grid masks]
   cor[corine package]
   rast[raster.align normalize]
-  ceip[ceip.loader reported_group_alpha]
+  aceip[alpha.ceip loader tensors]
   paths --> disc
   paths --> grid
   disc --> cams
   grid --> cor
   grid --> rast
   cams --> rast
-  ceip --> rast
+  aceip --> rast
 ```
 
 ---

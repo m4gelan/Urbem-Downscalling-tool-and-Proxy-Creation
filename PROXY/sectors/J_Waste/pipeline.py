@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import json
 import logging
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-import yaml
 
 from PROXY.core.cams import build_cam_cell_id_masked_for_sources
-from PROXY.core.ceip import default_ceip_profile_relpath
-from PROXY.core.dataloaders import resolve_path
+from PROXY.core.alpha import default_ceip_profile_relpath, load_ceip_and_alpha
+from PROXY.core.dataloaders import load_first_existing_yaml_or_json, resolve_path
 from PROXY.core.dataloaders.discovery import discover_cams_emissions, discover_corine
 from PROXY.core.grid import resolve_nuts_cntr_code
 from PROXY.core.logging_tables import log_waste_family_weights
@@ -24,7 +23,7 @@ from PROXY.core.raster import (
     validate_weight_sums,
 )
 from PROXY.core.ref_profile import load_area_ref_profile
-from PROXY.sectors.J_Waste import ceip_waste, composite_waste, diagnostics_waste
+from PROXY.sectors.J_Waste import composite_waste, diagnostics_waste
 from PROXY.sectors.J_Waste.proxy_waste import build_all_proxies
 
 logger = logging.getLogger(__name__)
@@ -32,20 +31,17 @@ logger = logging.getLogger(__name__)
 
 def _load_waste_base(root: Path) -> dict[str, Any]:
     candidates = [
+        root / "PROXY" / "config" / "ceip" / "profiles" / "J_Waste_rules.yaml",
         root / "PROXY" / "config" / "ceip" / "profiles" / "waste_pipeline.yaml",
         root / "PROXY" / "config" / "waste" / "defaults.json",
     ]
-    for p in candidates:
-        if not p.is_file():
-            continue
-        if p.suffix.lower() in (".yaml", ".yml"):
-            data = yaml.safe_load(p.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-        with p.open(encoding="utf-8") as f:
-            return json.load(f)
-    raise FileNotFoundError(
-        "J_Waste base config not found: expected PROXY/config/ceip/profiles/waste_pipeline.yaml "
-        "or legacy PROXY/config/waste/defaults.json"
+    return load_first_existing_yaml_or_json(
+        candidates,
+        context=(
+            "J_Waste base config (expected PROXY/config/ceip/profiles/J_Waste_rules.yaml "
+            "or legacy PROXY/config/ceip/profiles/waste_pipeline.yaml or "
+            "PROXY/config/waste/defaults.json)"
+        ),
     )
 
 
@@ -70,8 +66,10 @@ def merge_waste_pipeline_cfg(
     """
     Build cfg for :func:`run_waste_pipeline`.
 
-    Alpha: ``ceip_workbook`` = reported EU27 xlsx (mean over years) by default; legacy
-    single-year table via ``ceip_xlsx`` + ``ceip_year`` if workbook is missing.
+    CEIP α uses :func:`PROXY.core.alpha.load_ceip_and_alpha` (same reported workbook +
+    ``ceip_groups_yaml`` / optional ``ceip_rules_yaml`` pattern as GNFR D/Fugitive),
+    with ``group_order`` ``G1``–``G3``. Paths default from ``ceip/index.yaml`` via
+    ``default_ceip_profile_relpath``.
     """
     cfg = deepcopy(_load_waste_base(root))
     wov = sector_cfg.get("waste") or {}
@@ -177,6 +175,14 @@ def merge_waste_pipeline_cfg(
                 continue
             paths[key] = str(resolve_path(root, Path(str(val))).resolve())
 
+    if not str(paths.get("ceip_groups_yaml") or "").strip():
+        paths["ceip_groups_yaml"] = paths["ceip_families_yaml"]
+    if not str(paths.get("ceip_rules_yaml") or "").strip():
+        rr = default_ceip_profile_relpath(root, "J_Waste", "rules_yaml")
+        rp = resolve_path(root, Path(rr))
+        if rp.is_file():
+            paths["ceip_rules_yaml"] = str(rp.resolve())
+
     # Canonical overlay supports nested ``waste.ceip`` while keeping legacy flat keys.
     sp_merge = {
         k: v
@@ -199,6 +205,13 @@ def merge_waste_pipeline_cfg(
         )
     if ceip_ov.get("years") is not None and cfg["ceip"].get("ceip_years") is None:
         cfg["ceip"]["ceip_years"] = ceip_ov.get("years")
+    if not str(paths.get("alpha_method_audit_dir") or "").strip():
+        paths["alpha_method_audit_dir"] = str(out_base.resolve())
+
+    ceip_block = cfg.get("ceip") or {}
+    if ceip_block.get("ceip_years") is not None:
+        paths["ceip_years"] = ceip_block["ceip_years"]
+
     cfg["paths"] = paths
     cfg["corine_window"] = {
         "nuts_cntr": nuts_cntr,
@@ -207,6 +220,29 @@ def merge_waste_pipeline_cfg(
     cfg["cams"] = cfg.get("cams") or {}
     cfg["cams"]["gnfr_j_index"] = gnfr_idx
     cfg["cams"]["country_iso3"] = iso3
+
+    raw_go = (
+        wov.get("ceip_group_order")
+        or wov.get("group_order")
+        or sector_cfg.get("ceip_group_order")
+        or sector_cfg.get("group_order")
+    )
+    if raw_go:
+        cfg["group_order"] = tuple(str(x).strip() for x in raw_go if str(x).strip())
+    else:
+        cfg["group_order"] = ("G1", "G2", "G3")
+
+    poll_nc = (cfg.get("cams") or {}).get("pollutants_nc") or []
+    cfg["pollutants"] = [str(p).lower().replace(".", "_") for p in poll_nc]
+
+    cfg["ceip_pollutant_aliases"] = dict(ceip_block.get("pollutant_aliases") or {})
+
+    cc: dict[str, Any] = {}
+    for src in (ceip_ov.get("cntr_code_to_iso3"), sector_cfg.get("cntr_code_to_iso3")):
+        if isinstance(src, dict):
+            cc.update(src)
+    cfg["cntr_code_to_iso3"] = cc
+
     cfg["output"] = {
         **(cfg.get("output") or {}),
         "dir": str(out_base.resolve()),
@@ -220,11 +256,24 @@ def merge_waste_pipeline_cfg(
 
 
 def _setup_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
+    """Match :func:`PROXY.main._configure_logging` — avoid ``basicConfig`` when root is already configured."""
+    try:
+        log_level = getattr(logging, str(level).upper(), logging.INFO)
+    except AttributeError:
+        log_level = logging.INFO
+    root = logging.getLogger()
+    if root.handlers:
+        root.setLevel(log_level)
+        return
+    handler = logging.StreamHandler(stream=sys.stderr)
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
     )
+    root.addHandler(handler)
+    root.setLevel(log_level)
 
 
 def _cams_country_iso3(cfg: dict[str, Any]) -> str:
@@ -296,7 +345,6 @@ def run_waste_j_pipeline(cfg: dict[str, Any]) -> dict[str, Any]:
             logger.info("J_Waste path %s=%s", key, paths[key])
 
     nuts_path = Path(cfg["paths"]["nuts_gpkg"])
-    logger.info("J_Waste reference grid: %s x %s, CRS %s", ref["height"], ref["width"], ref["crs"])
 
     gnfr_j = int((cfg.get("cams") or {}).get("gnfr_j_index", 13))
     iso3_cam = _cams_country_iso3(cfg)
@@ -328,10 +376,24 @@ def run_waste_j_pipeline(cfg: dict[str, Any]) -> dict[str, Any]:
         int(np.count_nonzero(country_id > 0)),
     )
 
-    _, wide, ceip_fb = ceip_waste.build_ceip_weight_tables(cfg, focus_country_iso3=iso3_cam)
-    log_waste_family_weights(logger, sector="J_Waste", wide=wide, focus_iso3=iso3_cam)
-    pollutants = [str(p) for p in cfg["cams"]["pollutants_nc"]]
-    ws, ww, wr = ceip_waste.weights_lookup_arrays(wide, iso3_list, pollutants)
+    alpha, _fb, wide = load_ceip_and_alpha(
+        cfg,
+        iso3_list,
+        sector_key="J_Waste",
+        focus_country_iso3=iso3_cam,
+    )
+    wide_log = wide.rename(
+        columns={
+            "alpha_G1": "w_solid",
+            "alpha_G2": "w_ww",
+            "alpha_G3": "w_res",
+        }
+    )
+    log_waste_family_weights(
+        logger, sector="J_Waste", wide=wide_log, focus_iso3=iso3_cam
+    )
+    pollutants = list(cfg["pollutants"])
+    ws, ww, wr = composite_waste.weight_arrays_from_alpha_g123(alpha)
 
     proxies = build_all_proxies(cfg, ref)
     p_solid = proxies["proxy_solid"]
@@ -418,7 +480,7 @@ def run_waste_j_pipeline(cfg: dict[str, Any]) -> dict[str, Any]:
             cam_cell_id_area,
             combined_fb_area,
         )
-    diagnostics_waste.write_fallback_log(out_dir / "diagnostics_ceip_fallbacks.csv", ceip_fb)
+    diagnostics_waste.write_fallback_log(out_dir / "diagnostics_ceip_fallbacks.csv", None)
 
     if cfg["output"].get("write_intermediates"):
         diagnostics_waste.write_geotiff_single(out_dir / "proxy_solid.tif", p_solid, ref)

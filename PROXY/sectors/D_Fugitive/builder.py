@@ -9,10 +9,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PROXY.core.ceip import default_ceip_profile_relpath
+from PROXY.core.alpha import default_ceip_profile_relpath
 from PROXY.core.dataloaders import project_root, resolve_path
 from PROXY.core.grid import reference_window_profile
 from PROXY.sectors._shared.gnfr_groups import merge_ceip_group_sector_cfg
+from PROXY.sectors.D_Fugitive.pipeline import run_fugitive_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ def _merge_fugitive_pipeline_cfg(
         ),
         osm_key="fugitive",
         output_path=output_path,
+        profile_sector_id="D_Fugitive",
     )
     merged["paths"]["osm_fugitive_gpkg"] = merged["paths"]["osm_group_gpkg"]
     return merged
@@ -141,8 +143,6 @@ def build(*, path_cfg: dict[str, Any], sector_cfg: dict[str, Any], country: str)
         show_p,
         proxy_log,
     )
-
-    from PROXY.sectors.D_Fugitive.pipeline import run_fugitive_pipeline
 
     logger.info("D_Fugitive: starting shared run_gnfr_group_pipeline (fugitive)…")
     out_tif = run_fugitive_pipeline(

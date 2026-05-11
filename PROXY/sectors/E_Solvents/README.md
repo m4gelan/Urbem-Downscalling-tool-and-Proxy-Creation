@@ -31,7 +31,7 @@ python -m PROXY.main build --sector E_Solvents --country EL
 | **Builder** | `builder.py` | Resolves paths, merges sector/default config, logs resolved inputs, calls `run_solvents_pipeline`, and verifies the written output path. |
 | **Config / public runner** | `pipeline.py` | `merge_solvents_pipeline_cfg` plus the public `run_solvents_pipeline` wrapper. |
 | **Pipeline body** | `run_pipeline.py` | E-specific orchestration: CEIP alpha, CAMS source rows, raw indicators, archetypes, subsector beta stack, within-CAMS normalization, allocation, validation, and write. |
-| **CEIP / alpha** | `PROXY.core.ceip` | `load_ceip_and_alpha_solvents` reads the reported-emissions workbook and `PROXY/config/ceip/profiles/solvents_subsectors.yaml`. |
+| **CEIP / alpha** | `PROXY.core.alpha.ceip` | `load_ceip_and_alpha_solvents` reads the reported-emissions workbook and `PROXY/config/ceip/profiles/solvents_subsectors.yaml`. |
 | **Reusable raster math** | `PROXY.core.raster`, `PROXY.core.area_allocation`, `PROXY.core.corine.raster` | Population sum warp, quantile normalization, within-CAMS stack normalization, strict validation, CLC masks, and alpha-weight allocation. |
 | **Solvent methodology** | `archetypes.py`, `subsector_proxies.py`, `osm_indicators.py` | Solvent-specific archetype channels, beta mixing, and OSM channel construction. |
 

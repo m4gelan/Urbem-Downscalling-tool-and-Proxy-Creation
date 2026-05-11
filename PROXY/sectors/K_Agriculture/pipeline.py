@@ -168,12 +168,6 @@ def run_k_agriculture_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any
             nuts_country=nuts_for_ref,
             pad_m=pad,
         )
-    logger.info(
-        "K_Agriculture reference grid: crs=%s width=%s height=%s",
-        ref.get("crs"),
-        ref.get("width"),
-        ref.get("height"),
-    )
 
     out_tif = sector_cfg.get("output_path")
     if out_tif is None:

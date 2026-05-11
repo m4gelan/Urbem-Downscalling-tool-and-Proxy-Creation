@@ -2,35 +2,30 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-from PROXY.core.ceip import default_ceip_profile_relpath, remap_legacy_ceip_relpath
-from PROXY.core.dataloaders import resolve_path
+from PROXY.core.alpha import default_ceip_profile_relpath, remap_legacy_ceip_relpath
+from PROXY.core.dataloaders import load_first_existing_yaml_or_json, resolve_path
 from PROXY.core.dataloaders.discovery import discover_cams_emissions, discover_corine
 from PROXY.core.grid import resolve_nuts_cntr_code
+from PROXY.sectors.E_Solvents.run_pipeline import run_solvents_area_pipeline
 
 
 def _load_solvents_base(root: Path) -> dict[str, Any]:
     candidates = [
+        root / "PROXY" / "config" / "ceip" / "profiles" / "E_Solvents_rules.yaml",
         root / "PROXY" / "config" / "ceip" / "profiles" / "solvents_pipeline.yaml",
         root / "PROXY" / "config" / "solvents" / "defaults.json",
     ]
-    for p in candidates:
-        if not p.is_file():
-            continue
-        if p.suffix.lower() in (".yaml", ".yml"):
-            data = yaml.safe_load(p.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-        with p.open(encoding="utf-8") as f:
-            return json.load(f)
-    raise FileNotFoundError(
-        "E_Solvents base config not found: expected PROXY/config/ceip/profiles/solvents_pipeline.yaml "
-        "or legacy PROXY/config/solvents/defaults.json"
+    return load_first_existing_yaml_or_json(
+        candidates,
+        context=(
+            "E_Solvents base config (expected PROXY/config/ceip/profiles/E_Solvents_rules.yaml "
+            "or legacy PROXY/config/ceip/profiles/solvents_pipeline.yaml or "
+            "PROXY/config/solvents/defaults.json)"
+        ),
     )
 
 
@@ -90,7 +85,7 @@ def merge_solvents_pipeline_cfg(
         paths_overlay.get("ceip_subsector_map_yaml")
         or ceip_sp.get("ceip_subsector_map_yaml")
         or sp.get("ceip_subsector_map_yaml")
-        or default_ceip_profile_relpath(root, "E_Solvents", "subsectors_yaml")
+        or default_ceip_profile_relpath(root, "E_Solvents", "groups_yaml")
     )
     submap_path = resolve_path(root, Path(remap_legacy_ceip_relpath(str(submap_rel))))
 
@@ -141,8 +136,6 @@ def run_solvents_pipeline(
     *,
     config_path: Path | None = None,
 ) -> dict[str, Any]:
-    from PROXY.sectors.E_Solvents.run_pipeline import run_solvents_area_pipeline
-
     return run_solvents_area_pipeline(root, cfg, config_path=config_path)
 
 

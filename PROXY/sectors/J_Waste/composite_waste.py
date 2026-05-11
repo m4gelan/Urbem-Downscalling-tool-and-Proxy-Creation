@@ -100,3 +100,32 @@ def composite_per_pollutant(
         P = np.nan_to_num(P, nan=0.0, posinf=0.0, neginf=0.0)
         out[pol.lower()] = P.astype(np.float32)
     return out
+
+
+def renormalize_solid_ww_res_weights(
+    ws: np.ndarray, ww: np.ndarray, wr: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Per (country row, pollutant) column, enforce finite weights and sum=1.
+    All-zero, NaN, or non-positive sums become uniform 1/3.
+    """
+    t = ws + ww + wr
+    bad = ~np.isfinite(t) | (t <= 0)
+    u = 1.0 / 3.0
+    wsa = np.where(bad, u, ws)
+    wwa = np.where(bad, u, ww)
+    wra = np.where(bad, u, wr)
+    t2 = wsa + wwa + wra
+    return wsa / t2, wwa / t2, wra / t2
+
+
+def weight_arrays_from_alpha_g123(alpha: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    CEIP alpha tensor with groups ``G1``, ``G2``, ``G3`` (solid / wastewater / residual):
+    shape ``(n_iso, 3, n_pol)`` -> three ``(n_iso, n_pol)`` lookup tables.
+    """
+    a = np.asarray(alpha, dtype=np.float64)
+    ws = np.asarray(a[:, 0, :], dtype=np.float64)
+    ww = np.asarray(a[:, 1, :], dtype=np.float64)
+    wr = np.asarray(a[:, 2, :], dtype=np.float64)
+    return renormalize_solid_ww_res_weights(ws, ww, wr)

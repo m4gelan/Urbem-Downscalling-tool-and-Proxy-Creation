@@ -380,7 +380,7 @@ def main() -> int:
     out_dir = (args.out_dir.resolve() if args.out_dir else Path.cwd().resolve())
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    from PROXY.core.ceip.loader import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha.ceip_index_loader import DEFAULT_GNFR_GROUP_ORDER
     from PROXY.core.dataloaders import resolve_path
     from PROXY.core.dataloaders.discovery import discover_cams_emissions
     from PROXY.core.cams.mask import cams_gnfr_country_source_mask

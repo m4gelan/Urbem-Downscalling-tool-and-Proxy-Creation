@@ -1,8 +1,0 @@
-# Country-specific alpha fallback overrides for I_Offroad / EL (Greece).
-#
-# Subsectors are the CEIP triple-leg: rail, pipeline, nonroad. Defaults fall back to
-# uniform 1/3. Populate this file to override for EL.
-version: 1
-sector: I_Offroad
-country: EL
-groups: {}

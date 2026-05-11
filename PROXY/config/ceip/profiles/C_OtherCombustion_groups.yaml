@@ -1,0 +1,22 @@
+# GNFR C (1A4): CEIP inventory token -> group id for alpha tensor (G1..G4).
+# G1 = stationary 1A4ai/bi/ci; G2–G4 = off-road 1A4cii / 1A4bii / 1A4aii (beta split within alpha_off).
+# List longer NFR codes before shorter prefixes where both could match (1A4aii before 1A4ai is not in same group).
+groups:
+  G1:
+    name: stationary_1a4
+    ceip_sectors:
+      - 1A4ai
+      - 1A4bi
+      - 1A4ci
+  G2:
+    name: forestry_offroad_1a4cii
+    ceip_sectors:
+      - 1A4cii
+  G3:
+    name: residential_offroad_1a4bii
+    ceip_sectors:
+      - 1A4bii
+  G4:
+    name: commercial_offroad_1a4aii
+    ceip_sectors:
+      - 1A4aii

@@ -1,41 +1,23 @@
-"""Alpha / CEIP / offroad-share package.
+"""Alpha primitives and CEIP-reported α stack.
 
-Re-exports the same public names that used to live in the monolithic
-``PROXY.core.alpha`` module, so existing imports continue to work unchanged:
-
-.. code-block:: python
-
-    from PROXY.core.alpha import (
-        AlphaRequest,
-        compute_alpha,
-        norm_pollutant_key,
-        read_ceip_shares,
-        build_share_arrays,
-        lookup_offroad_triple_for_iso3,
-        _read_alpha_workbook,  # intentionally preserved for existing sector code
-    )
-
-New fallback resolver (opt-in, additive):
-
-.. code-block:: python
-
-    from PROXY.core.alpha.fallback import AlphaSource, resolve_alpha
+CEIP profile indexing, merge helpers, and tensor builders live in this package
+(:mod:`PROXY.core.alpha.ceip_index_loader`, :mod:`PROXY.core.alpha.reported_group_alpha`).
+For offroad triple-share rasters see :mod:`PROXY.sectors.I_Offroad.share_broadcast`.
 """
 from __future__ import annotations
 
 from .aliases import norm_pollutant_key
-from .ceip import read_ceip_shares
+from .ceip_index_loader import (
+    DEFAULT_GNFR_GROUP_ORDER,
+    clear_ceip_index_cache,
+    default_ceip_profile_relpath,
+    load_merged_ceip_profile_for_pipeline_paths,
+    remap_legacy_ceip_relpath,
+    shared_pollutant_aliases_relpath,
+)
 from .compute import AlphaRequest, compute_alpha
 from .fallback import AlphaResolution, AlphaSource, format_provenance, resolve_alpha
 from .matrix import finalize_alpha_matrix
-from .offroad import (
-    apply_offroad_yaml_overrides,
-    build_share_arrays,
-    load_offroad_mass_fractions_from_alpha_csv,
-    lookup_offroad_triple_for_iso3,
-    resolve_offroad_triple_with_yaml,
-    resolve_subsector_emission_masses,
-)
 from .reported import (
     normalize_inventory_sector,
     normalize_sector_token,
@@ -43,6 +25,15 @@ from .reported import (
     resolve_iso3_reported,
     short_country,
     to_iso3,
+)
+from .reported_group_alpha import (
+    load_ceip_and_alpha,
+    load_ceip_and_alpha_solvents,
+    load_group_mapping,
+    load_subsector_mapping_from_yaml,
+    read_ceip_long,
+    read_reported_emissions_fugitive_long,
+    read_reported_emissions_subsector_long,
 )
 from .workbook import (
     _is_semicolon_single_column_table,
@@ -55,25 +46,31 @@ __all__ = [
     "AlphaRequest",
     "AlphaResolution",
     "AlphaSource",
-    "apply_offroad_yaml_overrides",
-    "build_share_arrays",
+    "DEFAULT_GNFR_GROUP_ORDER",
+    "clear_ceip_index_cache",
     "compute_alpha",
+    "default_ceip_profile_relpath",
     "format_provenance",
     "finalize_alpha_matrix",
-    "load_offroad_mass_fractions_from_alpha_csv",
-    "lookup_offroad_triple_for_iso3",
+    "load_ceip_and_alpha",
+    "load_ceip_and_alpha_solvents",
+    "load_group_mapping",
+    "load_merged_ceip_profile_for_pipeline_paths",
+    "load_subsector_mapping_from_yaml",
     "norm_pollutant_key",
     "read_alpha_workbook",
-    "read_ceip_shares",
-    "resolve_offroad_triple_with_yaml",
+    "read_ceip_long",
+    "read_reported_emissions_fugitive_long",
+    "read_reported_emissions_subsector_long",
+    "remap_legacy_ceip_relpath",
     "resolve_alpha",
+    "shared_pollutant_aliases_relpath",
     "normalize_inventory_sector",
     "normalize_sector_token",
     "parse_float_or_nan",
     "resolve_iso3_reported",
     "short_country",
     "to_iso3",
-    "resolve_subsector_emission_masses",
     "_read_alpha_workbook",
     "_is_semicolon_single_column_table",
     "_semicolon_rows_to_standard_columns",

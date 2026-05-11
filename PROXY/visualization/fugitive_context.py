@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 import sys
-import yaml
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +34,7 @@ def is_fugitive_gem_auxiliary_layer(title: str) -> bool:
     )
 
 
-# Folium labels per CEIP group — must match ``proxy_mixture`` row order in ``fugitive_groups.yaml``.
+# Folium labels per CEIP group — must match ``proxy_mixture`` row order in merged D_Fugitive profile.
 FUGITIVE_MIXTURE_LAYER_LABELS: dict[str, tuple[str, ...]] = {
     "G1": ("CLC 131", "GEM COAL MINE", "OSM_G1", "CLC121"),
     "G2": ("OSM_PIPE_G2", "GEM_G2", "OSM_PORT_G2", "CLC 123 (G2)", "CLC121 (G2)"),
@@ -240,7 +239,8 @@ def build_fugitive_proxy_rgba_overlays(
         )
         return []
 
-    from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha.ceip_index_loader import load_merged_ceip_profile_for_pipeline_paths
     from PROXY.core.dataloaders import resolve_path
     from PROXY.core.dataloaders.raster import warp_raster_to_ref
     from PROXY.core.osm_corine_proxy import build_p_pop
@@ -364,8 +364,9 @@ def build_fugitive_proxy_rgba_overlays(
             dst_nodata=np.nan,
         )
         p_pop = build_p_pop(pop, mini)
-        with gy.open(encoding="utf-8") as gf:
-            group_specs_root = yaml.safe_load(gf) or {}
+        group_specs_root = load_merged_ceip_profile_for_pipeline_paths(
+            root, paths, profile_sector_id="D_Fugitive"
+        )
         groups_raw: dict = dict(group_specs_root.get("groups") or {})
         osm_gdf = gpd.read_file(osm_p)
         if _fugitive_viz_debug_enabled(visualization_cfg):

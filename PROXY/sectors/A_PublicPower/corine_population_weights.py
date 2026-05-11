@@ -31,6 +31,11 @@ from typing import Any, Literal, TYPE_CHECKING
 
 import numpy as np
 
+from PROXY.core.proxy.eligibility_pop_blend import (
+    pop_01_within_cell as _pop_01_core,
+    share_tensor_eligibility_pop_blend as _share_eligibility_pop_blend_core,
+)
+
 if TYPE_CHECKING:
     import geopandas as gpd
     import rasterio.io
@@ -156,17 +161,7 @@ def _warp_population_to_corine(
 
 def _pop_01_within_cell(pop_work: np.ndarray, ok_data: np.ndarray) -> np.ndarray:
     """Min–max population to [0, 1] over finite-CORINE pixels in this CAMS cell clip."""
-    pop_01 = np.zeros_like(pop_work, dtype=np.float64)
-    if not np.any(ok_data):
-        return pop_01
-    p = pop_work[ok_data]
-    pmin = float(np.min(p))
-    pmax = float(np.max(p))
-    if pmax > pmin:
-        pop_01[ok_data] = (pop_work[ok_data] - pmin) / (pmax - pmin)
-    else:
-        pop_01[ok_data] = 1.0 if pmax > 0.0 else 0.0
-    return np.clip(pop_01, 0.0, 1.0)
+    return _pop_01_core(pop_work, ok_data)
 
 
 def _share_tensor_corine_pop_product(
@@ -223,40 +218,15 @@ def _share_tensor_eligibility_pop_blend(
 
     ``eligibility`` is 1 on target CORINE classes else 0. Population always contributes via ``b * pop_01``.
     """
-    ok_data = np.isfinite(corine_arr)
-    if not np.any(ok_data):
-        return None
-
-    rint = np.zeros_like(corine_arr, dtype=np.int32)
-    rint[ok_data] = np.rint(corine_arr[ok_data]).astype(np.int32)
-    corine_hit = ok_data & np.isin(rint, list(code_set))
-
-    pop_work = np.maximum(np.nan_to_num(pop_dst, nan=0.0), floor)
-    pop_01 = _pop_01_within_cell(pop_work, ok_data)
-
-    elig = corine_hit.astype(np.float64)
-    exp_elig = np.zeros_like(corine_arr, dtype=np.float64)
-    exp_elig[ok_data] = np.power(elig[ok_data], 1.0 + pop_01[ok_data])
-
-    w_pix = np.zeros_like(corine_arr, dtype=np.float64)
-    w_pix[ok_data] = (
-        float(blend_eligibility_coef) * exp_elig[ok_data]
-        + float(blend_population_coef) * pop_01[ok_data]
+    return _share_eligibility_pop_blend_core(
+        corine_arr,
+        pop_dst,
+        code_set,
+        floor,
+        fallback_if_no_corine,
+        blend_eligibility_coef=blend_eligibility_coef,
+        blend_population_coef=blend_population_coef,
     )
-    s = float(np.sum(w_pix))
-    basis = "eligibility_pop_blend"
-
-    if s <= 0:
-        if fallback_if_no_corine == "skip":
-            return None
-        w_pix = np.where(ok_data, 1.0, 0.0)
-        s = float(np.sum(w_pix))
-        basis = "uniform_cell"
-        if s <= 0:
-            return None
-
-    share = (w_pix / s).astype(np.float64, copy=False)
-    return share, w_pix.astype(np.float64, copy=False), basis
 
 
 def _share_tensor_for_cell(

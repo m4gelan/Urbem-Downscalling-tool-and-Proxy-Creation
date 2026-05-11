@@ -1,11 +1,9 @@
-"""Offroad (GNFR I) subsector-mass helpers and grid-broadcast utilities.
+"""I_Offroad: CEIP triple-share lookup and raster broadcast (rail / pipeline / non-road).
 
-- :func:`build_share_arrays` broadcasts CEIP triples to a fine-grid country-index array.
-- :func:`lookup_offroad_triple_for_iso3` resolves a single-country triple with identical
-  fallback rules to :func:`build_share_arrays`.
-- :func:`load_offroad_mass_fractions_from_alpha_csv` and
-  :func:`resolve_subsector_emission_masses` read the legacy ``alpha_values.csv`` layout.
+Used only by :mod:`PROXY.sectors.I_Offroad.pipeline`; keeps triple-leg logic next to the sector.
+Alpha CSV helpers remain here for optional ``area_proxy`` emission splits.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,16 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .aliases import _norm_pol, normalize_country_token
-from .fallback import AlphaSource, format_provenance, resolve_alpha
-
-_ISO3_TO_SHORT_OFFROAD: dict[str, str] = {"GRC": "EL"}
-_OFFROAD_SUBSECTORS: tuple[str, ...] = ("rail", "pipeline", "nonroad")
-
-
-def _short_country_offroad(iso3: str) -> str:
-    c = str(iso3 or "").strip().upper()
-    return _ISO3_TO_SHORT_OFFROAD.get(c, c)
+from PROXY.core.alpha.aliases import _norm_pol, normalize_country_token
 
 
 def build_share_arrays(
@@ -80,9 +69,7 @@ def lookup_offroad_triple_for_iso3(
     *,
     default_triple: tuple[float, float, float] = (1.0 / 3, 1.0 / 3, 1.0 / 3),
 ) -> tuple[float, float, float]:
-    """Resolve ``(s_rail, s_pipeline, s_nonroad)`` for one ISO3 code with identical
-    fallback rules to :func:`build_share_arrays` (``country_idx == 0`` branch).
-    """
+    """Resolve ``(s_rail, s_pipeline, s_nonroad)`` for one ISO3 (same rules as ``build_share_arrays``)."""
     pk = _norm_pol(pollutant)
     table = shares.get(pk, {})
     fb = str(preferred_iso3).strip().upper()
@@ -109,32 +96,9 @@ def resolve_offroad_triple_with_yaml(
     iso3: str,
     logger: Any | None = None,
 ) -> tuple[float, float, float]:
-    """Apply configured I_Offroad alpha fallback only when CEIP yielded the default triple."""
-    if not all(abs(a - b) < 1e-12 for a, b in zip(triple, default_triple, strict=False)):
-        return triple
-    country = _short_country_offroad(iso3)
-    res = resolve_alpha(
-        sector="I_Offroad",
-        country=country,
-        pollutant=str(pollutant),
-        subsectors=list(_OFFROAD_SUBSECTORS),
-    )
-    has_override = any(s is AlphaSource.CONFIG_COUNTRY_OVERRIDE for s in res.source.values())
-    if not has_override:
-        return triple
-    new_triple = (
-        float(res.values.get("rail", triple[0])),
-        float(res.values.get("pipeline", triple[1])),
-        float(res.values.get("nonroad", triple[2])),
-    )
-    if logger is not None:
-        logger.info(
-            "[alpha] sector=I_Offroad country=%s pollutant=%s %s",
-            country,
-            pollutant,
-            format_provenance(res),
-        )
-    return new_triple
+    """Return the CEIP-derived triple (legacy YAML country overrides removed)."""
+    _ = default_triple, pollutant, iso3, logger
+    return triple
 
 
 def apply_offroad_yaml_overrides(
@@ -145,40 +109,8 @@ def apply_offroad_yaml_overrides(
     default_triple: tuple[float, float, float],
     logger: Any | None = None,
 ) -> None:
-    """Patch default or missing CEIP triples in-place using I_Offroad YAML alpha fallbacks."""
-    for pol in pollutants:
-        table = share_dict.setdefault(pol, {})
-        for iso3 in isos:
-            iso_u = str(iso3).strip().upper()
-            if not iso_u:
-                continue
-            current = table.get(iso_u)
-            looks_default = current is None or all(
-                abs(a - b) < 1e-12 for a, b in zip(current, default_triple, strict=False)
-            )
-            if not looks_default:
-                continue
-            country = _short_country_offroad(iso_u)
-            res = resolve_alpha(
-                sector="I_Offroad",
-                country=country,
-                pollutant=str(pol),
-                subsectors=list(_OFFROAD_SUBSECTORS),
-            )
-            new_triple = (
-                float(res.values.get("rail", default_triple[0])),
-                float(res.values.get("pipeline", default_triple[1])),
-                float(res.values.get("nonroad", default_triple[2])),
-            )
-            if any(s is AlphaSource.CONFIG_COUNTRY_OVERRIDE for s in res.source.values()):
-                table[iso_u] = new_triple
-                if logger is not None:
-                    logger.info(
-                        "[alpha] sector=I_Offroad country=%s pollutant=%s %s",
-                        country,
-                        pol,
-                        format_provenance(res),
-                    )
+    """No-op (legacy YAML alpha overrides removed; use CEIP + ``alpha_methods.yaml``)."""
+    _ = share_dict, pollutants, isos, default_triple, logger
 
 
 def load_offroad_mass_fractions_from_alpha_csv(
@@ -304,3 +236,13 @@ def resolve_subsector_emission_masses(
     return [
         {**dict(r), "emission_mass_fraction": float(vec[i])} for i, r in enumerate(rows)
     ], meta
+
+
+__all__ = [
+    "apply_offroad_yaml_overrides",
+    "build_share_arrays",
+    "load_offroad_mass_fractions_from_alpha_csv",
+    "lookup_offroad_triple_for_iso3",
+    "resolve_offroad_triple_with_yaml",
+    "resolve_subsector_emission_masses",
+]

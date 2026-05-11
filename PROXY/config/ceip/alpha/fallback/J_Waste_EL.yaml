@@ -1,9 +1,0 @@
-# Country-specific alpha fallback overrides for J_Waste / EL (Greece).
-#
-# Subsectors for this sector are: solid, ww, res. Current implicit behaviour is a
-# three-tier fallback (country mean -> EU mean -> uniform 1/3). Populate this file to
-# pin known values for EL; empty means "use defaults.yaml + ultimate 1/n fallback".
-version: 1
-sector: J_Waste
-country: EL
-groups: {}

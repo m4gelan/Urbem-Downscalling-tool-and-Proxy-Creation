@@ -54,25 +54,53 @@ def load_workbook_aggregation_spec(repo_root: Path) -> tuple[dict[str, Any], dic
     ``grouped`` maps group name -> list of sector tokens for ``group:`` expansion.
     """
     cfg_dir = repo_root / "PROXY" / "config" / "ceip" / "profiles"
-    solvents = _load_yaml(cfg_dir / "solvents_subsectors.yaml")
-    waste = _load_yaml(cfg_dir / "waste_families.yaml")
+    solvents = _load_yaml(cfg_dir / "E_Solvents_groups.yaml")
+    waste = _load_yaml(cfg_dir / "J_Waste_groups.yaml")
+    c_other = _load_yaml(cfg_dir / "C_OtherCombustion_groups.yaml")
 
     grouped: dict[str, list[str]] = {}
     grouped["solvents_d3_all"] = list(_SOLVENTS_D3_ALL_CODES)
 
+    _waste_profile_keys = (
+        ("G1", "waste_solid"),
+        ("G2", "waste_wastewater"),
+        ("G3", "waste_residual"),
+    )
+    _waste_legacy_keys = (
+        ("solid", "waste_solid"),
+        ("ww", "waste_wastewater"),
+        ("res", "waste_residual"),
+    )
+    groups_w = waste.get("groups") if isinstance(waste.get("groups"), dict) else {}
     families = waste.get("families") or {}
-    waste_group_names = {
-        "solid": "waste_solid",
-        "ww": "waste_wastewater",
-        "res": "waste_residual",
-    }
-    if isinstance(families, dict):
-        for fam_key, gname in waste_group_names.items():
+    if isinstance(groups_w, dict) and groups_w:
+        use_g = any(k in groups_w for k in ("G1", "G2", "G3"))
+        keys_iter = _waste_profile_keys if use_g else _waste_legacy_keys
+        for fam_key, gname in keys_iter:
+            block = groups_w.get(fam_key)
+            if not isinstance(block, dict):
+                continue
+            codes = block.get("ceip_sectors") or block.get("nfr") or []
+            if isinstance(codes, list):
+                grouped[gname] = [str(x).strip() for x in codes if str(x).strip()]
+    elif isinstance(families, dict):
+        for fam_key, gname in _waste_legacy_keys:
             codes = families.get(fam_key)
             if isinstance(codes, list):
                 grouped[gname] = [str(x).strip() for x in codes if str(x).strip()]
 
     grouped.update(_OFFROAD_GROUPS)
+
+    # C_OtherCombustion: G1–G4 from CEIP profile (stationary + three off-road legs).
+    groups_c = c_other.get("groups") if isinstance(c_other.get("groups"), dict) else {}
+    for gid in ("G1", "G2", "G3", "G4"):
+        block = groups_c.get(gid)
+        if not isinstance(block, dict):
+            continue
+        raw = block.get("ceip_sectors") or []
+        if isinstance(raw, list):
+            gname = f"gnfr_c_{gid}"
+            grouped[gname] = [str(x).strip() for x in raw if str(x).strip()]
 
     mapping: dict[str, Any] = {}
     for gnfr_key, sector_total in _GNFR_SECTOR_TOTAL_CODES.items():
@@ -92,9 +120,14 @@ def load_workbook_aggregation_spec(repo_root: Path) -> tuple[dict[str, Any], dic
         e_sub["d3_all"] = {"groups": ["solvents_d3_all"]}
     mapping["E_Solvents"]["subsectors"] = e_sub
 
-    # J_Waste from waste family lists (same group names as legacy YAML).
+    # J_Waste: subsector keys match CEIP ``groups`` ids (G1–G3) or legacy solid/ww/res.
     j_sub: dict[str, Any] = {}
-    for fam_key, gname in (("solid", "waste_solid"), ("ww", "waste_wastewater"), ("res", "waste_residual")):
+    j_pairs = (
+        (("G1", "waste_solid"), ("G2", "waste_wastewater"), ("G3", "waste_residual"))
+        if isinstance(waste.get("groups"), dict) and any(k in (waste.get("groups") or {}) for k in ("G1", "G2", "G3"))
+        else (("solid", "waste_solid"), ("ww", "waste_wastewater"), ("res", "waste_residual"))
+    )
+    for fam_key, gname in j_pairs:
         if gname in grouped:
             j_sub[fam_key] = {"groups": [gname]}
     mapping["J_Waste"]["subsectors"] = j_sub
@@ -105,5 +138,14 @@ def load_workbook_aggregation_spec(repo_root: Path) -> tuple[dict[str, Any], dic
         "offroad_pipelines": {"groups": ["offroad_pipelines"]},
         "offroad_non_road": {"groups": ["offroad_non_road"]},
     }
+
+    # C_OtherCombustion: subsector keys align with CEIP group ids G1–G4.
+    c_sub: dict[str, Any] = {}
+    for gid in ("G1", "G2", "G3", "G4"):
+        gname = f"gnfr_c_{gid}"
+        if gname in grouped:
+            c_sub[gid] = {"groups": [gname]}
+    if c_sub:
+        mapping["C_OtherCombustion"]["subsectors"] = c_sub
 
     return mapping, grouped

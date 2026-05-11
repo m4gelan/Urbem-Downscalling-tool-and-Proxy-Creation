@@ -1,6 +1,7 @@
 """Dataset loaders used across sector pipelines."""
 
 from .config import PathConfig, load_path_config, load_yaml, project_root, resolve_path
+from .config_candidates import load_first_existing_yaml_or_json
 from .emissions import dataset_summary, open_cams_dataset
 from .raster import (
     assert_same_grid,
@@ -19,6 +20,7 @@ __all__ = [
     "dataset_summary",
     "load_path_config",
     "load_yaml",
+    "load_first_existing_yaml_or_json",
     "open_cams_dataset",
     "project_root",
     "raster_metadata",

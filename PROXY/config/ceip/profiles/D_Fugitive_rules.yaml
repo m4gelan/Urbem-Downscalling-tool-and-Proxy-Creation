@@ -1,0 +1,101 @@
+# GNFR D Fugitive: proxy_mixture and spatial rules per group.
+groups:
+  G1:
+    proxy_mixture:
+    - kind: corine
+      weight: 0.4
+      classes:
+      - 131
+    - kind: gcmt_coal
+      weight: 0.35
+    - kind: osm
+      weight: 0.2
+      osm_rules:
+        any_of:
+        - landuse: quarry
+        - resource: coal
+        - industrial: mine
+    - kind: corine
+      weight: 0.05
+      classes:
+      - 121
+  G2:
+    proxy_mixture:
+    - kind: osm
+      weight: 0.35
+      osm_rules:
+        any_of:
+        - man_made: pipeline
+        - man_made: petroleum_well
+    - kind: goget_g2
+      weight: 0.3
+    - kind: osm
+      weight: 0.15
+      osm_rules:
+        any_of:
+        - landuse: port
+        - industrial: oil
+        - industrial: depot
+    - kind: corine
+      weight: 0.1
+      classes:
+      - 123
+    - kind: corine
+      weight: 0.1
+      classes:
+      - 121
+  G3:
+    proxy_mixture:
+    - kind: osm
+      weight: 0.35
+      osm_rules:
+        any_of:
+        - industrial: refinery
+    - kind: osm
+      weight: 0.25
+      osm_rules:
+        any_of:
+        - man_made: storage_tank
+        - man_made: tank
+        - industrial: fuel_storage
+    - kind: corine
+      weight: 0.15
+      classes:
+      - 121
+    - kind: osm
+      weight: 0.1
+      osm_rules:
+        any_of:
+        - amenity: fuel
+        - industrial: depot
+    - kind: population
+      weight: 0.15
+  G4:
+    proxy_mixture:
+    - kind: viirs_gaussian
+      weight: 0.45
+    - kind: goget_g4
+      weight: 0.2
+    - kind: osm
+      weight: 0.1
+      osm_rules:
+        any_of:
+        - man_made: flare
+        - man_made: chimney
+    - kind: osm
+      weight: 0.15
+      osm_rules:
+        any_of:
+        - power: plant
+        - power: generator
+        - power: substation
+        - industrial: gas
+        - resource: gas
+    - kind: corine
+      weight: 0.05
+      classes:
+      - 121
+    - kind: corine
+      weight: 0.05
+      classes:
+      - 131

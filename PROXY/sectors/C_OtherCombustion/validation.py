@@ -21,6 +21,7 @@ from .m_builder.emep_ef import ef_kg_per_tj, load_emep
 from .m_builder.mapping_io import load_gains_mapping
 from .m_builder.sidecar_io import load_sidecar_dict
 from ._log import LOG
+from .x_builder.appliance_proxy_config import load_appliance_proxy_from_rules_yaml
 
 
 def validate_pipeline_config(
@@ -108,6 +109,42 @@ def validate_pipeline_config(
             )
 
     emep = load_emep(emep_path)
+    paths = cfg.get("paths") or {}
+    hm = paths.get("hotmaps") or {}
+    ap_run = cfg.get("appliance_proxy") or {}
+    if bool(ap_run.get("enabled", True)):
+        hdd = hm.get("hdd_curr")
+        if not hdd:
+            raise ConfigurationError(
+                "appliance_proxy.enabled requires paths.hotmaps.hdd_curr (merged from sector hotmaps.hdd_curr)."
+            )
+        p_hdd = resolve_path(repo_root, Path(hdd))
+        if not p_hdd.is_file():
+            raise ConfigurationError(f"appliance_proxy: HDD raster not found: {p_hdd}")
+
+        pop_rel = paths.get("population_tif")
+        ghs_rel = paths.get("ghsl_smod_tif")
+        if not pop_rel:
+            raise ConfigurationError("appliance_proxy.enabled requires paths.population_tif (paths.yaml proxy_common)")
+        if not ghs_rel:
+            raise ConfigurationError(
+                "appliance_proxy.enabled requires paths.ghsl_smod_tif (paths.yaml proxy_specific.waste or equivalent)"
+            )
+        p_pop = resolve_path(repo_root, Path(pop_rel))
+        p_ghs = resolve_path(repo_root, Path(ghs_rel))
+        if not p_pop.is_file():
+            raise ConfigurationError(f"appliance_proxy: population raster not found: {p_pop}")
+        if not p_ghs.is_file():
+            raise ConfigurationError(f"appliance_proxy: GHSL SMOD raster not found: {p_ghs}")
+
+        ry = paths.get("ceip_rules_yaml")
+        if not ry:
+            raise ConfigurationError("appliance_proxy: ceip_rules_yaml missing from merged paths")
+        rules_path = resolve_path(repo_root, Path(ry))
+        if not rules_path.is_file():
+            raise ConfigurationError(f"appliance_proxy: CEIP rules YAML not found: {rules_path}")
+        load_appliance_proxy_from_rules_yaml(rules_path)
+
     probes = (
         ("Natural gas", "Small (single household scale, capacity <=50 kWth) boilers"),
         ("Solid fuel (not biomass)", "Fireplaces, saunas and outdoor heaters"),

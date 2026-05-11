@@ -4,6 +4,9 @@ mode: area
 output_dir: OUTPUT/Proxy_weights/C_OtherCombustion
 output_filename: othercombustion_areasource.tif
 
+# CEIP α for stationary (G1) vs off-road (G2–G4); optional years / country map overrides.
+ceip: {}
+
 # NUTS clip uses `python -m PROXY.main build --country EL` (CNTR_CODE).
 cams_country_iso3: GRC
 
@@ -80,21 +83,27 @@ pollutants:
     cams_var: pm10
   - output: co
     cams_var: co
-  - output: co2_total
-    cams_var: null
-    from_co2_mode: true
+
 
 hotmaps:
   heat_res: heat_res_curr_density.tif
   heat_nonres: heat_nonres_curr_density.tif
+  hdd_curr: HDD_curr.tif
   gfa_res: gfa_res_curr_density.tif
   gfa_nonres: gfa_nonres_curr_density.tif
+
+# When true (default), X uses S×L appliance proxy from C_OtherCombustion_rules.yaml (needs HDD + GHS-SMOD).
+# When false, legacy Hotmaps×GFA×CORINE morphology stack (needs all four Hotmaps rasters).
+appliance_proxy:
+  enabled: true
 
 run:
   write_weights_geotiff: true
   write_emissions_geotiffs: false
   write_weight_geotiffs: false
   show_progress: true
+  # When false, legacy stationary-only weights (matches pre–off-road pipeline).
+  enable_offroad: true
 
 visualization:
   visualization_weight_band: 1

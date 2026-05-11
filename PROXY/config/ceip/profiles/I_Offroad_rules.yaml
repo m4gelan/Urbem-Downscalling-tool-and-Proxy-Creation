@@ -1,0 +1,92 @@
+# GNFR I Offroad: defaults merged into sector ``area_proxy`` before pipeline merge_offroad_pipeline_cfg.
+# Sector ``offroad.yaml`` should keep deployment overrides (workbook path, ISO mapping, facilities_tif).
+
+source_type_index: 1
+cams_emission_category_index: 12
+corine_band: 1
+
+ceip_workbook: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+ceip_sheet: null
+
+defaults:
+  fallback_country_iso3: GRC
+  default_shares_rail: 0.34
+  default_shares_pipe: 0.33
+  default_shares_nonroad: 0.33
+
+pollutants:
+  - ch4
+  - co
+  - nh3
+  - nmvoc
+  - nox
+  - pm10
+  - pm2_5
+  - sox
+
+ceip_pollutant_aliases:
+  PM25: PM2_5
+  PM2.5: PM2_5
+  NOX: NOX
+  NMVOC: NMVOC
+  SO2: SOX
+  SOX: SOX
+  CH4: CH4
+  CO: CO
+  NH3: NH3
+
+proxy:
+  rail_buffer_m: 75
+  w_rail_diesel: 1.0
+  w_rail_electric: 0.15
+  w_rail_yard: 1.0
+  rail_exclude_service_siding: false
+  pipeline_buffer_m: 75
+  pipeline_facility_raster_mode: gaussian
+  pipeline_facility_sigma_m: 500
+  pipeline_facility_disc_radius_m: 1000
+  w_pipeline_lines_in_proxy: 0.30
+  w_pipeline_facilities_in_proxy: 0.70
+  osm_subdivide: 4
+  pipe_fac_weight: 0.8
+  pipe_raw_weight: 0.2
+  nonroad_corine_weights:
+    123: 0.40
+    121: 0.35
+    124: 0.15
+    131: 0.10
+  w_agri: 0.5
+  w_ind: 0.35
+  corine_agri_codes:
+    - 211
+    - 212
+    - 213
+    - 241
+    - 242
+    - 243
+  corine_agri_optional:
+    - 221
+    - 222
+    - 223
+  corine_ind_codes:
+    - 121
+    - 131
+    - 133
+  corine_ind_optional:
+    - 123
+
+visualization_pollutant: "NOx, PM2_5, NMVOC"
+
+corine_viz_layers:
+  agriculture:
+    corine_codes: [211, 212, 213, 221, 222, 223, 241, 242, 243]
+    color_rgb: [46, 125, 50]
+  industrial:
+    corine_codes: [121, 131, 133, 123]
+    color_rgb: [183, 28, 28]
+  rail_hint:
+    corine_codes: [122]
+    color_rgb: [21, 101, 192]
+  pipeline_hint:
+    corine_codes: [121, 3]
+    color_rgb: [198, 40, 40]

@@ -173,7 +173,7 @@ def compute_alpha(
         "country": country,
         "pollutant_filter": None if request.pollutant is None else request.pollutant.upper(),
         "workbook_path": str(workbook_path),
-        "aggregation_spec": "builtin:ceip/profiles/solvents_subsectors.yaml+waste_families.yaml+constants",
+        "aggregation_spec": "builtin:ceip/profiles/E_Solvents_groups.yaml+J_Waste_groups.yaml+constants",
         "records": rows,
         "diagnostics": diagnostics,
     }

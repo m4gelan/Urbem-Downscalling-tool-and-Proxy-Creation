@@ -1,0 +1,14 @@
+# Triple-leg CEIP tokens (1A3c rail / 1A3ei pipeline / 1A3eii non-road). Group ids match viz G1/G2/G3.
+groups:
+  G1:
+    name: rail_1a3c
+    ceip_sectors:
+      - 1A3c
+  G2:
+    name: pipeline_1a3ei
+    ceip_sectors:
+      - 1A3ei
+  G3:
+    name: nonroad_1a3eii
+    ceip_sectors:
+      - 1A3eii

@@ -1,5 +1,5 @@
 # J_Waste pipeline defaults (merged under sector YAML `waste:`).
-# Family -> CEIP NFR tokens: `ceip/profiles/waste_families.yaml`.
+# Family -> CEIP NFR tokens: `ceip/profiles/J_Waste_groups.yaml`.
 #
 # Proxy data mix (weights in `proxy` below):
 #   solid: CLC codes 132/121 + OSM point buffer for dispersed sources.

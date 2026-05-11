@@ -1,9 +1,7 @@
 """GNFR I offroad pipeline: three-leg proxy construction and CEIP share allocation.
 
-This module replaces the former ``multiband_builder.py`` catch-all.  The builder now
-handles entrypoint concerns, while this file owns config merging and the end-to-end
-offroad workflow: rail, pipeline, and nonroad proxies mixed with CEIP triple shares,
-then normalized within CAMS cells per pollutant band.
+CEIP triple shares come from :func:`PROXY.core.alpha.load_ceip_and_alpha`
+(``alpha_methods.yaml`` + merged ``I_Offroad_groups.yaml`` / reported workbook).
 """
 
 from __future__ import annotations
@@ -14,14 +12,17 @@ from typing import Any
 
 import numpy as np
 
-from PROXY.core.alpha import (
+from PROXY.core.alpha import norm_pollutant_key
+from PROXY.core.alpha import load_ceip_and_alpha
+from PROXY.core.logging_tables import log_wide_group_alpha_table
+from PROXY.sectors.I_Offroad.share_broadcast import (
     apply_offroad_yaml_overrides,
     build_share_arrays,
     lookup_offroad_triple_for_iso3,
-    norm_pollutant_key,
-    read_ceip_shares,
     resolve_offroad_triple_with_yaml,
 )
+from PROXY.core.alpha.ceip_index_loader import default_ceip_profile_relpath
+from PROXY.core.alpha.ceip_profile_merge import deep_merge, load_yaml_file
 from PROXY.core.cams.grid import build_cam_cell_id
 from PROXY.core.corine.raster import resolve_corine_tif, warp_corine_codes_nearest
 from PROXY.core.country_raster import rasterize_country_indices
@@ -35,6 +36,22 @@ from PROXY.sectors.I_Offroad.pipeline_osm import build_pipeline_z_final
 from PROXY.sectors.I_Offroad.rail_osm import build_rail_coverage_and_z
 
 logger = logging.getLogger(__name__)
+
+
+def _offroad_rules_base_area_proxy(root: Path) -> dict[str, Any]:
+    """Load ``I_Offroad_rules.yaml`` (flat or ``area_proxy:`` wrapper) as defaults."""
+    try:
+        rr = default_ceip_profile_relpath(root, "I_Offroad", "rules_yaml")
+        p = resolve_path(root, Path(rr))
+        if p.is_file():
+            doc = load_yaml_file(p)
+            inner = doc.get("area_proxy")
+            if isinstance(inner, dict):
+                return dict(inner)
+            return dict(doc)
+    except KeyError:
+        pass
+    return {}
 
 
 def _none_if_blank(value: Any) -> Any:
@@ -66,90 +83,6 @@ def _pollutant_aliases(area_cfg: dict[str, Any]) -> dict[str, str]:
     return aliases
 
 
-def _country_token_to_iso3_upper(token: str) -> str:
-    """Resolve YAML country tokens (ISO3 or common ISO2 / CEIP quirks) for CEIP dict keys."""
-    t = str(token).strip().upper()
-    if len(t) == 3 and t.isalpha():
-        return t
-    iso2 = {
-        "FR": "FRA",
-        "DE": "DEU",
-        "GE": "DEU",
-        "AT": "AUT",
-        "AU": "AUT",
-        "NL": "NLD",
-        "UK": "GBR",
-        "GB": "GBR",
-        "EL": "GRC",
-        "GR": "GRC",
-    }
-    return iso2.get(t, t)
-
-
-def apply_offroad_ceip_reference_pool(
-    share_dict: dict[str, dict[str, tuple[float, float, float]]],
-    *,
-    area_proxy: dict[str, Any],
-    pollutants: list[str],
-    fallback_iso: str,
-    logger: logging.Logger | None = None,
-) -> None:
-    """When enabled, replace target-country triples with the mean of reference ISO3 triples from CEIP."""
-    fb = area_proxy.get("alpha_fallback") or {}
-    if not bool(fb.get("enabled")):
-        return
-    targets = {_country_token_to_iso3_upper(str(x)) for x in (fb.get("target_countries_iso3") or [])}
-    refs_raw = list(
-        fb.get("reference_countries_iso3")
-        or fb.get("reference_countries")
-        or [],
-    )
-    refs = [_country_token_to_iso3_upper(str(x)) for x in refs_raw]
-    refs = [r for r in refs if len(r) == 3 and r.isalpha()]
-    iso_target = _country_token_to_iso3_upper(fallback_iso)
-    if iso_target not in targets:
-        return
-    pol_spec = fb.get("pollutants", "all")
-    if pol_spec not in (None, "all") and isinstance(pol_spec, (list, tuple)):
-        wanted = {norm_pollutant_key(str(x)) for x in pol_spec}
-    else:
-        wanted = {norm_pollutant_key(str(x)) for x in pollutants}
-
-    for pol in pollutants:
-        pk = norm_pollutant_key(str(pol))
-        if pk not in wanted:
-            continue
-        table = share_dict.setdefault(pk, {})
-        trips: list[tuple[float, float, float]] = []
-        for r_iso in refs:
-            t = table.get(r_iso)
-            if t is not None and len(t) == 3:
-                trips.append(tuple(float(x) for x in t))
-        if not trips:
-            if logger:
-                logger.warning(
-                    "I_Offroad alpha_fallback: no CEIP triple for pollutant %s among refs %s",
-                    pk,
-                    refs,
-                )
-            continue
-        m = tuple(sum(x[i] for x in trips) / len(trips) for i in range(3))
-        sm = sum(m)
-        if sm > 0:
-            m = tuple(x / sm for x in m)
-        table[iso_target] = m
-        if logger:
-            logger.info(
-                "I_Offroad alpha_fallback: %s %s triple <- mean(ref %s) = (%.4f, %.4f, %.4f)",
-                iso_target,
-                pk,
-                refs,
-                m[0],
-                m[1],
-                m[2],
-            )
-
-
 def merge_offroad_pipeline_cfg(
     root: Path,
     path_cfg: dict[str, Any],
@@ -159,7 +92,9 @@ def merge_offroad_pipeline_cfg(
     output_path: Path,
 ) -> dict[str, Any]:
     """Resolve paths and shape ``offroad.yaml`` into the structure used by the runner."""
-    area_cfg = dict(sector_cfg.get("area_proxy") or {})
+    base_area = _offroad_rules_base_area_proxy(root)
+    area_sector = dict(sector_cfg.get("area_proxy") or {})
+    area_cfg = deep_merge(base_area, area_sector)
     defaults = dict(area_cfg.get("defaults") or {})
     proxy_cfg = dict(area_cfg.get("proxy") or {})
 
@@ -175,7 +110,13 @@ def merge_offroad_pipeline_cfg(
         "cams_nc": str(resolve_path(root, Path(path_cfg["emissions"]["cams_2019_nc"])).resolve()),
         "ceip_workbook": str(resolve_path(root, Path(str(wb))).resolve()),
         "facilities_tif": str(resolve_path(root, Path(str(fac_tif))).resolve()) if fac_tif else None,
+        "ceip_groups_yaml": default_ceip_profile_relpath(root, "I_Offroad", "groups_yaml"),
     }
+    rr = default_ceip_profile_relpath(root, "I_Offroad", "rules_yaml")
+    rp = resolve_path(root, Path(rr))
+    if rp.is_file():
+        paths["ceip_rules_yaml"] = str(rp.resolve())
+    paths["alpha_method_audit_dir"] = str(output_path.parent.resolve())
 
     ceip_year_raw = defaults.get("ceip_year")
     ceip_year: int | None
@@ -183,6 +124,10 @@ def merge_offroad_pipeline_cfg(
         ceip_year = None
     else:
         ceip_year = int(ceip_year_raw)
+
+    ceip_years_raw = defaults.get("ceip_years")
+    if ceip_years_raw is not None:
+        paths["ceip_years"] = ceip_years_raw
 
     fallback_iso = str(
         sector_cfg.get("cams_country_iso3") or defaults.get("fallback_country_iso3", "GRC")
@@ -203,6 +148,9 @@ def merge_offroad_pipeline_cfg(
             "pollutant_aliases": _pollutant_aliases(area_cfg),
             "default_triple": _default_triple(defaults),
         },
+        "group_order": ("G1", "G2", "G3"),
+        "ceip_pollutant_aliases": _pollutant_aliases(area_cfg),
+        "cntr_code_to_iso3": dict(area_cfg.get("cntr_code_to_iso3") or {}),
         "pollutants": _normalized_pollutants(area_cfg),
         "proxy": proxy_cfg,
         "area_proxy": {k: v for k, v in area_cfg.items() if k != "defaults"},
@@ -255,12 +203,6 @@ def run_offroad_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any]:
     default_triple = tuple(float(x) for x in ceip_cfg["default_triple"])
 
     corine_path, ref = _build_reference_grid(cfg)
-    logger.info(
-        "I_Offroad reference grid: crs=%r width=%s height=%s",
-        ref.get("crs"),
-        ref.get("width"),
-        ref.get("height"),
-    )
     logger.info("I_Offroad paths: CAMS=%s", paths["cams_nc"])
     logger.info("I_Offroad paths: CORINE=%s", corine_path)
     logger.info("I_Offroad paths: OSM=%s", paths["osm_gpkg"])
@@ -295,23 +237,28 @@ def run_offroad_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any]:
     p_nr = nr["p_nr"]
     _log_raster_stats("p_nonroad", p_nr)
 
-    share_dict = read_ceip_shares(
-        Path(paths["ceip_workbook"]),
-        sheet=ceip_cfg.get("sheet") if isinstance(ceip_cfg.get("sheet"), str) else None,
-        pollutant_aliases=dict(ceip_cfg.get("pollutant_aliases") or {}),
-        pollutants_wanted=pollutants,
-        cntr_code_to_iso3=dict(country_cfg.get("cntr_code_to_iso3") or {}),
-        default_triple=default_triple,
-        ceip_year=ceip_cfg.get("year"),
+    share_dict: dict[str, dict[str, tuple[float, float, float]]] = {}
+    alpha, _fb_code, wide_alpha = load_ceip_and_alpha(
+        cfg,
+        [fallback_iso],
+        sector_key="I_Offroad",
+        focus_country_iso3=fallback_iso,
     )
-
-    apply_offroad_ceip_reference_pool(
-        share_dict,
-        area_proxy=dict(cfg.get("area_proxy") or {}),
-        pollutants=pollutants,
-        fallback_iso=fallback_iso,
-        logger=logger,
+    alpha = np.asarray(alpha, dtype=np.float64)
+    log_wide_group_alpha_table(
+        logger,
+        sector="I_Offroad",
+        wide=wide_alpha,
+        focus_iso3=fallback_iso,
+        group_cols=("alpha_G1", "alpha_G2", "alpha_G3"),
     )
+    for j, pol in enumerate(pollutants):
+        pk = norm_pollutant_key(str(pol))
+        share_dict.setdefault(pk, {})[fallback_iso] = (
+            float(alpha[0, 0, j]),
+            float(alpha[0, 1, j]),
+            float(alpha[0, 2, j]),
+        )
 
     logger.info(
         "[I_Offroad] downscale triple-leg shares (1A3c rail / 1A3ei pipeline / 1A3eii non-road) "

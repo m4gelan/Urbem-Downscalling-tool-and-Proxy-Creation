@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Print J_Waste CEIP / reported family shares (w_solid, w_ww, w_res) and E_solid, E_ww, E_res
-by country and pollutant, using the same merge + :func:`build_ceip_weight_tables` as the pipeline.
+Print J_Waste CEIP / reported family shares (w_solid, w_ww, w_res) and audit rows
+by country and pollutant, using the same merge + :func:`PROXY.core.alpha.load_ceip_and_alpha`
+as the pipeline.
 
 Example::
 
@@ -56,9 +57,9 @@ def main() -> int:
 
     import pandas as pd
 
+    from PROXY.core.alpha import load_ceip_and_alpha
     from PROXY.core.dataloaders import load_path_config, load_yaml
     from PROXY.core.dataloaders.discovery import discover_cams_emissions, discover_corine
-    from PROXY.sectors.J_Waste.ceip_waste import build_ceip_weight_tables
     from PROXY.sectors.J_Waste.pipeline import merge_waste_pipeline_cfg
 
     pcfg = load_path_config(cfg_p)
@@ -95,20 +96,34 @@ def main() -> int:
         output_dir=out_dir,
     )
     merged["_project_root"] = root
-    _long, wide, fb = build_ceip_weight_tables(merged)
+    _alpha, _fb, wide = load_ceip_and_alpha(
+        merged,
+        None,
+        sector_key="J_Waste",
+        focus_country_iso3=str(args.iso3).strip().upper()
+        if str(args.iso3).strip().upper() != "ALL"
+        else None,
+    )
+    audit_path = Path(merged["paths"].get("alpha_method_audit_dir") or out_dir) / "J_Waste_alpha_method_audit.csv"
+    audit = None
+    if audit_path.is_file():
+        audit = pd.read_csv(audit_path)
+
+    wide = wide.rename(
+        columns={
+            "alpha_G1": "w_solid",
+            "alpha_G2": "w_ww",
+            "alpha_G3": "w_res",
+        }
+    )
 
     want = [
         "country_iso3",
         "pollutant",
-        "E_solid",
-        "E_ww",
-        "E_res",
-        "E_sum3",
         "w_solid",
         "w_ww",
         "w_res",
-        "fallback_tier",
-        "fallback_note",
+        "method",
     ]
     cols = [c for c in want if c in wide.columns]
     view = wide[cols].copy()
@@ -144,8 +159,8 @@ def main() -> int:
                 "pipeline uses default w=(1/3,1/3,1/3) for those."
             )
     print()
-    if fb is not None and len(fb) > 0:
-        print(f"Rows with tiered fallbacks in compute_weights_with_fallbacks: {len(fb)}")
+    if audit is not None and len(audit) > 0:
+        print(f"Long-form alpha method audit rows: {len(audit)}")
     if args.csv is not None:
         outp = args.csv if args.csv.is_absolute() else root / args.csv
         outp.parent.mkdir(parents=True, exist_ok=True)

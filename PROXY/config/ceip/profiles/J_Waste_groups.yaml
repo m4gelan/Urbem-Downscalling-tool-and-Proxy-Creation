@@ -1,0 +1,31 @@
+# Waste: inventory tokens → CEIP group ids ``G1``–``G3`` (solid / wastewater / residual semantics via ``name``).
+# Alpha tensor axis and ``alpha_methods.yaml`` ``method_2`` keys: ``G1``, ``G2``, ``G3``.
+# Proxy weights live in ``J_Waste_rules.yaml`` (merged under sector ``waste:``).
+
+groups:
+  G1:
+    name: solid_waste
+    ceip_sectors:
+      - "5A"
+      - "5B1"
+      - "5B2"
+  G2:
+    name: wastewater
+    ceip_sectors:
+      - "5D1"
+      - "5D2"
+      - "5D3"
+  G3:
+    name: residual
+    ceip_sectors:
+      - "5C2"
+      - "5E"
+
+exclude_always:
+  - "5C1A"
+  - "5C1BI"
+  - "5C1BII"
+  - "5C1BIII"
+  - "5C1BIV"
+  - "5C1BV"
+  - "5C1BVI"

@@ -477,7 +477,7 @@ def build_all_group_pg(
     what order (must match CEIP alpha axis). If ``None``, uses dict insertion order
     of ``groups`` (YAML load order).
     """
-    from PROXY.core.ceip import DEFAULT_GNFR_GROUP_ORDER
+    from PROXY.core.alpha import DEFAULT_GNFR_GROUP_ORDER
 
     # How much of p_g comes from (scaled sector proxy) vs population when sector signal exists.
     w_s = float(pcfg.get("w_sector_in_p", 0.8))

@@ -1,15 +1,28 @@
-# Single index for CEIP profile YAMLs. Paths are project-root-relative (as elsewhere in PROXY).
-# Sectors may override these via industry_paths / waste / solvents paths in sector YAMLs.
+# CEIP profile YAMLs (project-root-relative paths). Each CEIP-heavy sector may use:
+#   groups_yaml — inventory token → group id (+ optional display name)
+#   rules_yaml  — proxy/OSM/weights (merged over groups_yaml per group id)
 
 sectors:
   B_Industry:
-    groups_yaml: PROXY/config/ceip/profiles/industry_groups.yaml
+    groups_yaml: PROXY/config/ceip/profiles/B_Industry_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/B_Industry_rules.yaml
   D_Fugitive:
-    groups_yaml: PROXY/config/ceip/profiles/fugitive_groups.yaml
-  J_Waste:
-    families_yaml: PROXY/config/ceip/profiles/waste_families.yaml
+    groups_yaml: PROXY/config/ceip/profiles/D_Fugitive_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/D_Fugitive_rules.yaml
   E_Solvents:
-    subsectors_yaml: PROXY/config/ceip/profiles/solvents_subsectors.yaml
+    groups_yaml: PROXY/config/ceip/profiles/E_Solvents_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/E_Solvents_rules.yaml
+    subsectors_yaml: PROXY/config/ceip/profiles/E_Solvents_groups.yaml
+  J_Waste:
+    groups_yaml: PROXY/config/ceip/profiles/J_Waste_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/J_Waste_rules.yaml
+    families_yaml: PROXY/config/ceip/profiles/J_Waste_groups.yaml
+  I_Offroad:
+    groups_yaml: PROXY/config/ceip/profiles/I_Offroad_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/I_Offroad_rules.yaml
+  C_OtherCombustion:
+    groups_yaml: PROXY/config/ceip/profiles/C_OtherCombustion_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/C_OtherCombustion_rules.yaml
 
 shared:
   pollutant_aliases_yaml: PROXY/config/pollutant_aliases.yaml

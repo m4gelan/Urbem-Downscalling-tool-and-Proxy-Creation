@@ -32,6 +32,7 @@ proxy_rules:
       - dismantled
 
 osm:
+  other_combustion: INPUT/Proxy/OSM/industry_layers.gpkg
   offroad: INPUT/Proxy/OSM/offroad_layers.gpkg
   shipping: INPUT/Proxy/OSM/shipping_layers.gpkg
   waste: INPUT/Proxy/OSM/waste_layers.gpkg

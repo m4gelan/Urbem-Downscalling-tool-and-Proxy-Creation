@@ -100,3 +100,16 @@ def resolve_iso3_reported(country_raw: str, cntr_code_to_iso3: dict[str, str]) -
     if c in merged:
         return merged[c]
     return None
+
+
+EU_AGGREGATE_CODES = frozenset({"EU11", "EU27"})
+
+
+def resolve_reporting_key(country_raw: Any, cntr_code_to_iso3: dict[str, str]) -> str | None:
+    """Map workbook ``COUNTRY`` to either ISO3 or an EU aggregate code (``EU11``, ``EU27``)."""
+    c = str(country_raw).strip().upper()
+    if not c:
+        return None
+    if c in EU_AGGREGATE_CODES:
+        return c
+    return resolve_iso3_reported(country_raw, cntr_code_to_iso3)

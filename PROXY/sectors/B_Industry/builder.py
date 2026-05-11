@@ -9,25 +9,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PROXY.core.ceip import default_ceip_profile_relpath
+from PROXY.core.alpha import default_ceip_profile_relpath
 from PROXY.core.dataloaders import project_root, resolve_path
 from PROXY.core.grid import reference_window_profile
 from PROXY.sectors._shared.gnfr_groups import merge_ceip_group_sector_cfg
 
 logger = logging.getLogger(__name__)
 
-
-def _log_reference_grid(ref: dict[str, Any]) -> None:
-    """Log CRS and dimensions of the CORINE–NUTS reference window (same idea as A_PublicPower)."""
-    crs = ref.get("crs", "?")
-    w = int(ref.get("width", 0) or 0)
-    h = int(ref.get("height", 0) or 0)
-    logger.info(
-        "B_Industry: reference window crs=%r width=%d height=%d (CORINE + NUTS + pad_m)",
-        crs,
-        w,
-        h,
-    )
 
 
 def _log_domain_bbox(ref: dict[str, Any]) -> None:
@@ -66,6 +54,7 @@ def _merge_industry_pipeline_cfg(
         ),
         osm_key="industry",
         output_path=output_path,
+        profile_sector_id="B_Industry",
     )
     merged["paths"]["osm_industry_gpkg"] = merged["paths"]["osm_group_gpkg"]
     return merged
@@ -113,7 +102,6 @@ def build(*, path_cfg: dict[str, Any], sector_cfg: dict[str, Any], country: str)
     # Shared pipeline reads CORINE from ref when present; builder ensures it is set
     # after the same discovery path the grid helper used.
     ref["corine_path"] = str(corine_path.resolve())
-    _log_reference_grid(ref)
     _log_domain_bbox(ref)
 
     output_path = Path(sector_cfg["output_path"]).resolve()
