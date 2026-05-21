@@ -16,6 +16,7 @@ fallback differ between callers.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -484,12 +485,17 @@ def load_ceip_and_alpha_solvents(
         len(sub_order),
         len(pollutants),
     )
+    if audit is None or getattr(audit, "empty", True):
+        audit_jsonable: list[dict[str, Any]] = []
+    else:
+        # ``json.dump`` cannot serialize DataFrames; round-trip via pandas JSON for safe types.
+        audit_jsonable = json.loads(audit.to_json(orient="records", double_precision=15))
     meta: dict[str, Any] = {
         "source": "reported_emissions_eu27",
         "path": str(xlsx),
         "ceip_years": years_filter,
         "ceip_subsector_map_yaml": str(submap_path),
-        "alpha_method_audit": audit,
+        "alpha_method_audit": audit_jsonable,
     }
     return alpha, fb, wide, meta
 

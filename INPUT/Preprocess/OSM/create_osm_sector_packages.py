@@ -1,41 +1,75 @@
 #!/usr/bin/env python3
-"""
-Build OSM sector GeoPackages under ``INPUT/Proxy/OSM/`` from ``osm_sector_layers.yaml``.
-
-* ``mode: rules`` sectors use ``osm_engine`` (see ``osm_engine/osm_schema.yaml``), including ``aviation``.
-* ``mode: plugin`` sectors use ``osm_engine.plugins.industry_v1`` / ``fugitive_v1``.
-
-Usage (from repo root)::
-
-    python INPUT/Preprocess/OSM/create_osm_sector_packages.py --country EL
-    python INPUT/Preprocess/OSM/create_osm_sector_packages.py --country EL --sector waste
-"""
+"""Build OSM sector GeoPackages from osm_sector_layers.yaml + osm_engine/osm_schema.yaml."""
 
 from __future__ import annotations
 
-import argparse
-import importlib
+import gc
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+# Top of file — user edits here only
+SECTORS = ["industry", "fugitive", "aviation", "agricultural"]
+SECTORS_ENABLED = SECTORS
+COUNTRY = "Austria"  # maps to NUTS CNTR_CODE (e.g. EL)
+OUTPUT_DIR = f"INPUT/Proxy/OSM/{COUNTRY}"  # GeoPackage output folder (repo-relative or absolute)
+LOG_LEVEL = "DEBUG"  # DEBUG | INFO | WARNING | ERROR
+NO_BBOX_EXTRACT = False
+ALLOW_LARGE_PBF_WITHOUT_OSMIUM = False
+OSMIUM_EXE = None  # None → shutil.which("osmium")
+
+COUNTRY_TO_CNTR: dict[str, str] = {
+    "Austria": "AT",
+    "Belgium": "BE",
+    "Bulgaria": "BG",
+    "Croatia": "HR",
+    "Cyprus": "CY",
+    "Czechia": "CZ",
+    "Denmark": "DK",
+    "Estonia": "EE",
+    "Finland": "FI",
+    "France": "FR",
+    "Germany": "DE",
+    "Greece": "EL",
+    "Hungary": "HU",
+    "Ireland": "IE",
+    "Italy": "IT",
+    "Latvia": "LV",
+    "Lithuania": "LT",
+    "Luxembourg": "LU",
+    "Malta": "MT",
+    "Netherlands": "NL",
+    "Poland": "PL",
+    "Portugal": "PT",
+    "Romania": "RO",
+    "Slovakia": "SK",
+    "Slovenia": "SI",
+    "Spain": "ES",
+    "Sweden": "SE",
+}
+
 
 def project_root() -> Path:
+    """Return repository root (parent of INPUT/)."""
     return Path(__file__).resolve().parents[3]
 
 
 def osm_preprocess_dir() -> Path:
+    """Return INPUT/Preprocess/OSM directory."""
     return Path(__file__).resolve().parent
 
 
 def resolve_under_root(root: Path, p: str | Path) -> Path:
+    """Resolve path relative to repo root unless already absolute."""
     q = Path(p)
     return q.resolve() if q.is_absolute() else (root / q).resolve()
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
+    """Load one YAML file as a dict."""
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise SystemExit(f"Invalid YAML: {path}")
@@ -43,27 +77,14 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
 
 def output_gpkg(root: Path, defaults: dict[str, Any], sector_id: str) -> Path:
-    out_dir = resolve_under_root(root, defaults.get("output_dir", "INPUT/Proxy/OSM"))
+    """Build output GeoPackage path for a sector id."""
+    out_dir = resolve_under_root(root, defaults.get("output_dir", OUTPUT_DIR))
     tmpl = str(defaults.get("output_name_template", "{id}_layers.gpkg"))
     return (out_dir / tmpl.format(id=sector_id)).resolve()
 
 
-def sector_ids_from_run_config(cfg: dict[str, Any]) -> list[str]:
-    raw = cfg.get("sectors")
-    if not isinstance(raw, list):
-        raise SystemExit("osm_sector_layers.yaml: need list 'sectors'.")
-    ids: list[str] = []
-    for item in raw:
-        if isinstance(item, str):
-            ids.append(item.strip())
-        elif isinstance(item, dict) and "id" in item:
-            ids.append(str(item["id"]).strip())
-        else:
-            raise SystemExit(f"Invalid sector entry: {item!r}")
-    return ids
-
-
 def sector_entry(cfg: dict[str, Any], sector_id: str) -> dict[str, Any]:
+    """Return per-sector run config entry, or minimal dict with id only."""
     for item in cfg.get("sectors") or []:
         if isinstance(item, dict) and str(item.get("id", "")).strip() == sector_id:
             return dict(item)
@@ -72,152 +93,116 @@ def sector_entry(cfg: dict[str, Any], sector_id: str) -> dict[str, Any]:
     return {"id": sector_id}
 
 
-def schema_sector_mode(schema_path: Path, sector_id: str) -> tuple[str, str | None]:
-    sch = load_yaml(schema_path)
-    sec = (sch.get("sectors") or {}).get(sector_id)
-    if not isinstance(sec, dict):
-        raise SystemExit(f"osm_schema.yaml: missing sector {sector_id!r}")
-    mode = str(sec.get("mode", "rules"))
-    plugin = sec.get("plugin")
-    return mode, str(plugin) if plugin else None
+def cntr_code_for_country(country: str) -> str:
+    """Map human country name to NUTS CNTR_CODE."""
+    key = str(country).strip()
+    if key.upper() in {v.upper() for v in COUNTRY_TO_CNTR.values()}:
+        return key.upper()
+    if key not in COUNTRY_TO_CNTR:
+        raise SystemExit(f"Unknown COUNTRY {key!r}; add to COUNTRY_TO_CNTR in create_osm_sector_packages.py")
+    return COUNTRY_TO_CNTR[key].upper()
 
 
-def build_plugin_argv(
-    *,
-    sector_id: str,
-    root: Path,
-    defaults: dict[str, Any],
-    entry: dict[str, Any],
-    country: str | None,
-    osmium: str | None,
-    no_bbox_extract: bool,
-    allow_large_pbf: bool,
-) -> list[str]:
-    pbf = resolve_under_root(root, defaults["pbf"])
-    nuts = resolve_under_root(root, defaults["nuts_gpkg"])
-    out = output_gpkg(root, defaults, sector_id)
-    argv: list[str] = [f"{sector_id}_plugin", "--pbf", str(pbf), "--nuts", str(nuts), "--out", str(out)]
-    if country:
-        argv.extend(["--cntr-code", country.strip().upper()])
-    if osmium:
-        argv.extend(["--osmium", osmium])
-    if no_bbox_extract:
-        argv.append("--no-bbox-extract")
-    if allow_large_pbf:
-        argv.append("--allow-large-pbf-without-osmium")
+def validate_startup(schema: dict[str, Any], run_cfg: dict[str, Any]) -> None:
+    """Fail fast if enabled sectors or schema modes are invalid."""
+    from osm_engine import log
 
-    if sector_id == "industry":
-        if entry.get("prefilter_tags", defaults.get("industry_prefilter_tags", False)) is True:
-            argv.append("--prefilter-tags")
-        if entry.get("keep_temp") is True:
-            argv.append("--keep-temp")
-        if entry.get("no_progress") is True:
-            argv.append("--no-progress")
-    elif sector_id == "fugitive":
-        if entry.get("prefilter_tags", defaults.get("fugitive_prefilter_tags", False)) is True:
-            argv.append("--prefilter-tags")
-        if entry.get("keep_temp") is True:
-            argv.append("--keep-temp")
-        layer = entry.get("gpkg_layer")
-        if layer:
-            argv.extend(["--layer", str(layer)])
-        argv.extend(["--min-polygon-area-m2", str(float(entry.get("min_polygon_area_m2", 10.0)))])
-        if entry.get("dedupe_geometry") is True:
-            argv.append("--dedupe-geometry")
-        if entry.get("debug") is True:
-            argv.append("--debug")
-    else:
-        raise SystemExit(f"Unknown plugin sector: {sector_id!r}")
-
-    return argv
-
-
-def run_plugin_main(plugin_name: str, argv: list[str]) -> None:
-    mod = importlib.import_module(f"osm_engine.plugins.{plugin_name}")
-    old = sys.argv
-    try:
-        sys.argv = argv
-        mod.main()
-    finally:
-        sys.argv = old
+    sectors_yaml = {
+        str(item.get("id") if isinstance(item, dict) else item).strip()
+        for item in (run_cfg.get("sectors") or [])
+    }
+    schema_sectors = schema.get("sectors") or {}
+    allowed_modes = {"rules", "classify"}
+    for sid in SECTORS_ENABLED:
+        sk = str(sid).strip()
+        if sk not in SECTORS:
+            log.error(f"sector {sk!r} not in SECTORS list")
+            raise SystemExit(1)
+        if sk not in sectors_yaml:
+            log.error(f"sector {sk!r} missing from osm_sector_layers.yaml")
+            raise SystemExit(1)
+        if sk not in schema_sectors:
+            log.error(f"sector {sk!r} missing from osm_schema.yaml")
+            raise SystemExit(1)
+        mode = str((schema_sectors[sk] or {}).get("mode", "rules"))
+        if mode not in allowed_modes:
+            log.error(f"sector {sk!r}: invalid mode {mode!r}")
+            raise SystemExit(1)
+        if mode == "classify":
+            rules = (schema_sectors[sk] or {}).get("classify_rules")
+            ind_file = osm_preprocess_dir() / "osm_engine" / "industry_classify_rules.yaml"
+            if not rules and sk == "industry" and not ind_file.is_file():
+                log.error(f"sector {sk!r}: classify_rules missing (run build_industry_rules.py once)")
+                raise SystemExit(1)
 
 
 def main() -> int:
+    """Run all enabled sectors and write GeoPackages."""
     here = osm_preprocess_dir()
     if str(here) not in sys.path:
         sys.path.insert(0, str(here))
 
+    from osm_engine import log
+    from osm_engine import pipeline
+    from osm_engine.run import load_schema, run_sector
+
+    log.configure(LOG_LEVEL)
     root = project_root()
+    run_cfg_path = here / "osm_sector_layers.yaml"
+    run_cfg = load_yaml(run_cfg_path)
+    schema = load_schema()
+    validate_startup(schema, run_cfg)
 
-    default_cfg = here / "osm_sector_layers.yaml"
-    schema_path = here / "osm_engine" / "osm_schema.yaml"
-
-    p = argparse.ArgumentParser(description="Build OSM sector GeoPackages (unified engine).")
-    p.add_argument("--config", type=Path, default=default_cfg)
-    p.add_argument("--country", type=str, default=None)
-    p.add_argument("--sector", type=str, default="all")
-    p.add_argument("--osmium", type=str, default=None)
-    p.add_argument("--no-bbox-extract", action="store_true")
-    p.add_argument("--allow-large-pbf-without-osmium", action="store_true")
-    args = p.parse_args()
-
-    cfg_path = args.config.expanduser().resolve()
-    if not cfg_path.is_file():
-        raise SystemExit(f"Config not found: {cfg_path}")
-    if not schema_path.is_file():
-        raise SystemExit(f"Schema not found: {schema_path}")
-
-    run_cfg = load_yaml(cfg_path)
-    defaults = run_cfg.get("defaults") or {}
+    defaults = dict(run_cfg.get("defaults") or {})
     if not defaults:
         raise SystemExit("osm_sector_layers.yaml must define defaults.")
+    defaults["output_dir"] = OUTPUT_DIR
 
-    configured = sector_ids_from_run_config(run_cfg)
-    want = args.sector.strip().lower()
-    todo = configured if want == "all" else [want]
-    for sid in todo:
-        if sid not in configured:
-            raise SystemExit(f"Sector {sid!r} not in {cfg_path}")
+    cntr = cntr_code_for_country(COUNTRY)
+    pbf = resolve_under_root(root, defaults["pbf"])
+    nuts = resolve_under_root(root, defaults["nuts_gpkg"])
 
-    for sid in todo:
-        entry = sector_entry(run_cfg, sid)
-        mode, plugin = schema_sector_mode(schema_path, sid)
-        print(f"[{sid}] mode={mode}", flush=True)
-        if mode == "plugin":
-            if not plugin:
-                raise SystemExit(f"Sector {sid} has mode plugin but no plugin: key")
-            run_plugin_main(
-                plugin,
-                build_plugin_argv(
-                    sector_id=sid,
-                    root=root,
-                    defaults=defaults,
-                    entry=entry,
-                    country=args.country,
-                    osmium=args.osmium,
-                    no_bbox_extract=bool(args.no_bbox_extract),
-                    allow_large_pbf=bool(args.allow_large_pbf_without_osmium),
-                ),
+    from osm_engine import common
+
+    osmium_exe = common.resolve_osmium_exe(OSMIUM_EXE)
+
+    log.info(f"start country={COUNTRY} cntr={cntr} sectors={SECTORS_ENABLED}")
+    t_run = time.perf_counter()
+
+    run_ctx = pipeline.RunContext(
+        root=root,
+        pbf=pbf,
+        nuts=nuts,
+        cntr_code=cntr,
+        osmium_exe=osmium_exe,
+        no_bbox_extract=NO_BBOX_EXTRACT,
+        allow_large_pbf=ALLOW_LARGE_PBF_WITHOUT_OSMIUM,
+    )
+
+    for sid in SECTORS_ENABLED:
+        sk = str(sid).strip()
+        entry = sector_entry(run_cfg, sk)
+        out = output_gpkg(root, defaults, sk)
+        log.sector_info(sk, f"start -> {out.name}")
+        t0 = time.perf_counter()
+        try:
+            run_sector(
+                sk,
+                run_ctx=run_ctx,
+                sector_entry=entry,
+                defaults=defaults,
+                out=out,
             )
-        else:
-            from osm_engine.run import run_rules_sector
+        except SystemExit:
+            raise
+        except Exception as e:
+            log.error(f"sector {sk!r} failed: {e}")
+            raise
+        log.sector_info(sk, f"done ({log.format_duration(time.perf_counter() - t0)})")
+        gc.collect()
 
-            run_rules_sector(
-                sid,
-                pbf=resolve_under_root(root, defaults["pbf"]),
-                nuts=resolve_under_root(root, defaults["nuts_gpkg"]),
-                out=output_gpkg(root, defaults, sid),
-                cntr_code=args.country,
-                osmium_exe=args.osmium,
-                no_bbox_extract=bool(args.no_bbox_extract),
-                allow_large_pbf=bool(args.allow_large_pbf_without_osmium),
-                bbox_extract_pbf=resolve_under_root(root, entry["bbox_extract_pbf"])
-                if entry.get("bbox_extract_pbf")
-                else None,
-                with_optional=bool(entry.get("with_optional", False)),
-                include_wastewater_plant=entry.get("include_wastewater_plant", True) is not False,
-            )
-
+    pipeline.cleanup_run_context(run_ctx, keep_temp=False)
+    log.info(f"all done {len(SECTORS_ENABLED)} sectors ({log.format_duration(time.perf_counter() - t_run)})")
     return 0
 
 

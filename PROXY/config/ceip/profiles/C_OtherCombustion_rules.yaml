@@ -25,7 +25,8 @@ offroad:
 alpha_beta_override: null
 
 # Seven-band spatial proxy X_k = S_k * L_k (stock x load). Keys must match MODEL_CLASSES in code.
-# Carriers: POP -> B_res; H_NRES -> max(0, H_nres) per pixel. No Eurostat/GAINS in X.
+# Stock carriers: POP (residential); CORINE (commercial) = weighted CLC masks + optional u_other only — no heat in S.
+# Non-residential heat enters X only via load (e.g. H_NRES). No Eurostat/GAINS in X.
 appliance_proxy:
   ghs_rural_classes: [11, 12, 13]
   epsilon: 1.0e-12
@@ -87,20 +88,19 @@ appliance_proxy:
       exponent: 1.0
   C_BOILER_MAN:
     stock:
-      carrier: H_NRES
+      carrier: CORINE
       corine_weights:
         "111": 1.0
         "112": 0.7
         "121": 1.5
       commercial_other_weight: 0.3
     load:
-      type: product
-      terms:
-        - { name: H_NRES, exponent: 0.7 }
-        - { name: HDD, exponent: 0.3 }
+      type: variable
+      name: H_NRES
+      exponent: 1.0
   C_BOILER_AUT:
     stock:
-      carrier: H_NRES
+      carrier: CORINE
       corine_weights:
         "111": 1.0
         "112": 0.7

@@ -40,6 +40,7 @@ osm:
   industry: INPUT/Proxy/OSM/industry_layers.gpkg
   fugitive: INPUT/Proxy/OSM/fugitive_layers.gpkg
   aviation: INPUT/Proxy/OSM/aviation_layers.gpkg
+  agriculture: INPUT/Proxy/OSM/agricultural_layers.gpkg
 
 proxy_specific:
   root: INPUT/Proxy/ProxySpecific
@@ -70,4 +71,6 @@ proxy_specific:
     gfed41s_agri_dm_mean_npy: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_agri_dm_mean.npy
     gfed41s_grid_area_npy: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_grid_area.npy
     gfed41s_nuts2_lookup_parquet: INPUT/Proxy/ProxySpecific/Agriculture/gfed41s_nuts2_lookup.parquet
+    # Köppen-Geiger raster (GeoTIFF, same integer legend as koppen_wet_dry.yaml). Optional for combined crop EFs.
+    koppen_raster_tif: INPUT/Proxy/ProxySpecific/Agriculture/Koppen-Geiger.tif
 

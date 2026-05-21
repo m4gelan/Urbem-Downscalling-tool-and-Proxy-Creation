@@ -1,8 +1,8 @@
 """K_Agriculture public pipeline orchestration.
 
-This module owns the sector-level flow: merge project/sector configuration, build the
-NUTS2 x CLC tabular weights, then rasterize those weights onto the CAMS K/L area-source
-grid. Source-relevance formulas remain in ``source_relevance`` and the tabular model.
+Merges path + sector configuration, loads CEIP alpha (method 1 / EU27 pool over seven
+``family_*`` groups), and rasterizes the combined seven-family proxy stack onto the
+CAMS K/L area-source grid.
 """
 
 from __future__ import annotations
@@ -14,12 +14,14 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Iterator
 
+import numpy as np
+
+from PROXY.core.alpha import default_ceip_profile_relpath, load_ceip_and_alpha
 from PROXY.core.dataloaders import resolve_path
 from PROXY.core.dataloaders.discovery import discover_cams_emissions, discover_corine
 from PROXY.core.grid import reference_window_profile
 
 from . import k_config
-from .tabular.pipeline import run_pipeline_with_config
 from .rasterize_kl import build_kl_sourcearea_tif
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,41 @@ def _timed(label: str) -> Iterator[None]:
         yield
     finally:
         logger.info("K_Agriculture timing: %s %.2fs", label, perf_counter() - t0)
+
+
+def _pollutant_axes_from_sector(sector_cfg: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """CEIP internal keys (lowercase) and GeoTIFF band labels."""
+    raw = sector_cfg.get("pollutants")
+    default_keys = ["nh3", "nox", "nmvoc", "co", "pm10", "pm2_5"]
+    default_labels = ["NH3", "NOx", "NMVOC", "CO", "PM10", "PM2.5"]
+    if not raw:
+        return default_keys, default_labels
+    keys: list[str] = []
+    labels: list[str] = []
+    for p in raw:
+        if isinstance(p, dict):
+            tok = str(p.get("output", p.get("cams_var", ""))).strip()
+        else:
+            tok = str(p).strip()
+        if not tok:
+            continue
+        pl = tok.lower().replace(".", "_")
+        keys.append(pl)
+        if pl == "pm2_5":
+            labels.append("PM2.5")
+        elif pl == "nh3":
+            labels.append("NH3")
+        elif pl == "nox":
+            labels.append("NOx")
+        elif pl == "nmvoc":
+            labels.append("NMVOC")
+        elif pl == "co":
+            labels.append("CO")
+        elif pl == "pm10":
+            labels.append("PM10")
+        else:
+            labels.append(str(tok).strip().upper())
+    return keys, labels
 
 
 def merge_k_agriculture_pipeline_cfg(
@@ -91,15 +128,39 @@ def merge_k_agriculture_pipeline_cfg(
     cfg["paths"].setdefault("outputs", {})
     cfg["paths"]["outputs"].update(
         {
-            "long_csv": str(tab_dir / "weights_long.csv"),
-            "wide_csv": str(tab_dir / "weights_wide.csv"),
-            "pollutant_dir": str(tab_dir / "pollutants"),
-            "combined_csv": str(tab_dir / "weights_wide.csv"),
-            "ch4_csv": str(tab_dir / "nuts2_ch4_weights_by_clc.csv"),
-            "nox_csv": str(tab_dir / "nuts2_nox_ag_weights_by_clc.csv"),
             "intermediary_dir": str(tab_dir / "intermediary"),
         }
     )
+
+    alpha_w = (
+        (sector_cfg.get("ceip") or {}).get("workbook")
+        or (sector_cfg.get("ceip") or {}).get("ceip_workbook")
+        or pcommon.get("alpha_workbook")
+        or "INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx"
+    )
+    ceip_workbook = resolve_path(root, Path(str(alpha_w)))
+    cfg["paths"]["ceip_workbook"] = str(ceip_workbook.resolve())
+    gy_rel = default_ceip_profile_relpath(root, "K_Agriculture", "groups_yaml")
+    ry_rel = default_ceip_profile_relpath(root, "K_Agriculture", "rules_yaml")
+    cfg["paths"]["ceip_groups_yaml"] = str(resolve_path(root, Path(gy_rel)).resolve())
+    cfg["paths"]["ceip_rules_yaml"] = str(resolve_path(root, Path(ry_rel)).resolve())
+    cfg["paths"]["alpha_method_audit_dir"] = str(tab_dir.resolve())
+
+    ceip_years = sector_cfg.get("ceip_years")
+    if ceip_years is not None:
+        cfg["paths"]["ceip_years"] = ceip_years
+
+    raw_go = sector_cfg.get("ceip_group_order") or sector_cfg.get("group_order")
+    if raw_go:
+        cfg["group_order"] = tuple(str(x).strip() for x in raw_go if str(x).strip())
+    else:
+        cfg["group_order"] = tuple(f"family_{i}" for i in range(1, 8))
+
+    pol_keys, pol_labels = _pollutant_axes_from_sector(sector_cfg)
+    cfg["pollutants"] = pol_keys
+    cfg["_raster_pollutant_labels"] = pol_labels
+    cfg["ceip_pollutant_aliases"] = dict(sector_cfg.get("ceip_pollutant_aliases") or {})
+    cfg["cntr_code_to_iso3"] = dict(sector_cfg.get("cntr_code_to_iso3") or {})
 
     cfg["lucas_build"] = cfg.get("lucas_build") or {}
     cfg["lucas_build"]["lucas_data"] = str(resolve_path(root, Path(psw["eu_lucas_2022_csv"])))
@@ -124,10 +185,6 @@ def merge_k_agriculture_pipeline_cfg(
     cfg["lucas_build"]["lucas_soil_2018_csv"] = str(resolve_path(root, Path(lsoil)))
     cfg["lucas_build"]["output_csv"] = str(tab_dir / "lucas_nuts2_clc_relevance.csv")
 
-    alpha_yaml = root / "PROXY" / "config" / "agriculture" / "alpha.config.yaml"
-    alpha_json = root / "PROXY" / "config" / "agriculture" / "alpha.config.json"
-    cfg["alpha"] = k_config.load_alpha_config(alpha_yaml if alpha_yaml.is_file() else alpha_json)
-
     cfg["visualization"] = cfg.get("visualization") or {}
     cfg["visualization"].setdefault("enabled", False)
     cfg["visualization"].setdefault("output_dir", str(out_base / "plots"))
@@ -144,17 +201,28 @@ def merge_k_agriculture_pipeline_cfg(
     logger.info("K_Agriculture paths: GFED dm=%s", cfg["lucas_build"].get("gfed41s_agri_dm_mean_npy"))
     logger.info("K_Agriculture paths: GFED area=%s", cfg["lucas_build"].get("gfed41s_grid_area_npy"))
     logger.info("K_Agriculture paths: GFED lookup=%s", cfg["lucas_build"].get("gfed41s_nuts2_lookup_parquet"))
+    logger.info("K_Agriculture paths: CEIP workbook=%s", cfg["paths"]["ceip_workbook"])
+    logger.info("K_Agriculture paths: CEIP groups=%s", cfg["paths"]["ceip_groups_yaml"])
+    logger.info("K_Agriculture paths: CEIP rules=%s", cfg["paths"]["ceip_rules_yaml"])
+    osm_block = path_cfg.get("osm") or {}
+    ag_osm = osm_block.get("agriculture")
+    if ag_osm:
+        cfg.setdefault("paths", {}).setdefault("inputs", {})
+        cfg["paths"]["inputs"]["agriculture_osm_gpkg"] = str(resolve_path(root, Path(str(ag_osm))).resolve())
+        logger.info("K_Agriculture paths: OSM agriculture=%s", cfg["paths"]["inputs"]["agriculture_osm_gpkg"])
+    if psw.get("koppen_raster_tif"):
+        cfg.setdefault("paths", {}).setdefault("inputs", {})
+        cfg["paths"]["inputs"]["koppen_raster_tif"] = str(
+            resolve_path(root, Path(str(psw["koppen_raster_tif"]))).resolve()
+        )
+        logger.info("K_Agriculture paths: Köppen raster=%s", cfg["paths"]["inputs"]["koppen_raster_tif"])
     return cfg
 
 
 def run_k_agriculture_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any]:
-    """Run tabular K_Agriculture weights and rasterize them to the K/L CAMS grid."""
+    """Load CEIP alpha and rasterize the seven-family proxy stack to the K/L CAMS grid."""
     sector_cfg = cfg.get("_sector_cfg") or {}
     path_cfg = cfg.get("_path_cfg") or {}
-
-    with _timed("tabular weights"):
-        tab = run_pipeline_with_config(cfg)
-    weights_long = Path(tab["long_csv"])
 
     pcommon = path_cfg.get("proxy_common") or {}
     corine = discover_corine(root, Path(pcommon["corine_tif"]))
@@ -181,28 +249,39 @@ def run_k_agriculture_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any
     cams_iso3 = str(sector_cfg.get("cams_country_iso3", "GRC")).strip().upper()
     emi = sector_cfg.get("cams_emission_category_indices") or [14, 15]
     cams_emis = tuple(int(x) for x in emi)
-    pols = sector_cfg.get("raster_pollutants")
-    if not pols:
-        pols = list((cfg.get("alpha") or {}).get("pollutants", {}).keys())
-    if not pols:
-        pols = ["CH4", "NH3", "NOx"]
     ag_clc = sector_cfg.get("ag_clc_codes")
     ag_t = tuple(int(x) for x in ag_clc) if ag_clc is not None else None
     corine_band = int(
         sector_cfg.get("corine_band", (path_cfg.get("corine") or {}).get("band", 1))
     )
 
+    with _timed("CEIP alpha"):
+        alpha, _fb, _wide = load_ceip_and_alpha(
+            cfg,
+            [cams_iso3],
+            sector_key="K_Agriculture",
+            focus_country_iso3=cams_iso3,
+        )
+    cfg["_ceip_alpha"] = np.asarray(alpha, dtype=np.float64)
+
+    tab = {
+        "long_csv": "",
+        "wide_csv": "",
+        "pollutant_dir": "",
+        "pollutants": list(cfg.get("_raster_pollutant_labels") or cfg.get("pollutants") or []),
+        "rows": 0,
+    }
+
     with _timed("raster weights"):
         build_kl_sourcearea_tif(
             root,
             ref=ref,
             cams_nc=cams,
-            weights_long=weights_long,
             nuts_gpkg=nuts,
             out_tif=out_tif,
             cams_iso3=cams_iso3,
             nuts_cntr=nuts_for_ref,
-            pollutants=[str(p) for p in pols],
+            pipeline_cfg=cfg,
             ag_clc_codes=ag_t,
             corine_band=corine_band,
             cams_emission_category_indices=cams_emis,
@@ -212,6 +291,6 @@ def run_k_agriculture_pipeline(root: Path, cfg: dict[str, Any]) -> dict[str, Any
     logger.info("K_Agriculture pipeline complete: %s", out_tif)
     return {
         "output_path": str(out_tif),
-        "weights_long": str(weights_long),
+        "weights_long": "",
         "tabular": tab,
     }

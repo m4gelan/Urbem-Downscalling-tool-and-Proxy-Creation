@@ -23,6 +23,9 @@ sectors:
   C_OtherCombustion:
     groups_yaml: PROXY/config/ceip/profiles/C_OtherCombustion_groups.yaml
     rules_yaml: PROXY/config/ceip/profiles/C_OtherCombustion_rules.yaml
+  K_Agriculture:
+    groups_yaml: PROXY/config/ceip/profiles/K_Agriculture_groups.yaml
+    rules_yaml: PROXY/config/ceip/profiles/K_Agriculture_rules.yaml
 
 shared:
   pollutant_aliases_yaml: PROXY/config/pollutant_aliases.yaml

@@ -57,6 +57,7 @@ def load_workbook_aggregation_spec(repo_root: Path) -> tuple[dict[str, Any], dic
     solvents = _load_yaml(cfg_dir / "E_Solvents_groups.yaml")
     waste = _load_yaml(cfg_dir / "J_Waste_groups.yaml")
     c_other = _load_yaml(cfg_dir / "C_OtherCombustion_groups.yaml")
+    k_agri = _load_yaml(cfg_dir / "K_Agriculture_groups.yaml")
 
     grouped: dict[str, list[str]] = {}
     grouped["solvents_d3_all"] = list(_SOLVENTS_D3_ALL_CODES)
@@ -147,5 +148,38 @@ def load_workbook_aggregation_spec(repo_root: Path) -> tuple[dict[str, Any], dic
             c_sub[gid] = {"groups": [gname]}
     if c_sub:
         mapping["C_OtherCombustion"]["subsectors"] = c_sub
+
+    groups_k = k_agri.get("groups") if isinstance(k_agri.get("groups"), dict) else {}
+    for gid in (
+        "family_1",
+        "family_2",
+        "family_3",
+        "family_4",
+        "family_5",
+        "family_6",
+        "family_7",
+    ):
+        block = groups_k.get(gid)
+        if not isinstance(block, dict):
+            continue
+        raw = block.get("ceip_sectors") or []
+        if isinstance(raw, list):
+            gname = f"gnfr_k_{gid}"
+            grouped[gname] = [str(x).strip() for x in raw if str(x).strip()]
+    k_sub: dict[str, Any] = {}
+    for gid in (
+        "family_1",
+        "family_2",
+        "family_3",
+        "family_4",
+        "family_5",
+        "family_6",
+        "family_7",
+    ):
+        gname = f"gnfr_k_{gid}"
+        if gname in grouped:
+            k_sub[gid] = {"groups": [gname]}
+    if k_sub:
+        mapping["K_Agriculture"]["subsectors"] = k_sub
 
     return mapping, grouped

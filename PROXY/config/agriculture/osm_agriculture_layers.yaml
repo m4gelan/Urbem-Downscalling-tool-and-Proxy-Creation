@@ -1,0 +1,84 @@
+# Contract for OSM-derived agricultural infrastructure used by K_Agriculture
+# Family 1 (housing / farmyard leg, H_j in report sec:agriculture-combined-proxies).
+#
+# Resolved file path: paths.yaml key ``osm.agriculture`` (default
+# INPUT/Proxy/OSM/agricultural_layers.gpkg). This document defines what that
+# GeoPackage MUST contain so rasterization code can load it without ad hoc logic.
+#
+# Scope: air-pollutant downscaling (NH3, NOx, NMVOC, CO, PM). GHG bands (CH4, CO2)
+# are out of scope for the upgraded agriculture proxy stack.
+
+_version: 1
+
+path_key: osm.agriculture
+
+crs:
+  # Stored geometries SHOULD be in this CRS before packaging (recommended),
+  # OR the loader will reproject to the CORINE reference CRS (EPSG:3035 in Greece runs).
+  expected_epsg: 3035
+
+layers:
+  # Single merged layer (simplest contract): all farm-related polygons in one table.
+  agricultural_farmyard:
+    layer_name: agricultural_farmyard
+    geometry_types:
+      - Polygon
+      - MultiPolygon
+    description: >
+      Built agricultural infrastructure: farmyards, animal housing, barns,
+      dairies, and related landuse polygons selected from OSM. Polygons MUST be
+      mutually exclusive from the CORINE pasture mask (231/243) used for the
+      pasture leg P_j (no overlap in source data preparation).
+    optional_columns:
+      - osm_id
+      - name
+      - landuse
+      - building
+      - amenity
+      - farm_type
+      - source_pbf
+    notes: >
+      Optional columns are for QA only; rasterization uses geometry union.
+      If multiple layers are ever added, list them under ``additional_layers`` and
+      document merge order; the default reader unions ``agricultural_farmyard`` only.
+
+  # Optional second layer (points buffered in preprocess). Omit layer from GPKG if unused.
+  agricultural_points_buffered:
+    layer_name: agricultural_points_buffered
+    geometry_types:
+      - Polygon
+      - MultiPolygon
+    description: >
+      Point features (e.g. amenity=animal_shelter, isolated farm gates) buffered
+      to polygons in the preprocess step. Buffer radius in metres is fixed in
+      preprocess, NOT in this file, but should match rasterization_buffer_m below
+      if you use the raw-points variant.
+    optional: true
+
+rasterization:
+  # Values passed to rasterio.features.rasterize when building H_j.
+  burn_value: 1.0
+  fill: 0.0
+  dtype: float32
+  all_touched: false
+  merge_alg: replace
+
+# Reference for whoever maintains INPUT/Preprocess/OSM → agricultural_layers.gpkg
+# (not parsed by PROXY at runtime).
+preprocess_osm_tag_reference:
+  landuse:
+    - farmyard
+  building:
+    - farm
+    - barn
+    - cowshed
+    - stable
+    - greenhouse
+  amenity:
+    - animal_shelter
+  aerialway:
+    - stile
+  # Exclude from this GPKG: generic residential buildings, landuse=farmland
+  # (use CORINE cropland/pasture instead), and any feature already represented
+  # in industry/commercial OSM extracts for other GNFR sectors unless explicitly
+  # relabelled as on-farm infrastructure.

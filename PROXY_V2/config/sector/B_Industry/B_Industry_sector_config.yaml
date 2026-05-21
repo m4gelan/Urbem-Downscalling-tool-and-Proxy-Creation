@@ -1,0 +1,401 @@
+filepaths:
+  CAMS:
+    path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  OSM:
+    path: INPUT/Proxy/OSM/industry_layers.gpkg
+  EPRTR:
+    path: INPUT/Proxy/EPRTR/F1_4_Air_Releases_Facilities.csv
+  CORINE:
+    path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  Population:
+    path: INPUT/Proxy/Population/JRC-ESTAT_Census_Population_2021_100m.tif
+  Alpha:
+    path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+    config: PROXY_V2/config/alpha_methods.yaml
+
+pollutants:
+- CO
+- NOx
+- NH3
+- NMVOC
+- PM10
+- PM2.5
+- SOx
+cams_point_sources:
+  year: 2019
+  emission_category_indices: [2]
+  source_type_indices: [1]
+  max_match_distance_km: 10.0
+
+cams_area_sources:
+  year: 2019
+  emission_category_indices: [2]
+  source_type_indices: [1]
+
+eprtr_point_sources:
+  reportingYears:
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  eprtr_sector_code:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 6
+  eprtr_sub_sector_codes:
+  - 1(a)
+  - 1(b)
+  - 1(c)
+  - 1(d)
+  - 1(e)
+  - 2(a)
+  - 2(b)
+  - 2(c)(i)
+  - 2(c)(ii)
+  - 2(c)(iii)
+  - 2(e)(i)
+  - 2(e)(ii)
+  - 3(a)
+  - 3(b)
+  - 3(c)(i)
+  - 3(c)(ii)
+  - 3(e)
+  - 3(f)
+  - 3(g)
+  - 4(a)(i)
+  - 4(a)(ii)
+  - 4(a)(iii)
+  - 4(a)(iv)
+  - 4(a)(v)
+  - 4(a)(vi)
+  - 4(a)(vii)
+  - 4(a)(viii)
+  - 4(a)(ix)
+  - 4(b)(i)
+  - 4(b)(ii)
+  - 4(b)(iii)
+  - 4b(iv)
+  - 4(b)(v)
+  - 4(c)
+  - 4(d)
+  - 4(e)
+  - 4(f)
+  - 6(a)
+  - 6(b)
+
+corine:
+  band: 1
+  min_patch_area_m2: 50000
+  max_match_distance_km: 30.0
+  refineries_petroleum:
+    l3_codes:
+    - 121
+  manufacturing_combustion_residual:
+    l3_codes:
+    - 121
+  mineral:
+    l3_codes:
+    - 131
+  chemical_metal:
+    l3_codes:
+    - 121
+# OSM / CORINE / weights use the same four keys as alpha_methods.yaml → sectors → B_Industry → groups.
+osm:
+  metric_crs: EPSG:3035
+  domain_clip_buffer_m: 0
+  buffer_m:
+    point: 300
+    line: 100
+    polygon: 25
+  layer_map:
+    point: osm_industrial_points
+    line: osm_industrial_lines
+    polygon: osm_industrial_polygons
+  layer_order:
+  - osm_industrial_polygons
+  - osm_industrial_lines
+  - osm_industrial_points
+  row_tags:
+  - industrial_layer
+  - landuse
+  - industrial
+  - man_made
+  - power
+  - building
+  - amenity
+  - craft
+  - product
+  - content
+  - plant_source
+  - generator_source
+  - name
+  groups:
+    refineries_petroleum:
+      industrial_layer_include:
+      - landuse_industrial_name_refinery_regex
+      - industrial_refinery
+      - industrial_oil
+      - industrial_fuel
+      - industrial_petroleum
+      - industrial_oil_mill
+      - industrial_oil_terminal
+      - industrial_fuel_depot
+      - works_product_oil
+      - works_product_fuel
+      - works_product_petroleum
+      - works_product_diesel
+      - works_product_gasoline
+      - works_product_kerosene
+      - works_product_bitumen
+      - works_product_lubricant
+      - storage_tank_content_oil
+      - storage_tank_content_fuel
+      - storage_tank_content_diesel
+      - storage_tank_content_gasoline
+      - storage_tank_content_petroleum
+      - storage_tank_content_crude
+      - man_made_petroleum_well
+      - man_made_oil_well
+      - amenity_fuel_depot
+      - craft_oil_mill
+      - building_name_refinery_regex
+      - landuse_port
+      - landuse_depot
+      - power_plant_plant_source_oil
+      - power_generator_generator_source_oil
+    manufacturing_combustion_residual:
+      industrial_layer_include:
+      - landuse_railway
+      - landuse_brownfield
+      - industrial_factory
+      - industrial_manufacture
+      - industrial_manufacturing
+      - industrial_engineering
+      - industrial_machine_shop
+      - industrial_workshop
+      - industrial_metal_works
+      - industrial_textile
+      - industrial_textile_mill
+      - industrial_food
+      - industrial_food_processing
+      - industrial_brewery
+      - industrial_distillery
+      - industrial_sugar
+      - industrial_tobacco
+      - industrial_wood
+      - industrial_sawmill
+      - industrial_lumber
+      - industrial_furniture
+      - industrial_rubber
+      - industrial_plastics
+      - industrial_printing
+      - industrial_electronics
+      - industrial_electrical
+      - industrial_vehicle
+      - industrial_shipyard
+      - industrial_boatyard
+      - industrial_aircraft
+      - industrial_railway
+      - industrial_recycling
+      - industrial_scrap
+      - industrial_slaughterhouse
+      - industrial_dairy
+      - industrial_bakery
+      - industrial_fish_processing
+      - industrial_leather
+      - industrial_hemp
+      - industrial_packaging
+      - industrial_warehouse
+      - industrial_logistics
+      - industrial_depot
+      - man_made_factory
+      - man_made_kiln
+      - man_made_chimney
+      - man_made_smokestack
+      - man_made_cooling_tower
+      - man_made_gasometer
+      - man_made_boiler_house
+      - man_made_works_generic
+      - building_industrial
+      - building_factory
+      - building_warehouse
+      - building_manufacture
+      - building_works
+      - building_workshop
+      - building_hangar
+      - power_plant_plant_source_gas
+      - power_plant_plant_source_biomass
+      - power_plant_plant_source_coal
+      - power_generator_generator_source_gas
+      - power_generator_generator_source_biomass
+      - landuse_industrial
+    mineral:
+      industrial_layer_include:
+      - landuse_quarry
+      - industrial_quarry
+      - industrial_mine
+      - industrial_cement
+      - industrial_cement_plant
+      - industrial_lime
+      - industrial_lime_kiln
+      - industrial_glass
+      - industrial_glassworks
+      - industrial_ceramic
+      - industrial_ceramics
+      - industrial_pottery
+      - industrial_brick
+      - industrial_brickworks
+      - industrial_tileworks
+      - industrial_sand
+      - industrial_gravel
+      - industrial_aggregate
+      - industrial_stone
+      - industrial_mineral
+      - industrial_gypsum
+      - industrial_chalk
+      - industrial_clay
+      - industrial_salt
+      - industrial_asphalt
+      - industrial_asphalt_plant
+      - industrial_concrete
+      - industrial_concrete_plant
+      - industrial_ready_mix_concrete
+      - works_product_cement
+      - works_product_lime
+      - works_product_glass
+      - works_product_ceramic
+      - works_product_brick
+      - works_product_gravel
+      - works_product_sand
+      - works_product_stone
+      - works_product_aggregate
+      - works_product_asphalt
+      - works_product_concrete
+      - works_product_gypsum
+      - man_made_mineshaft
+      - man_made_adit
+    chemical_metal:
+      industrial_layer_include:
+      - industrial_chemical
+      - industrial_chemical_plant
+      - industrial_chemicals
+      - industrial_petrochemical
+      - industrial_pharmaceutical
+      - industrial_pharmaceuticals
+      - industrial_fertilizer
+      - industrial_fertiliser
+      - industrial_agrochemical
+      - industrial_pesticide
+      - industrial_paint
+      - industrial_paints
+      - industrial_varnish
+      - industrial_polymer
+      - industrial_resin
+      - industrial_acid
+      - industrial_chlorine
+      - industrial_ammonia
+      - industrial_detergent
+      - industrial_soap
+      - industrial_cosmetics
+      - industrial_explosives
+      - industrial_pyrotechnics
+      - industrial_gas_plant
+      - industrial_oxygen_plant
+      - industrial_nitrogen_plant
+      - industrial_carbon_black
+      - industrial_solvent
+      - industrial_adhesive
+      - industrial_ink
+      - industrial_steel
+      - industrial_steelworks
+      - industrial_iron
+      - industrial_iron_works
+      - industrial_ironworks
+      - industrial_metal
+      - industrial_metalworks
+      - industrial_foundry
+      - industrial_smelting
+      - industrial_smelter
+      - industrial_blast_furnace
+      - industrial_aluminium
+      - industrial_aluminum
+      - industrial_aluminium_smelter
+      - industrial_copper
+      - industrial_zinc
+      - industrial_lead
+      - industrial_nickel
+      - industrial_titanium
+      - industrial_magnesium
+      - industrial_precious_metal
+      - industrial_gold
+      - industrial_silver
+      - industrial_rolling_mill
+      - industrial_wire_drawing
+      - industrial_forging
+      - industrial_casting
+      - industrial_galvanizing
+      - industrial_electroplating
+      - industrial_scrap_metal
+      - works_product_chemical
+      - works_product_chemicals
+      - works_product_pharmaceutical
+      - works_product_fertilizer
+      - works_product_ammonia
+      - works_product_chlorine
+      - works_product_polymer
+      - works_product_plastic
+      - works_product_acid
+      - works_product_paint
+      - works_product_gas
+      - works_product_nitrogen
+      - works_product_oxygen
+      - works_product_steel
+      - works_product_iron
+      - works_product_aluminium
+      - works_product_aluminum
+      - works_product_copper
+      - works_product_zinc
+      - works_product_lead
+      - works_product_metal
+      - works_product_wire
+      - storage_tank_content_chemical
+      - storage_tank_content_acid
+      - storage_tank_content_ammonia
+      - storage_tank_content_chlorine
+      - man_made_blast_furnace
+  rasterize:
+    burn_value: 1.0
+    fill: 0.0
+    dtype: float32
+    all_touched: true
+weights:
+  refineries_petroleum:
+    w_osm: 0.85
+    w_clc: 0.15
+    w_pop: 0.03
+  chemical_metal:
+    w_osm: 0.75
+    w_clc: 0.25
+    w_pop: 0.05
+  manufacturing_combustion_residual:
+    w_osm: 0.6
+    w_clc: 0.4
+    w_pop: 0.1
+  mineral:
+    w_osm: 0.7
+    w_clc: 0.3
+    w_pop: 0.05

@@ -1,0 +1,47 @@
+# GAINS dom_share_ENE_* : map each (fuel, appliance) row -> model class -> bucket.
+# Rules are evaluated top-to-bottom; first match wins.
+# Fuel column is not filtered unless a rule sets fuel_contains* (all fuels match otherwise).
+
+class_buckets:
+  R_FIREPLACE: space_heating
+  R_HEATING_STOVE: space_heating
+  R_COOKING_STOVE: cooking
+  R_BOILER_MAN: space_and_water_heating
+  R_BOILER_AUT: space_and_water_heating
+  C_BOILER_MAN: commercial
+  C_BOILER_AUT: commercial
+
+rules:
+  # --- Commercial (medium boilers) ---
+  - class: C_BOILER_AUT
+    note: GAINS Medium boilers, automatic, commercial sector
+    appliance_contains_all: [Medium boilers, automatic, (commercial)]
+  - class: C_BOILER_MAN
+    note: GAINS Medium boilers, manual, commercial sector
+    appliance_contains_all: [Medium boilers, manual, (commercial)]
+
+  # --- Residential boilers: space + water heating bucket ---
+  - class: R_BOILER_AUT
+    note: GAINS Single house boilers, automatic (any fuel)
+    appliance_contains_all: [Single house boilers, automatic]
+  - class: R_BOILER_MAN
+    note: GAINS Single house boilers, manual (any fuel)
+    appliance_contains_all: [Single house boilers, manual]
+  - class: R_BOILER_AUT
+    note: GAINS Medium boilers, automatic, agr/forestry/other (non-household small)
+    appliance_contains_all: [Medium boilers, automatic, (agr, forestry, other)]
+  - class: R_BOILER_MAN
+    note: GAINS Medium boilers, manual, agr/forestry/other
+    appliance_contains_all: [Medium boilers, manual, (agr, forestry, other)]
+
+  # --- Stoves & fireplaces (space heating or cooking) ---
+  - class: R_FIREPLACE
+    note: GAINS Fireplaces (households or agr/forestry)
+    appliance_contains: Fireplaces
+  - class: R_HEATING_STOVE
+    note: GAINS Heating stoves (households or agr/forestry)
+    appliance_contains: Heating stoves
+  - class: R_COOKING_STOVE
+    note: GAINS Cooking stoves or three-stone stoves
+    appliance_contains_any: [Cooking stoves, Three-stone stove]
+

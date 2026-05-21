@@ -1,0 +1,53 @@
+urbem_interface/config/loaded_config.json
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.cursor
+
+# Data / datasets (keep local; usually large or licensed)
+data/
+INPUT/Emissions/
+INPUT/Proxy/
+INPUT/Preprocess/OSM/_source
+Output/
+OLD CODES/
+report/
+
+# Common data / geospatial formats
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.arrow
+*.xlsx
+*.xls
+*.jsonl
+*.geojson
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.tif
+*.tiff
+*.grib
+*.grb
+*.nc
+*.png
+*.jpg
+*.html
+*.pdf
+
+# Archives
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz

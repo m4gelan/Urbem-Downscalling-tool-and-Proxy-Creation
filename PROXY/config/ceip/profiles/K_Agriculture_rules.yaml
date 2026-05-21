@@ -1,0 +1,144 @@
+# K_Agriculture spatial proxy parameters (merged over K_Agriculture_groups.yaml for CEIP loaders).
+
+_version: 1
+
+housing_pasture:
+  w_osm: 0.65
+  w_luc: 0.35
+  lucas_lu1: U111
+  lucas_building_lc1:
+    - A11
+    - A12
+  pasture:
+    omega_231: 0.9
+    omega_243: 0.1
+
+livestock:
+  lsu_per_head:
+    bovine: 1.0
+    sheep: 0.1
+    goats: 0.1
+    pigs: 0.108
+    poultry: 0.007
+  farm_fraction:
+    bovine: 0.6
+    sheep: 0.51
+    goats: 0.51
+    pigs: 0.95
+    poultry: 0.995
+
+grazing:
+  kappa: 0.5
+  epsilon: 1.0e-6
+  w_max: 4.0
+  lucas_grazing_confirmed: 1.0
+
+minor_soil:
+  raw_clc_codes:
+    - 211
+    - 212
+    - 213
+    - 221
+    - 222
+    - 223
+    - 231
+    - 241
+    - 242
+    - 243
+    - 244
+
+crop_operations:
+  arable_raw_clc_codes:
+    - 211
+    - 212
+    - 213
+    - 221
+    - 222
+    - 223
+  group_emep_row:
+    g1_nonfixing_cereals: wheat
+    g2_fixing_pulses: other_arable
+    g3_roots_tubers: other_arable
+    g4_fixing_forage: grass
+    g5_other_forage: grass
+  lucas_lc1_to_group:
+    B11: g1_nonfixing_cereals
+    B12: g1_nonfixing_cereals
+    B13: g1_nonfixing_cereals
+    B14: g1_nonfixing_cereals
+    B15: g1_nonfixing_cereals
+    B16: g1_nonfixing_cereals
+    B17: g1_nonfixing_cereals
+    B18: g1_nonfixing_cereals
+    B19: g1_nonfixing_cereals
+    B31: g1_nonfixing_cereals
+    B32: g1_nonfixing_cereals
+    B33: g2_fixing_pulses
+    B41: g3_roots_tubers
+    B51: g5_other_forage
+    B52: g5_other_forage
+    B53: g5_other_forage
+    B54: g5_other_forage
+    B55: g5_other_forage
+    E10: g5_other_forage
+    E20: g5_other_forage
+  default_group: g1_nonfixing_cereals
+  emep_totals:
+    wet:
+      wheat:
+        PM10: 3.7
+        PM2.5: 0.212
+        NMVOC: 0.5
+      rye:
+        PM10: 2.98
+        PM2.5: 0.149
+        NMVOC: 0.5
+      barley:
+        PM10: 3.04
+        PM2.5: 0.168
+        NMVOC: 0.5
+      oat:
+        PM10: 4.51
+        PM2.5: 0.2505
+        NMVOC: 0.5
+      grass:
+        PM10: 0.5
+        PM2.5: 0.025
+        NMVOC: 0.41
+      other_arable:
+        PM10: 3.7
+        PM2.5: 0.212
+        NMVOC: 0.5
+    dry:
+      wheat:
+        PM10: 4.89
+        PM2.5: 0.2895
+        NMVOC: 0.5
+      rye:
+        PM10: 4.26
+        PM2.5: 0.204
+        NMVOC: 0.5
+      barley:
+        PM10: 4.46
+        PM2.5: 0.22
+        NMVOC: 0.5
+      oat:
+        PM10: 6.35
+        PM2.5: 0.3575
+        NMVOC: 0.5
+      grass:
+        PM10: 3.5
+        PM2.5: 0.17
+        NMVOC: 0.41
+      other_arable:
+        PM10: 4.89
+        PM2.5: 0.2895
+        NMVOC: 0.5
+
+gfed:
+  lon_min: -180.0
+  lon_max: 180.0
+  lat_min: -90.0
+  lat_max: 90.0
+  width: 1440
+  height: 720

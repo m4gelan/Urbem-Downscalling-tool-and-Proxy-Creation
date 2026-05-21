@@ -24,7 +24,7 @@ from typing import Any
 
 from PROXY.core.alpha.ceip_index_loader import default_ceip_profile_relpath, remap_legacy_ceip_relpath
 from PROXY.core.dataloaders import load_path_config, load_yaml, project_root, resolve_path
-from PROXY.sectors.C_OtherCombustion.constants import END_USE_COMMERCIAL, MODEL_CLASSES
+from PROXY.sectors.C_OtherCombustion.constants import MODEL_CLASSES
 from PROXY.sectors.C_OtherCombustion.m_builder.assemble import build_m_matrix
 from PROXY.sectors.C_OtherCombustion.m_builder.emep_ef import load_emep
 from PROXY.sectors.C_OtherCombustion.m_builder.enduse_factors import compute_end_use_factors
@@ -104,14 +104,14 @@ def _emit_text(
     rows_by_class: dict[str, list[tuple[str, str, float]]],
     class_sums: dict[str, float],
 ) -> None:
-    print(f"=== GNFR C — M-matrix appendix values — ISO3={iso3} ===\n")
+    print(f"=== GNFR C - M-matrix appendix values - ISO3={iso3} ===\n")
     print(f"GAINS file: {gains_path}")
     print(f"GAINS year column: {year_col}\n")
 
     if factors.legacy_class_scalars is not None:
-        print("Eurostat: disabled or uniform — row multiplier μ_k = legacy scalar (here all 1.0).\n")
+        print("Eurostat: disabled or uniform - row multiplier mu_k = legacy scalar (here all 1.0).\n")
     else:
-        print("Eurostat f_enduse (bucket b) — national weights for this country/year:")
+        print("Eurostat f_enduse (bucket b) - national weights for this country/year:")
         for k in sorted(factors.f_enduse_by_bucket.keys()):
             print(f"  {k!r:50s}  {factors.f_enduse_by_bucket[k]:.12g}")
         prov = getattr(factors, "provenance_enduse", {}) or {}
@@ -133,18 +133,18 @@ def _emit_text(
         print(f"  {cls:22s}  {fa:.12g}")
     print()
 
-    print("Row multiplier μ_k = f_enduse(b(k)) × f_GAINS(k):")
+    print("Row multiplier mu_k = f_enduse(b(k)) x f_GAINS(k):")
     for cls in MODEL_CLASSES:
         mu = factors.row_multiplier(cls)
         print(f"  {cls:22s}  {mu:.12g}")
     print()
 
-    print("GAINS activity share s_r (cell/100) summed by class Σ_{r∈k} s_r (not necessarily 1):")
+    print("GAINS activity share s_r (cell/100) summed by class sum_{r in k} s_r (not necessarily 1):")
     for cls in MODEL_CLASSES:
         print(f"  {cls:22s}  {class_sums.get(cls, 0.0):.12g}")
     print()
 
-    print("Per-row detail (fuel, appliance, s_r); s_r_norm = s_r / Σ_{q∈k} s_q when sum > 0:")
+    print("Per-row detail (fuel, appliance, s_r); s_r_norm = s_r / sum_{q in k} s_q when sum > 0:")
     for cls in MODEL_CLASSES:
         lst = rows_by_class.get(cls, [])
         if not lst:
@@ -155,7 +155,7 @@ def _emit_text(
             nr = (sr / den) if den > 0 else float("nan")
             print(f"  s_r={sr:.8g}  s_r_norm={nr:.8g}  |  {fuel[:56]!r}  |  {app[:56]!r}")
 
-    print("\n=== Assembled M^{(c)} matrix [pollutant × class] (same as assemble.py) ===")
+    print("\n=== Assembled M^(c) matrix [pollutant x class] (same as assemble.py) ===")
     hdr = "".join(f"{p:>12s}" for p in pollutant_outputs)
     print(f"{'class':<22s}{hdr}")
     for ki, cls in enumerate(MODEL_CLASSES):
@@ -355,7 +355,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pollutant_outputs = [str(x["output"]) for x in (merged.get("pollutants") or []) if isinstance(x, dict)]
     if not pollutant_outputs:
-        print("No pollutants in sector YAML — using nox pm2_5 nh3 as placeholders", file=sys.stderr)
+        print("No pollutants in sector YAML - using nox pm2_5 nh3 as placeholders", file=sys.stderr)
         pollutant_outputs = ["nox", "pm2_5", "nh3"]
 
     emep_path = Path(merged["paths"]["emep_ef"])

@@ -130,8 +130,12 @@ def _composite_rgba_over_osm(
     north: float,
     *,
     zoom_adjust: int | None,
+    source: object | None = None,
 ) -> object:
     import contextily as ctx
+
+    if source is None:
+        source = ctx.providers.OpenStreetMap.Mapnik
     gh, gw = int(dst_shape[0]), int(dst_shape[1])
     if np.asarray(rgba).shape[:2] != (gh, gw):
         raise ValueError(f"RGBA shape mismatch vs ({gh}, {gw})")
@@ -142,7 +146,7 @@ def _composite_rgba_over_osm(
         north,
         zoom="auto",
         ll=True,
-        source=ctx.providers.OpenStreetMap.Mapnik,
+        source=source,
         zoom_adjust=zoom_adjust,
     )
     base = _reproject_basemap_to_overlay_grid(img_merc, extent, dst_transform, (gh, gw))

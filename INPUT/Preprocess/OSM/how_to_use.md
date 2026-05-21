@@ -2,70 +2,105 @@
 
 ## What this does
 
-Builds multi-layer GeoPackages under `INPUT/Proxy/OSM/` (`waste_layers.gpkg`, `solvents_layers.gpkg`, …) matching `PROXY/config/paths.yaml`, using a unified **osm_engine** (YAML rules for most sectors; Python **plugins** for industry and fugitive).
+Builds multi-layer GeoPackages (e.g. `waste_layers.gpkg`, `industry_layers.gpkg`) for **PROXY_V2** sector pipelines. Each file is read from `filepaths.OSM.path` in the matching `PROXY_V2/config/sector/*/` config.
 
-## Full country build — what you need (including waste)
+All sectors share one **osm_engine**: YAML **rules** (`mode: rules`) or ordered **classify** rules (`mode: classify` for industry). There are no per-sector Python plugins.
 
-**There is no separate “waste input file”.** All sectors (waste, solvents, offroad, …) read the **same** OSM **`.osm.pbf`** and the **same** NUTS boundary file. The sector scripts only *filter* that data by tags (landfill, amenities, etc.) and clip to the country mask.
+## Inputs (same for every sector)
 
-| Input | Role |
-|--------|------|
-| **Regional / Europe PBF** | Path in `osm_sector_layers.yaml` → `defaults.pbf` (e.g. `INPUT/Preprocess/OSM/_source/europe-latest.osm.pbf`). You must download or place that file yourself (e.g. [Geofabrik](https://download.geofabrik.de/) Europe extract). |
-| **NUTS boundaries** | `defaults.nuts_gpkg` (e.g. `INPUT/Proxy/Boundaries/NUTS_RG_20M_2021_3035.gpkg`). Used to get the country polygon and a WGS84 bbox. |
-| **`--country EL`** (example) | Two-letter **NUTS `CNTR_CODE`**. Masks and clips outputs to that country only. |
-| **osmium-tool** | Recommended: clips the big PBF to the country bbox *before* Python reads it (faster, less RAM). Without it, use `--allow-large-pbf-without-osmium` only for small PBFs or you risk OOM. |
+| Input | Where configured |
+|--------|------------------|
+| **OSM `.osm.pbf`** | `osm_sector_layers.yaml` → `defaults.pbf` (e.g. `INPUT/Preprocess/OSM/_source/europe-latest.osm.pbf`). Download from [Geofabrik](https://download.geofabrik.de/) or similar. |
+| **NUTS boundaries** | `defaults.nuts_gpkg` (e.g. `INPUT/Proxy/Boundaries/NUTS_RG_20M_2021_3035.gpkg`). |
+| **Country** | `COUNTRY` in `create_osm_sector_packages.py` (human name, e.g. `Greece` → NUTS `CNTR_CODE` `EL`). |
+| **Output folder** | `OUTPUT_DIR` in `create_osm_sector_packages.py` (overrides `defaults.output_dir` in YAML). |
+| **osmium-tool** | On `PATH`, or set `OSMIUM_EXE`. Used for country bbox extract and optional tags-filter before pyosmium. |
 
-**Flow for one country + one sector (e.g. waste):** download/configure PBF + NUTS → run with `--country` → optional `osmium extract` to bbox → pyosmium walks the (extracted) PBF and keeps objects matching the **waste** rules in `osm_schema.yaml` → write `INPUT/Proxy/OSM/waste_layers.gpkg`.
+**Flow:** load NUTS mask for country → **one shared** bbox extract per run → optional tags-filter per sector → pyosmium scan → clip/dedupe/min-area → write `{sector}_layers.gpkg` under `OUTPUT_DIR`.
 
+## How to run
 
-## Files
+Edit the top of [`create_osm_sector_packages.py`](create_osm_sector_packages.py), then from the **repository root**:
+
+```bash
+python INPUT/Preprocess/OSM/create_osm_sector_packages.py
+```
+
+### User settings (top of `create_osm_sector_packages.py`)
+
+| Constant | Purpose |
+|----------|---------|
+| `SECTORS` | All sector ids known to the engine |
+| `SECTORS_ENABLED` | Subset to build in this run |
+| `COUNTRY` | Country name (must be in `COUNTRY_TO_CNTR`) |
+| `OUTPUT_DIR` | Folder for `*_layers.gpkg` files |
+| `LOG_LEVEL` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` |
+| `NO_BBOX_EXTRACT` | If `True`, skip osmium bbox extract (slow / high RAM on large PBF) |
+| `ALLOW_LARGE_PBF_WITHOUT_OSMIUM` | Allow continent-scale PBF without osmium-tool |
+| `OSMIUM_EXE` | Path to `osmium` executable, or `None` for `PATH` |
+
+Example:
+
+```python
+SECTORS_ENABLED = ["waste", "fugitive"]
+COUNTRY = "Greece"
+OUTPUT_DIR = "INPUT/Proxy/OSM"
+LOG_LEVEL = "INFO"
+```
+
+## Sectors
+
+`waste`, `solvents`, `offroad`, `shipping`, `industry`, `fugitive`, `aviation`, `agricultural`
+
+| Sector | Engine mode | Output (default names) |
+|--------|-------------|-------------------------|
+| waste | rules | `osm_waste_polygons`, `osm_waste_points` |
+| solvents | rules | roads, landuse, buildings, … |
+| offroad | rules | rail / pipeline layers |
+| shipping | rules | `osm_shipping_high`, `osm_shipping_medium` |
+| industry | classify | `osm_industrial_{polygons,lines,points}`, column `industrial_layer` |
+| fugitive | rules | `osm_energy_polygons`, column `tag_match_families` |
+| aviation | rules | `osm_aviation_airport_polygons` |
+| agricultural | rules | `agricultural_farmyard`, `agricultural_points_buffered` |
+
+## Configuration files
 
 | File | Purpose |
-|------|--------|
-| `osm_sector_layers.yaml` | Run settings: PBF, NUTS, output dir, per-sector options (`with_optional`, `prefilter_tags`, …). |
-| `osm_engine/osm_schema.yaml` | Tag / geometry **rules** (nodes, lines, areas), global `min_polygon_area_m2` (default 10 m² in EPSG:3035). |
-| `create_osm_sector_packages.py` | CLI that reads `osm_sector_layers.yaml` and runs the right engine or plugin. |
-| `create_country_specific_packages.py` | Optional: country bbox extract → roads + landuse/buildings PBFs (not the sector GPKGs). |
+|------|---------|
+| [`osm_sector_layers.yaml`](osm_sector_layers.yaml) | PBF/NUTS paths, `min_polygon_area_m2`, per-sector flags (`prefilter_tags`, `with_optional`, `include_wastewater_plant`, …). |
+| [`osm_engine/osm_schema.yaml`](osm_engine/osm_schema.yaml) | Tag rules, layer order, `augment` columns, `osmium_tag_filters`, industry/fugitive semantics. |
+| [`osm_engine/industry_classify_rules.yaml`](osm_engine/industry_classify_rules.yaml) | Ordered classify rules for industry (loaded into schema at runtime). |
+
+Change **what** gets extracted: edit `osm_schema.yaml` (and industry classify rules). Change **paths and run toggles**: edit `osm_sector_layers.yaml` and/or the entry script constants.
 
 ## Requirements
 
 - Python: `osmium` (pyosmium), `geopandas`, `shapely`, `pyyaml`
-- **osmium-tool** on `PATH` (or pass `--osmium` to the executable) for bbox extract / tags-filter on large PBFs
+- **osmium-tool** strongly recommended for Europe-scale PBFs
 
-## Build all sector GPKGs
+## Performance notes
 
-From the **repository root**:
+- Bbox extract runs **once per run** and is reused for all sectors in `SECTORS_ENABLED`.
+- Sectors with `osmium_tag_filters` in `osm_schema.yaml` should use `prefilter_tags: true` (default in `osm_sector_layers.yaml`) so pyosmium reads a small PBF, not the full country extract. **Solvents without prefilter can take 100+ minutes and gigabytes of RAM.**
+- Default `pyosmium_idx: flex_mem` (portable). After `tags-filter`, PBFs are small enough for `flex_mem` on typical RAM.
+- `LOG_LEVEL=DEBUG` does **not** store full `osm_tags` unless you set `store_osm_tags: true` on a sector.
+- Run fewer sectors per invocation (`SECTORS_ENABLED`) if memory is tight.
+- Prefer a **country extract** PBF (e.g. Geofabrik `austria-latest.osm.pbf`) instead of filtering all of Europe to one country.
 
-```bash
-python INPUT/Preprocess/OSM/create_osm_sector_packages.py --country EL
-```
+## Logging
 
-Use your NUTS `CNTR_CODE` (e.g. `DE`, `FR`). Omit `--country` only if your NUTS file is already a single-country extent.
+Messages use the `[osm]` prefix, e.g. `[osm][waste] parse done kept=8691 (27m39s)`. Increase detail with `LOG_LEVEL = "DEBUG"`.
 
-## One sector
+## Rules vs classify
 
-```bash
-python INPUT/Preprocess/OSM/create_osm_sector_packages.py --country EL --sector waste
-```
+- **`mode: rules`** — `RulesCollector` matches `rules.nodes` / `lines` / `areas` in `osm_schema.yaml`; optional `augment.columns` add derived fields (`waste_family`, `tag_match_families`, …).
+- **`mode: classify`** — `ClassifyCollector` applies first-match `classify_rules` (industry only today); output column `industrial_layer`.
 
-Sectors: `waste`, `solvents`, `offroad`, `shipping`, `industry`, `fugitive`.
+## Troubleshooting
 
-## Common flags
-
-- `--osmium` — path to `osmium` if not on `PATH`
-- `--no-bbox-extract` — read the full PBF in Python (slow, high memory; for small extracts only)
-- `--allow-large-pbf-without-osmium` — allow large PBF without osmium-tool (not recommended for continent-scale files)
-- `--config` — alternative to `osm_sector_layers.yaml`
-
-## Rules vs plugins
-
-- **Rules** (YAML in `osm_schema.yaml`): waste, solvents, offroad, shipping. Edit predicates there; keep `osm_sector_layers.yaml` for paths and toggles.
-- **Plugins** (`osm_engine/plugins/`): `industry_v1`, `fugitive_v1` — complex classification; change the Python if needed.
-
-## Country road / landuse PBFs
-
-```bash
-python INPUT/Preprocess/OSM/create_country_specific_packages.py --country EL
-```
-
-Outputs next to the script (or `--out-dir`): `OSM_roads_<CC>.osm.pbf`, `OSM_landuse_buildings_<CC>.osm.pbf`.
+| Issue | What to try |
+|-------|-------------|
+| osmium OOM on extract | Retry (engine retries without progress bar); use a smaller regional PBF; ensure enough RAM |
+| Fugitive / industry empty after prefilter | `prefilter_tags: false` for that sector in `osm_sector_layers.yaml` |
+| Unknown `COUNTRY` | Add mapping in `COUNTRY_TO_CNTR` in the entry script |
+| PROXY_V2 cannot find GPKG | Point `filepaths.OSM.path` at the same folder as `OUTPUT_DIR` |

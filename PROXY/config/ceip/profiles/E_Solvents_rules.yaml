@@ -45,19 +45,19 @@ beta:
     ind: 0.0
     infra: 1.0
   d3c_asphalt_roofing:
-    house: 0.0
-    serv: 0.0
-    ind: 0.2
-    infra: 0.8
+    house: 0
+    serv: 1
+    ind: 0
+    infra: 0
   d3d_coating:
-    house: 0.4
-    serv: 0.2
-    ind: 0.4
+    house: 0.3
+    serv: 0.25
+    ind: 0.45
     infra: 0.0
   d3e_degreasing:
     house: 0.0
-    serv: 0.3
-    ind: 0.7
+    serv: 0.2
+    ind: 0.8
     infra: 0.0
   d3f_dry_cleaning:
     house: 0.0
@@ -71,19 +71,15 @@ beta:
     infra: 0.0
   d3h_printing:
     house: 0.0
-    serv: 0.7
-    ind: 0.3
+    serv: 0.5
+    ind: 0.5
     infra: 0.0
   d3i_other:
-    house: 0.5
+    house: 0.2
     serv: 0.3
-    ind: 0.2
+    ind: 0.5
     infra: 0.0
-generic_omega:
-  house: 0.25
-  serv: 0.25
-  ind: 0.25
-  infra: 0.25
+
 normalization:
   method: quantile_minmax
   q_low: 0.01
@@ -121,14 +117,12 @@ archetype_weights:
     service_land: 0.35
     service_osm: 0.25
   ind:
-    industry_clc: 0.35
-    industry_osm: 0.35
-    industry_buildings: 0.3
+    industry_clc: 0.6
+    industry_osm: 0.4
   infra:
-    road_length: 0.35
-    weighted_road_length: 0.35
-    transport_area: 0.2
-    roof_area: 0.1
+    road_length: 0.45
+    weighted_road_length: 0.45
+    transport_area: 0.1
 osm:
   osm_point_buffer_m: 50.0
   osm_solvent_layers:

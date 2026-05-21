@@ -2,8 +2,8 @@
 Crop production NMVOC (NFR 3.D / GNFR L): EMEP Table 3.3 EFs per LUCAS LC1 with
 Thunen NIR assignment rules.
 
-Agricultural CO2 from urea and liming is handled in urea_application.py and
-soil_liming.py.
+Agricultural CO2 from urea and liming is not part of the air-pollutant proxy
+set; legacy modules for those pathways were removed from the tabular registry.
 """
 
 from __future__ import annotations

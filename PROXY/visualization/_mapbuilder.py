@@ -306,7 +306,14 @@ def pick_band_by_pollutant(
     po = lookup.get("pollutants")
     if isinstance(po, (list, tuple)):
         for i, name in enumerate(po):
-            if norm_pollutant_key(name) == tgt:
+            token: Any = None
+            if isinstance(name, dict):
+                token = name.get("output")
+                if token is None:
+                    token = name.get("cams_var")
+            else:
+                token = name
+            if token is not None and norm_pollutant_key(str(token)) == tgt:
                 return i + 1
     return default_band
 

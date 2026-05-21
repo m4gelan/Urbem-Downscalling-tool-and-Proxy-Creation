@@ -80,7 +80,7 @@ grazing:
     is_grazing: false
 
 # ---------------------------------------------------------------------------
-# Livestock housing tiers (source_relevance/livestock_housing.py)
+# Livestock housing tiers (historical; combined pipeline uses signals/housing_pasture.py)
 # ---------------------------------------------------------------------------
 livestock_housing:
   missing_grazing_damping: 0.4
@@ -173,7 +173,6 @@ b55_cross_module_audit:
   status: documented_intentional_divergence
   livestock_housing:
     tier: 0.30
-    file: PROXY/sectors/K_Agriculture/source_relevance/livestock_housing.py
     rationale: "Ley supports housing signal between pure cropland (0.20) and grassland (0.55)."
   manure_land_application:
     tier: 0.10
@@ -233,7 +232,7 @@ nmvoc_ef:
   E20: 0.41
 
 # ---------------------------------------------------------------------------
-# Biomass-burning residue ratios (source_relevance/biomass_burning.py)
+# Biomass-burning residue ratios (tabular emission_factors / historical note)
 # kg dry residue / kg grain yield (EMEP Table 3-2).
 # ---------------------------------------------------------------------------
 residue_ratios:

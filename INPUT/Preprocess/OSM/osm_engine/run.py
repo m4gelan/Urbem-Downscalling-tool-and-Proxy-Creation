@@ -1,50 +1,65 @@
-"""Run a sector: ``mode: rules`` (YAML) or ``plugin:`` (industry_v1 / fugitive_v1)."""
-
 from __future__ import annotations
 
-import argparse
-import shutil
-import sys
-import tempfile
-import warnings
 from pathlib import Path
 from typing import Any
 
-import geopandas as gpd
 import yaml
 
-from . import common
+from . import classify
+from . import log
+from . import pipeline
+from . import pyosmium_io
 from .rules_handler import RulesCollector
 
 
 def _schema_path() -> Path:
+    """Return path to osm_schema.yaml."""
     return Path(__file__).resolve().parent / "osm_schema.yaml"
 
 
 def load_schema() -> dict[str, Any]:
+    """Load osm_schema.yaml and merge industry classify_rules from sidecar file."""
     p = _schema_path()
-    return yaml.safe_load(p.read_text(encoding="utf-8"))
+    data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    ind_path = Path(__file__).resolve().parent / "industry_classify_rules.yaml"
+    if ind_path.is_file():
+        rules = yaml.safe_load(ind_path.read_text(encoding="utf-8"))
+        sec = (data.get("sectors") or {}).get("industry")
+        if isinstance(sec, dict) and isinstance(rules, list):
+            sec["classify_rules"] = rules
+    return data
 
 
-def _offroad_frozensets(sec: dict[str, Any]) -> dict[str, frozenset[str]]:
+def _sector_ctx(sector_entry: dict[str, Any]) -> dict[str, Any]:
+    """Build rules-engine context flags from per-sector run config entry."""
+    return {
+        "with_optional": bool(sector_entry.get("with_optional", False)),
+        "include_wastewater_plant": sector_entry.get("include_wastewater_plant", True) is not False,
+    }
+
+
+def _offroad_sets(sec: dict[str, Any]) -> dict[str, frozenset[str]]:
+    """Parse offroad_sets from sector schema into frozensets."""
     raw = sec.get("offroad_sets") or {}
     return {k: frozenset(str(x) for x in v) for k, v in raw.items()}
 
 
-def run_rules_sector(
+def _store_osm_tags(sec: dict[str, Any], sector_entry: dict[str, Any]) -> bool:
+    """Whether to embed full osm_tags JSON (off by default; huge RAM cost)."""
+    if "store_osm_tags" in sector_entry:
+        return sector_entry["store_osm_tags"] is True
+    return sec.get("store_osm_tags") is True
+
+
+def run_sector(
     sector_id: str,
     *,
-    pbf: Path,
-    nuts: Path,
+    run_ctx: pipeline.RunContext,
+    sector_entry: dict[str, Any],
+    defaults: dict[str, Any],
     out: Path,
-    cntr_code: str | None,
-    osmium_exe: str | None,
-    no_bbox_extract: bool,
-    allow_large_pbf: bool,
-    bbox_extract_pbf: Path | None,
-    with_optional: bool = False,
-    include_wastewater_plant: bool = True,
 ) -> None:
+    """Run one sector (rules or classify) and write its GeoPackage."""
     data = load_schema()
     glob = data.get("global") or {}
     sectors = data.get("sectors") or {}
@@ -52,118 +67,71 @@ def run_rules_sector(
         raise SystemExit(f"Unknown sector in osm_schema.yaml: {sector_id!r}")
     sec = dict(sectors[sector_id])
     sec["id"] = sector_id
-    if sec.get("mode") != "rules":
-        raise SystemExit(f"Sector {sector_id} is not mode: rules")
+    mode = str(sec.get("mode", "rules"))
+    if mode not in ("rules", "classify"):
+        raise SystemExit(f"Sector {sector_id!r}: mode must be rules or classify (got {mode!r})")
 
-    min_m2 = float(glob.get("min_polygon_area_m2", 10.0))
+    min_m2 = float(sector_entry.get("min_polygon_area_m2", glob.get("min_polygon_area_m2", 10.0)))
+    filters = sector_entry.get("osmium_tag_filters") or sec.get("osmium_tag_filters")
+    if filters is not None:
+        filters = list(filters)
+    # Default: prefilter when schema defines osmium_tag_filters (unless explicitly disabled).
+    prefilter = sector_entry.get("prefilter_tags")
+    if prefilter is None:
+        prefilter = bool(filters)
+    else:
+        prefilter = prefilter is True
+    bbox_override = None
+    if sector_entry.get("bbox_extract_pbf"):
+        bbox_override = (run_ctx.root / str(sector_entry["bbox_extract_pbf"])).resolve()
 
-    pbf = pbf.expanduser().resolve()
-    nuts = nuts.expanduser().resolve()
-    out = out.expanduser().resolve()
-    if not pbf.is_file():
-        raise SystemExit(f"PBF not found: {pbf}")
-    if not nuts.is_file():
-        raise SystemExit(f"NUTS not found: {nuts}")
+    work_pbf = pipeline.prepare_work_pbf(
+        run_ctx,
+        prefilter_tags=prefilter,
+        osmium_tag_filters=filters,
+        bbox_extract_pbf=bbox_override,
+    )
+    pipeline.ensure_boundary(run_ctx)
+    assert run_ctx.boundary_wgs is not None
 
-    boundary, _n = common.load_boundary(nuts, cntr_code)
-    bbox_wgs84 = common.bbox_str_wgs84(boundary)
-    osmium_exe = common.resolve_osmium_exe(osmium_exe)
-    work_pbf = pbf
-    temp_root: Path | None = None
+    sec["store_osm_tags"] = _store_osm_tags(sec, sector_entry)
+    pyosmium_idx = pyosmium_io.pick_pyosmium_idx(work_pbf, defaults, sector_entry)
 
-    if (
-        not osmium_exe
-        and pbf.stat().st_size > common.MAX_PBF_BYTES_WITHOUT_OSMIUM_TOOL
-        and not allow_large_pbf
-    ):
-        raise SystemExit(
-            f"PBF is large and osmium-tool was not found. Install osmium-tool or pass "
-            f"--allow-large-pbf-without-osmium."
+    if mode == "classify":
+        classify.run_classify_sector(
+            sector_id,
+            sec,
+            work_pbf=work_pbf,
+            boundary_wgs=run_ctx.boundary_wgs,
+            out=out,
+            min_m2=min_m2,
+            pyosmium_idx=pyosmium_idx,
         )
+        return
 
-    try:
-        if osmium_exe and not no_bbox_extract:
-            temp_root = Path(tempfile.mkdtemp(prefix=f"osm_{sector_id}_"))
-            be = bbox_extract_pbf or (temp_root / "bbox_extract.osm.pbf")
-            be = be.expanduser().resolve()
-            be.parent.mkdir(parents=True, exist_ok=True)
-            common.extract_bbox(osmium_exe, bbox_wgs84, pbf, be)
-            work_pbf = be
-        elif not osmium_exe:
-            warnings.warn(
-                "osmium-tool not found: full PBF read is slow / high RAM.",
-                stacklevel=1,
-            )
-
-        ctx = {
-            "with_optional": with_optional,
-            "include_wastewater_plant": include_wastewater_plant,
-        }
-        off_sets = _offroad_frozensets(sec) if sec.get("augment_family") == "offroad" else None
-        col = RulesCollector(sec, ctx=ctx, offroad_sets=off_sets)
-        col.apply_file(str(work_pbf), locations=True, idx="flex_mem")
-
-        boundary_wgs = boundary.to_crs(4326)
-        layer_order = sec.get("layer_order") or sorted(col.buckets.keys())
-
-        out_layers: list[tuple[str, gpd.GeoDataFrame]] = []
-        for name in layer_order:
-            rows = col.buckets.get(name) or []
-            if not rows:
-                out_layers.append((name, common.empty_gdf_wgs84()))
-                continue
-            gdf = gpd.GeoDataFrame(rows, geometry="geometry", crs="EPSG:4326")
-            gdf = common.dedupe_osm_id(gdf)
-            gt = set(gdf.geometry.geom_type.unique())
-            if gt <= {"Point"}:
-                gdf = common.clip_points_to_3035(gdf, boundary_wgs)
-            elif gt <= {"LineString", "MultiLineString"}:
-                gdf = common.clip_lines_to_3035(gdf, boundary_wgs)
-            else:
-                gdf = common.clip_mixed_to_3035(gdf, boundary_wgs)
-            gdf = common.filter_polygon_min_area(gdf, min_m2)
-            out_layers.append((name, gdf))
-
-        common.write_gpkg(out, out_layers)
-    finally:
-        if temp_root is not None:
-            shutil.rmtree(temp_root, ignore_errors=True)
-
-
-def main() -> int:
-    p = argparse.ArgumentParser(description="OSM rules engine (YAML mode: rules only).")
-    p.add_argument(
-        "--sector",
-        required=True,
-        help="Sector id (waste, solvents, offroad, shipping, aviation)",
+    ctx = _sector_ctx(sector_entry)
+    off_sets = _offroad_sets(sec) if sec.get("offroad_sets") else {}
+    t0 = log.Timer()
+    log.sector_info(sector_id, f"parse start {work_pbf.name} idx={pyosmium_idx}")
+    col = RulesCollector(sec, ctx=ctx, offroad_sets=off_sets)
+    used_idx = pyosmium_io.apply_file(col, work_pbf, sector_id=sector_id, idx=pyosmium_idx)
+    if used_idx != pyosmium_idx:
+        log.sector_info(sector_id, f"parse using idx={used_idx}")
+    log.sector_info(
+        sector_id,
+        f"parse done kept={col.kept_count()} ({log.format_duration(t0.elapsed())})",
     )
-    p.add_argument("--pbf", type=Path, required=True)
-    p.add_argument("--nuts", type=Path, required=True)
-    p.add_argument("--out", type=Path, required=True)
-    p.add_argument("--cntr-code", type=str, default=None)
-    p.add_argument("--osmium", type=str, default=None)
-    p.add_argument("--no-bbox-extract", action="store_true")
-    p.add_argument("--allow-large-pbf-without-osmium", action="store_true")
-    p.add_argument("--bbox-extract-pbf", type=Path, default=None)
-    p.add_argument("--with-optional", action="store_true")
-    p.add_argument("--no-wastewater-plant", action="store_true")
-    args = p.parse_args()
+    if log.debug_enabled():
+        log.sector_debug(sector_id, f"per-layer counts={col.layer_counts()}")
 
-    run_rules_sector(
-        args.sector,
-        pbf=args.pbf,
-        nuts=args.nuts,
-        out=args.out,
-        cntr_code=args.cntr_code,
-        osmium_exe=args.osmium,
-        no_bbox_extract=bool(args.no_bbox_extract),
-        allow_large_pbf=bool(args.allow_large_pbf_without_osmium),
-        bbox_extract_pbf=args.bbox_extract_pbf,
-        with_optional=bool(args.with_optional),
-        include_wastewater_plant=not bool(args.no_wastewater_plant),
+    layer_order = list(sec.get("layer_order") or sorted(col.buckets.keys()))
+    layer_buffers_m = sec.get("layer_buffers_m") or {}
+    layers = pipeline.postprocess_layers(
+        dict(col.buckets),
+        layer_order=layer_order,
+        boundary_wgs=run_ctx.boundary_wgs,
+        min_m2=min_m2,
+        layer_buffers_m={str(k): float(v) for k, v in layer_buffers_m.items()},
     )
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    allow_empty = bool(sec.get("allow_all_empty_layers"))
+    pipeline.write_sector_gpkg(out, layers, sector_id=sector_id, allow_all_empty=allow_empty)

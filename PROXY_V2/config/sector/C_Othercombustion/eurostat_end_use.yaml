@@ -1,0 +1,48 @@
+# National f_enduse bucket weights from Eurostat API (no XLSX).
+# Datasets: nrg_bal_s (commercial vs household) + nrg_d_hhq (household end-use TJ).
+# Eurostat geo code: country_profile["other"] from PROXY_V2/core/alias.py (e.g. Greece -> EL).
+
+year: 2021
+
+api:
+  timeout_s: 30
+  offline: false
+  retries: 2
+  retry_sleep_s: 4.0
+  cache_dirs:
+    - PROXY_V2/cache/eurostat
+    - PROXY/cache/eurostat
+  write_cache_dir: PROXY_V2/cache/eurostat
+
+commercial_bucket: commercial
+
+nrg_d_hhq_balances:
+  FC_OTH_HH_E_SH: space_heating
+  FC_OTH_HH_E_WH: water_heating
+  FC_OTH_HH_E_CK: cooking
+  FC_OTH_HH_E_CL: space_cooling
+  FC_OTH_HH_E_LE: lighting_appliances
+  FC_OTH_HH_E_OE: other_end_use
+
+# Bucket names must match GAINS_mapping class_buckets (plus commercial).
+bucket_from_metrics:
+  space_heating:
+    metrics: [space_heating]
+  cooking:
+    metrics: [cooking]
+  space_and_water_heating:
+    metrics: [space_heating, water_heating]
+    combine: sum
+  commercial:
+    source: nrg_bal_s_alpha
+
+class_to_bucket:
+  R_FIREPLACE: space_heating
+  R_HEATING_STOVE: space_heating
+  R_COOKING_STOVE: cooking
+  R_BOILER_MAN: space_and_water_heating
+  R_BOILER_AUT: space_and_water_heating
+  C_BOILER_MAN: commercial
+  C_BOILER_AUT: commercial
+
+default_residential_if_missing: 1.0

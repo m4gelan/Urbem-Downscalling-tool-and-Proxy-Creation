@@ -1,0 +1,1633 @@
+- elem_kind_in: &id001
+  - node
+  - way_open
+  - area_way
+  - area_rel
+  match:
+    all_of:
+    - tag:
+        key: landuse
+        equals: industrial
+    - name_regex: refinery|raffinerie|raffineria|raffinería
+  value: landuse_industrial_name_refinery_regex
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: refinery
+  value: industrial_refinery
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: oil
+  value: industrial_oil
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: fuel
+  value: industrial_fuel
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: petroleum
+  value: industrial_petroleum
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: oil_mill
+  value: industrial_oil_mill
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: oil_terminal
+  value: industrial_oil_terminal
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: industrial
+      equals: fuel_depot
+  value: industrial_fuel_depot
+- elem_kind_in: &id002
+  - node
+  - way_open
+  - area_way
+  - area_rel
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: oil
+  value: works_product_oil
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: fuel
+  value: works_product_fuel
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: petroleum
+  value: works_product_petroleum
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: diesel
+  value: works_product_diesel
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: gasoline
+  value: works_product_gasoline
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: kerosene
+  value: works_product_kerosene
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: bitumen
+  value: works_product_bitumen
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: lubricant
+  value: works_product_lubricant
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: cement
+  value: works_product_cement
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: lime
+  value: works_product_lime
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: glass
+  value: works_product_glass
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: ceramic
+  value: works_product_ceramic
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: brick
+  value: works_product_brick
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: gravel
+  value: works_product_gravel
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: sand
+  value: works_product_sand
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: stone
+  value: works_product_stone
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: aggregate
+  value: works_product_aggregate
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: asphalt
+  value: works_product_asphalt
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: concrete
+  value: works_product_concrete
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: gypsum
+  value: works_product_gypsum
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: chemical
+  value: works_product_chemical
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: chemicals
+  value: works_product_chemicals
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: pharmaceutical
+  value: works_product_pharmaceutical
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: fertilizer
+  value: works_product_fertilizer
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: ammonia
+  value: works_product_ammonia
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: chlorine
+  value: works_product_chlorine
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: polymer
+  value: works_product_polymer
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: plastic
+  value: works_product_plastic
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: acid
+  value: works_product_acid
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: paint
+  value: works_product_paint
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: gas
+  value: works_product_gas
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: nitrogen
+  value: works_product_nitrogen
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: oxygen
+  value: works_product_oxygen
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: steel
+  value: works_product_steel
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: iron
+  value: works_product_iron
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: aluminium
+  value: works_product_aluminium
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: aluminum
+  value: works_product_aluminum
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: copper
+  value: works_product_copper
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: zinc
+  value: works_product_zinc
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: lead
+  value: works_product_lead
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: metal
+  value: works_product_metal
+- elem_kind_in: *id002
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: works
+    - tag:
+        key: product
+        equals: wire
+  value: works_product_wire
+- elem_kind_in: &id003
+  - node
+  - way_open
+  - area_way
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: oil
+  value: storage_tank_content_oil
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: fuel
+  value: storage_tank_content_fuel
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: diesel
+  value: storage_tank_content_diesel
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: gasoline
+  value: storage_tank_content_gasoline
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: petroleum
+  value: storage_tank_content_petroleum
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: crude
+  value: storage_tank_content_crude
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: chemical
+  value: storage_tank_content_chemical
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: acid
+  value: storage_tank_content_acid
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: ammonia
+  value: storage_tank_content_ammonia
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: man_made
+        equals: storage_tank
+    - tag:
+        key: content
+        equals: chlorine
+  value: storage_tank_content_chlorine
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: petroleum_well
+  value: man_made_petroleum_well
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: oil_well
+  value: man_made_oil_well
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: amenity
+      equals: fuel_depot
+  value: amenity_fuel_depot
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: craft
+      equals: oil_mill
+  value: craft_oil_mill
+- elem_kind_in: &id005
+  - way_open
+  - area_way
+  - area_rel
+  match:
+    all_of:
+    - tag:
+        key: building
+        exists: true
+    - name_regex: refinery|raffinerie|raffineria
+  value: building_name_refinery_regex
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: port
+  value: landuse_port
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: depot
+  value: landuse_depot
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: railway
+  value: landuse_railway
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: quarry
+  value: landuse_quarry
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: brownfield
+  value: landuse_brownfield
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: factory
+  value: industrial_factory
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: manufacture
+  value: industrial_manufacture
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: manufacturing
+  value: industrial_manufacturing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: engineering
+  value: industrial_engineering
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: machine_shop
+  value: industrial_machine_shop
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: workshop
+  value: industrial_workshop
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: metal_works
+  value: industrial_metal_works
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: textile
+  value: industrial_textile
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: textile_mill
+  value: industrial_textile_mill
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: food
+  value: industrial_food
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: food_processing
+  value: industrial_food_processing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: brewery
+  value: industrial_brewery
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: distillery
+  value: industrial_distillery
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: sugar
+  value: industrial_sugar
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: tobacco
+  value: industrial_tobacco
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: wood
+  value: industrial_wood
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: sawmill
+  value: industrial_sawmill
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: lumber
+  value: industrial_lumber
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: furniture
+  value: industrial_furniture
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: rubber
+  value: industrial_rubber
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: plastics
+  value: industrial_plastics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: printing
+  value: industrial_printing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: electronics
+  value: industrial_electronics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: electrical
+  value: industrial_electrical
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: vehicle
+  value: industrial_vehicle
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: shipyard
+  value: industrial_shipyard
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: boatyard
+  value: industrial_boatyard
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: aircraft
+  value: industrial_aircraft
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: railway
+  value: industrial_railway
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: recycling
+  value: industrial_recycling
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: scrap
+  value: industrial_scrap
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: slaughterhouse
+  value: industrial_slaughterhouse
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: dairy
+  value: industrial_dairy
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: bakery
+  value: industrial_bakery
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: fish_processing
+  value: industrial_fish_processing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: leather
+  value: industrial_leather
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: hemp
+  value: industrial_hemp
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: packaging
+  value: industrial_packaging
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: warehouse
+  value: industrial_warehouse
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: logistics
+  value: industrial_logistics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: depot
+  value: industrial_depot
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: quarry
+  value: industrial_quarry
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: mine
+  value: industrial_mine
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: cement
+  value: industrial_cement
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: cement_plant
+  value: industrial_cement_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: lime
+  value: industrial_lime
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: lime_kiln
+  value: industrial_lime_kiln
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: glass
+  value: industrial_glass
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: glassworks
+  value: industrial_glassworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ceramic
+  value: industrial_ceramic
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ceramics
+  value: industrial_ceramics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: pottery
+  value: industrial_pottery
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: brick
+  value: industrial_brick
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: brickworks
+  value: industrial_brickworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: tileworks
+  value: industrial_tileworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: sand
+  value: industrial_sand
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: gravel
+  value: industrial_gravel
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: aggregate
+  value: industrial_aggregate
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: stone
+  value: industrial_stone
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: mineral
+  value: industrial_mineral
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: gypsum
+  value: industrial_gypsum
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: chalk
+  value: industrial_chalk
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: clay
+  value: industrial_clay
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: salt
+  value: industrial_salt
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: asphalt
+  value: industrial_asphalt
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: asphalt_plant
+  value: industrial_asphalt_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: concrete
+  value: industrial_concrete
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: concrete_plant
+  value: industrial_concrete_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ready_mix_concrete
+  value: industrial_ready_mix_concrete
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: chemical
+  value: industrial_chemical
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: chemical_plant
+  value: industrial_chemical_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: chemicals
+  value: industrial_chemicals
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: petrochemical
+  value: industrial_petrochemical
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: pharmaceutical
+  value: industrial_pharmaceutical
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: pharmaceuticals
+  value: industrial_pharmaceuticals
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: fertilizer
+  value: industrial_fertilizer
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: fertiliser
+  value: industrial_fertiliser
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: agrochemical
+  value: industrial_agrochemical
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: pesticide
+  value: industrial_pesticide
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: paint
+  value: industrial_paint
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: paints
+  value: industrial_paints
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: varnish
+  value: industrial_varnish
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: polymer
+  value: industrial_polymer
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: resin
+  value: industrial_resin
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: acid
+  value: industrial_acid
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: chlorine
+  value: industrial_chlorine
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ammonia
+  value: industrial_ammonia
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: detergent
+  value: industrial_detergent
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: soap
+  value: industrial_soap
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: cosmetics
+  value: industrial_cosmetics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: explosives
+  value: industrial_explosives
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: pyrotechnics
+  value: industrial_pyrotechnics
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: gas_plant
+  value: industrial_gas_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: oxygen_plant
+  value: industrial_oxygen_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: nitrogen_plant
+  value: industrial_nitrogen_plant
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: carbon_black
+  value: industrial_carbon_black
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: solvent
+  value: industrial_solvent
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: adhesive
+  value: industrial_adhesive
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ink
+  value: industrial_ink
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: steel
+  value: industrial_steel
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: steelworks
+  value: industrial_steelworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: iron
+  value: industrial_iron
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: iron_works
+  value: industrial_iron_works
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: ironworks
+  value: industrial_ironworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: metal
+  value: industrial_metal
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: metalworks
+  value: industrial_metalworks
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: foundry
+  value: industrial_foundry
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: smelting
+  value: industrial_smelting
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: smelter
+  value: industrial_smelter
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: blast_furnace
+  value: industrial_blast_furnace
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: aluminium
+  value: industrial_aluminium
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: aluminum
+  value: industrial_aluminum
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: aluminium_smelter
+  value: industrial_aluminium_smelter
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: copper
+  value: industrial_copper
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: zinc
+  value: industrial_zinc
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: lead
+  value: industrial_lead
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: nickel
+  value: industrial_nickel
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: titanium
+  value: industrial_titanium
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: magnesium
+  value: industrial_magnesium
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: precious_metal
+  value: industrial_precious_metal
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: gold
+  value: industrial_gold
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: silver
+  value: industrial_silver
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: rolling_mill
+  value: industrial_rolling_mill
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: wire_drawing
+  value: industrial_wire_drawing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: forging
+  value: industrial_forging
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: casting
+  value: industrial_casting
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: galvanizing
+  value: industrial_galvanizing
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: electroplating
+  value: industrial_electroplating
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: industrial
+      equals: scrap_metal
+  value: industrial_scrap_metal
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: man_made
+      equals: factory
+  value: man_made_factory
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: man_made
+      equals: kiln
+  value: man_made_kiln
+- elem_kind_in: &id004
+  - node
+  match:
+    tag:
+      key: man_made
+      equals: chimney
+  value: man_made_chimney
+- elem_kind_in: *id004
+  match:
+    tag:
+      key: man_made
+      equals: smokestack
+  value: man_made_smokestack
+- elem_kind_in: *id004
+  match:
+    tag:
+      key: man_made
+      equals: mineshaft
+  value: man_made_mineshaft
+- elem_kind_in: *id004
+  match:
+    tag:
+      key: man_made
+      equals: adit
+  value: man_made_adit
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: cooling_tower
+  value: man_made_cooling_tower
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: gasometer
+  value: man_made_gasometer
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: boiler_house
+  value: man_made_boiler_house
+- elem_kind_in: *id003
+  match:
+    tag:
+      key: man_made
+      equals: blast_furnace
+  value: man_made_blast_furnace
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: industrial
+  value: building_industrial
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: factory
+  value: building_factory
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: warehouse
+  value: building_warehouse
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: manufacture
+  value: building_manufacture
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: works
+  value: building_works
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: workshop
+  value: building_workshop
+- elem_kind_in: *id005
+  match:
+    tag:
+      key: building
+      equals: hangar
+  value: building_hangar
+- elem_kind_in: *id001
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: plant
+    - any_of:
+      - tag:
+          key: plant:source
+          equals: gas
+      - tag:
+          key: plant_source
+          equals: gas
+  value: power_plant_plant_source_gas
+- elem_kind_in: *id001
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: plant
+    - any_of:
+      - tag:
+          key: plant:source
+          equals: oil
+      - tag:
+          key: plant_source
+          equals: oil
+  value: power_plant_plant_source_oil
+- elem_kind_in: *id001
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: plant
+    - any_of:
+      - tag:
+          key: plant:source
+          equals: biomass
+      - tag:
+          key: plant_source
+          equals: biomass
+  value: power_plant_plant_source_biomass
+- elem_kind_in: *id001
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: plant
+    - any_of:
+      - tag:
+          key: plant:source
+          equals: coal
+      - tag:
+          key: plant_source
+          equals: coal
+  value: power_plant_plant_source_coal
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: generator
+    - any_of:
+      - tag:
+          key: generator:source
+          equals: gas
+      - tag:
+          key: generator_source
+          equals: gas
+  value: power_generator_generator_source_gas
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: generator
+    - any_of:
+      - tag:
+          key: generator:source
+          equals: oil
+      - tag:
+          key: generator_source
+          equals: oil
+  value: power_generator_generator_source_oil
+- elem_kind_in: *id003
+  match:
+    all_of:
+    - tag:
+        key: power
+        equals: generator
+    - any_of:
+      - tag:
+          key: generator:source
+          equals: biomass
+      - tag:
+          key: generator_source
+          equals: biomass
+  value: power_generator_generator_source_biomass
+- elem_kind_in: *id002
+  match:
+    tag:
+      key: man_made
+      equals: works
+  value: man_made_works_generic
+- elem_kind_in: *id001
+  match:
+    tag:
+      key: landuse
+      equals: industrial
+  value: landuse_industrial

@@ -195,53 +195,28 @@ sectors:
         G2: 0.4
         G3: 0.3
 
-  # K_Agriculture — method 2: fixed mass shares per process_id (same tokens as PROXY/config/agriculture/alpha.config.yaml).
-  # Under method_2, each pollutant key maps process_id -> weight; names must match group_order / subsectors when this sector uses build_alpha_tensor_methods.
+  # K_Agriculture — CEIP ``K_Agriculture_groups.yaml`` (family_1..family_7) + method 1 EU27 pool.
   K_Agriculture:
     gnfr_letter: K
     defaults:
-      method: 2
+      method: 1
+      pool: EU27
     pollutants:
-      ch4:
-        method: 2
       nh3:
-        method: 2
+        method: 1
+        pool: EU27
       nox:
-        method: 2
-      co2:
-        method: 2
+        method: 1
+        pool: EU27
       nmvoc:
-        method: 2
+        method: 1
+        pool: EU27
       co:
-        method: 2
+        method: 1
+        pool: EU27
       pm10:
-        method: 2
+        method: 1
+        pool: EU27
       pm2_5:
-        method: 2
-    method_2:
-      ch4:
-        enteric_grazing: 0.79
-        manure: 0.198
-        rice: 0.012
-      nh3:
-        fertilized_land: 0.541
-        manure: 0.459
-      nox:
-        fertilized_land: 0.936
-        manure: 0.055
-        biomass_burning: 0.009
-      co2:
-        urea_application: 0.468
-        soil_liming: 0.532
-      nmvoc:
-        agricultural_soils: 0.239
-        manure: 0.76
-        biomass_burning: 0.001
-      co:
-        biomass_burning: 1.0
-      pm10:
-        biomass_burning: 0.036
-        livestock_housing: 0.964
-      pm2_5:
-        biomass_burning: 0.146
-        livestock_housing: 0.854
+        method: 1
+        pool: EU27

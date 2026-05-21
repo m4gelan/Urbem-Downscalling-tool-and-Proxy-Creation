@@ -1,0 +1,256 @@
+filepaths:
+  CAMS:
+    path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  OSM:
+    path: INPUT/Proxy/OSM/fugitive_layers.gpkg
+  EPRTR:
+    path: INPUT/Proxy/EPRTR/F1_4_Air_Releases_Facilities.csv
+  CORINE:
+    path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  Population:
+    path: INPUT/Proxy/Population/JRC-ESTAT_Census_Population_2021_100m.tif
+  GLOBAL_COAL_MINE_TRACKER:
+    path: INPUT/Proxy/ProxySpecific/Fugitive/Global-Coal-Mine-Tracker-May-2025-V2.xlsx
+  GLOBAL_OIL_GAS_EXTRACTORS:
+    path: INPUT/Proxy/ProxySpecific/Fugitive/Global-Oil-and-Gas-Extraction-Tracker-March-2026.xlsx
+  VNF:
+    path: INPUT/Proxy/ProxySpecific/Fugitive/VNF_npp_d20210101_noaa_v30.csv
+  Alpha:
+    path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+    config: PROXY_V2/config/alpha_methods.yaml
+
+pollutants:
+- CO
+- NOx
+- NH3
+- NMVOC
+- PM10
+- PM2.5
+- SOx
+
+cams_point_sources:
+  year: 2019
+  emission_category_indices: [4]
+  source_type_indices: [2]
+  max_match_distance_km: 20.0
+
+cams_area_sources:
+  year: 2019
+  emission_category_indices: [4]
+  source_type_indices: [1]
+
+eprtr_point_sources:
+  reportingYears:
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  eprtr_sector_code:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 6
+  eprtr_sub_sector_codes:
+  - 1(a)
+  - 1(b)
+  - 1(c)
+  - 1(d)
+  - 1(e)
+  - 2(a)
+  - 2(b)
+  - 2(c)(i)
+  - 2(c)(ii)
+  - 2(c)(iii)
+  - 2(e)(i)
+  - 2(e)(ii)
+  - 3(a)
+  - 3(b)
+  - 3(c)(i)
+  - 3(c)(ii)
+  - 3(e)
+  - 3(f)
+  - 3(g)
+  - 4(a)(i)
+  - 4(a)(ii)
+  - 4(a)(iii)
+  - 4(a)(iv)
+  - 4(a)(v)
+  - 4(a)(vi)
+  - 4(a)(vii)
+  - 4(a)(viii)
+  - 4(a)(ix)
+  - 4(b)(i)
+  - 4(b)(ii)
+  - 4(b)(iii)
+  - 4b(iv)
+  - 4(b)(v)
+  - 4(c)
+  - 4(d)
+  - 4(e)
+  - 4(f)
+  - 6(a)
+  - 6(b)
+  
+corine:
+  band: 1
+  min_patch_area_m2: 50000
+  max_match_distance_km: 30.0
+  l3_codes_131:
+    - 131
+  l3_codes_121:
+    - 121
+  l3_codes_123:
+    - 123
+  
+# OSM from fugitive_layers.gpkg (plugin default layer name ``osm_energy_polygons`` unless you rebuilt with --layer).
+osm:
+  metric_crs: EPSG:3035
+  domain_clip_buffer_m: 0
+  buffer_m:
+    point: 0
+    line: 0
+    polygon: 25
+  layer_order:
+    - osm_energy_polygons
+  rasterize:
+    burn_value: 1.0
+    fill: 0.0
+    dtype: float32
+    all_touched: true
+  subgroups:
+    coal_and_solid_fuels:
+      slots:
+        - id: quarry_coal_mine
+          buffer_m:
+            polygon: 40
+          match:
+            any_of:
+              - landuse: quarry
+              - resource: coal
+              - industrial: mine
+    oil_upstream_and_transport:
+      slots:
+        - id: pipeline_well
+          buffer_m:
+            polygon: 30
+          match:
+            any_of:
+              - man_made: pipeline
+              - man_made: petroleum_well
+        - id: port_oil_depot
+          buffer_m:
+            polygon: 50
+          match:
+            any_of:
+              - landuse: port
+              - industrial: oil
+              - industrial: depot
+    storage_refining_distribution:
+      slots:
+        - id: refinery
+          buffer_m:
+            polygon: 35
+          match:
+            any_of:
+              - industrial: refinery
+        - id: tank_storage
+          buffer_m:
+            polygon: 25
+          match:
+            any_of:
+              - man_made: storage_tank
+              - man_made: tank
+              - industrial: fuel_storage
+        - id: fuel_depot
+          buffer_m:
+            polygon: 30
+          match:
+            any_of:
+              - amenity: fuel
+              - industrial: depot
+    gas_flaring_and_residual_losses:
+      slots:
+        - id: flare_chimney
+          buffer_m:
+            polygon: 40
+          match:
+            any_of:
+              - man_made: flare
+              - man_made: chimney
+        - id: power_gen
+          buffer_m:
+            polygon: 35
+          match:
+            any_of:
+              - power: plant
+              - power: generator
+              - power: substation
+
+gem_coal:
+  non_closed_sheet: GCMT Non-closed Mines
+  closed_sheet: GCMT Closed Mines
+  country_column: Country / Area
+  closed_disk_m: 300
+  uniform_disk_m: null
+  fallback_radius_m: 120
+  apply_status_gate: true
+
+gem_oil_gas:
+  main_sheet: Field-level main data
+  country_column: Country/Area
+  lat_column: Latitude
+  lon_column: Longitude
+  status_column: Status
+  status_allow:
+    - operating
+    - in-development
+    - discovered
+  onshore_column: Onshore/Offshore
+  point_buffer_m: 1500
+  point_buffer_onshore_m: 1500
+  point_buffer_offshore_m: 5000
+
+vnf:
+  lat_column: Lat_GMTCO
+  lon_column: Lon_GMTCO
+  rhi_column: RHI
+  buffer_m: 750
+  rhi_sentinel_max: 1000000.0
+weights:
+  coal_and_solid_fuels:
+    w_osm: 0.2
+    w_clc_131: 0.4
+    w_clc_121: 0.05
+    w_gem_coal : 0.35
+  oil_upstream_and_transport:
+    w_osm_pipeline: 0.35
+    w_osm_port : 0.15
+    w_clc_121: 0.4
+    w_clc_123: 0.25
+    w_gem_oil : 0.3
+  storage_refining_distribution:
+    w_osm_refinery: 0.35
+    w_osm_tank : 0.25
+    w_osm_fuel : 0.1
+    w_clc_121: 0.05
+    w_pop : 0.15
+  gas_flaring_and_residual_losses:
+    w_osm_flaring: 0.35
+    w_osm_power: 0.15
+    w_viirs : 0.45
+    w_clc_121: 0.1
+    w_clc_123: 0.05
+

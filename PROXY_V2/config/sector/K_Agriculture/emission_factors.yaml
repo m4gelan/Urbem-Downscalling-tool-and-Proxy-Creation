@@ -1,0 +1,240 @@
+
+
+nmvoc_crop_ef:
+  _description: NMVOC emission factors for crop production per LUCAS LC1 code (kg
+    NMVOC per hectare per year).
+  _source: EMEP/EEA air pollutant emission inventory guidebook 2023, Table 3-3. Assignment
+    of generic EFs (wheat / rape / grass) to specific LUCAS LC1 codes follows Thunen
+    NIR.
+  _notes:
+  - Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/agricultural_soils.py
+    (NMVOC_EF dict).
+  - Values are identical to the historical Python constants.
+  - Used by source_relevance/agricultural_soils.py (NFR 3.D / GNFR L).
+  _version: 1
+  pollutant: NMVOC
+  units: kg ha^-1 yr^-1
+  lc1_ef:
+    B11: 0.32
+    B12: 0.32
+    B13: 1.03
+    B14: 0.32
+    B15: 0.32
+    B16: 0.32
+    B17: 0.32
+    B18: 0.32
+    B19: 0.32
+    B21: 0.32
+    B22: 0.32
+    B23: 0.32
+    B32: 1.34
+    B41: 0.32
+    B51: 0.41
+    B52: 0.41
+    B53: 0.41
+    B54: 0.41
+    B55: 0.41
+    E10: 0.41
+    E20: 0.41
+residue_ratios:
+  _description: Crop residue production ratios per LUCAS LC1 code (kg dry residue
+    per kg grain yield). Used by biomass-burning proxy as a multiplicative weight
+    on per-pixel agricultural DM burned.
+  _source: EMEP/EEA air pollutant emission inventory guidebook 2023, Table 3-2.
+  _notes:
+  - Phase 1.5 extraction from PROXY/sectors/K_Agriculture/source_relevance/biomass_burning.py
+    (RESIDUE_RATIOS dict).
+  - Values are identical to the historical Python constants.
+  - Only LUCAS codes flagged as NFR 4.F eligible are listed.
+  _version: 1
+  units: kg residue / kg grain
+  lc1_ratio:
+    B11: 1.3
+    B12: 1.3
+    B13: 1.2
+    B14: 1.6
+    B15: 1.3
+    B16: 1.0
+    B17: 1.4
+    B18: 1.2
+    B19: 1.2
+    B33: 2.1
+    B41: 1.7
+
+
+enteric_fermentation_factors:
+  _description: 'Enteric fermentation CH4 emission factors per animal head per year.
+    Source: IPCC 2006 Guidelines for National Greenhouse Gas Inventories, Volume 4
+    (Agriculture), Tables 10.11 and 10.10. Default values for Western Europe.'
+  _units: kg CH4 per head per year
+  _source: IPCC 2006 Vol.4 Ch.10 Tables 10.11 and 10.01
+  _note: Only ruminants contribute meaningfully to enteric CH4. Pigs and poultry are
+    monogastric and are excluded from this source. Goats use Table 10.01 Tier 1 default.
+  species_factors:
+    bovine:
+      ch4_per_head_per_year_kg: 116
+      ipcc_table: '10.11'
+      animal_category: dairy cattle, Western Europe default
+      included_in_enteric: true
+    sheep:
+      ch4_per_head_per_year_kg: 8
+      ipcc_table: '10.11'
+      animal_category: sheep, Western Europe default
+      included_in_enteric: true
+    goats:
+      ch4_per_head_per_year_kg: 5
+      ipcc_table: '10.01'
+      animal_category: goats, Tier 1 default
+      included_in_enteric: true
+    pigs:
+      ch4_per_head_per_year_kg: 1.5
+      ipcc_table: '10.11'
+      animal_category: swine
+      included_in_enteric: false
+      exclusion_reason: Monogastric — negligible enteric CH4
+    poultry:
+      ch4_per_head_per_year_kg: 0
+      included_in_enteric: false
+      exclusion_reason: Monogastric — no enteric CH4
+  intensity_weight_params:
+    normalisation: EU-wide median of ruminant_intensity_nc
+    cap_low: 0.05
+    cap_high: 5.0
+    missing_data_fallback: 1.0
+
+    
+livestock_housing_factors:
+  _description: 'NH3 emission factors for livestock housing (confined animals), expressed
+    as gN per livestock unit per day, converted to gN per head per day using standard
+    liveweight assumptions. Primary source: T.H. Misselbrook et al. (2000) Ammonia
+    emission factors for UK agriculture, Atmospheric Environment. DOI: 10.1016/S1352-2310(99)00350-7'
+  _units_raw: gN per livestock unit (LU) per day, where 1 LU = 500 kg liveweight
+  _units_converted: gN per head per day
+  _liveweight_source: Standard EU livestock liveweight assumptions consistent with
+    Sutton et al. 1999 and IPCC 2006 Guidelines
+  _note: Sheep and goats are reported together in T.H. Misselbrook et al. (2000) at
+    3 gN/LU/day. Separate per-head values derived using the IPCC V4 2006 guidelines,
+    tables 10A.2 and 10A.9
+  species_factors:
+    bovine:
+      gN_per_LU_per_day: 34.3
+      liveweight_kg: 600
+      LU_per_head: 1.2
+      gN_per_head_per_day: 41.16
+      source_table: Sutton et al. 1999, housing stage, IPCC 2006 T10A-4
+      included_in_housing: true
+    pigs:
+      gN_per_LU_per_day: 80.0
+      liveweight_kg: 50
+      LU_per_head: 0.1
+      gN_per_head_per_day: 8.0
+      source_table: Sutton et al. 1999, housing stage, IPCC 2006 T10A-7
+      included_in_housing: true
+    poultry:
+      gN_per_LU_per_day: 150.0
+      liveweight_kg: 1.8
+      LU_per_head: 0.0036
+      gN_per_head_per_day: 0.54
+      source_table: Sutton et al. 1999, housing stage IPCC 2006 T10A-9
+      included_in_housing: true
+      note: Low per-head factor compensated by very high stocking densities in intensive
+        operations
+    sheep:
+      gN_per_LU_per_day: 3.0
+      liveweight_kg: 48.5
+      LU_per_head: 0.097
+      gN_per_head_per_day: 0.291
+      source_table: Sutton et al. 1999, sheep+goats IPCC 2006 T10A-9
+      included_in_housing: true
+    goats:
+      gN_per_LU_per_day: 3.0
+      liveweight_kg: 38.5
+      LU_per_head: 0.077
+      gN_per_head_per_day: 0.231
+      source_table: Sutton et al. 1999, IPCC 2006 T10A-9
+      included_in_housing: true
+  intensity_weight_params:
+    normalisation: EU-wide median of housing_intensity_nc
+    cap_low: 0.05
+    cap_high: 5.0
+    missing_data_fallback: 1.0
+
+
+housing_factor:
+  _description : 'EMEP table 3-9 chapter 3.B, N_excretion from IPCC table 10.19 in kg N/(1000kg animal)/day'
+  bovine : 
+    housing_fraction: 0.5
+    N_excretion: 0.48
+    liveweight_kg: 600
+  pigs : 
+    housing_fraction: 1
+    N_excretion: 0.51
+    liveweight_kg: 50
+  sheep:
+    housing_fraction: 0.08
+    N_excretion: 0.85
+    liveweight_kg: 48.5
+  goats: 
+    housing_fraction: 0.08
+    N_excretion: 1.28
+    liveweight_kg: 38.5
+  poultry: 
+    housing_fraction: 1
+    N_excretion: 0.96
+    liveweight_kg: 1.8
+
+
+manure_application_to_soils:
+  storage_n_loss_fraction: 0.25
+  nonfodder_rate_ratios:
+    non_fodder_high_manure: 1.0
+    non_fodder_medium_manure: 0.75
+    non_fodder_low_manure: 0.10
+
+inorganic_n_fertilizer:
+  lc1_rates_kg_n_ha_yr:
+    B11: 116
+    B12: 116
+    B13: 99
+    B14: 29
+    B15: 43
+    B16: 169
+    B17: 118
+    B18: 52
+    B19: 52
+    B21: 77
+    B22: 123
+    B23: 77
+    B31: 51
+    B32: 146
+    B33: 52
+    B34: 101
+    B35: 144
+    B36: 29
+    B37: 144
+    B41: 15
+    B42: 125
+    B43: 103
+    B44: 103
+    B45: 103
+    B51: 51
+    B52: 51
+    B53: 51
+    B54: 51
+    B55: 90
+    B71: 67
+    B72: 67
+    B73: 67
+    B74: 56
+    B75: 67
+    B76: 67
+    B77: 67
+    B81: 58
+    B82: 28
+    B83: 52
+    B84: 144
+    BX1: 0
+    BX2: 0
+    E10: 43
+    E20: 43
+    E30: 10

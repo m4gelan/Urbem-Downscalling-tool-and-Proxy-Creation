@@ -1,11 +1,11 @@
-"""YAML ``match`` → tag predicate (all_of / any_of / tag)."""
-
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
 def match_tags(tags: dict[str, str], spec: dict[str, Any] | None) -> bool:
+    """Evaluate a YAML match spec (all_of / any_of / not / tag / name_regex) against OSM tags."""
     if spec is None or spec is False:
         return True
     if not isinstance(spec, dict):
@@ -17,6 +17,9 @@ def match_tags(tags: dict[str, str], spec: dict[str, Any] | None) -> bool:
         return any(match_tags(tags, s) for s in spec["any_of"])
     if "not" in spec:
         return not match_tags(tags, spec["not"])
+    if "name_regex" in spec:
+        pat = str(spec["name_regex"])
+        return bool(re.search(pat, tags.get("name") or "", re.I))
     if "tag" in spec:
         t = spec["tag"]
         if not isinstance(t, dict):
@@ -34,3 +37,15 @@ def match_tags(tags: dict[str, str], spec: dict[str, Any] | None) -> bool:
         raise ValueError(f"tag: needs equals, in, or exists: {t}")
 
     raise ValueError(f"Unknown match spec keys: {list(spec)}")
+
+
+def match_classify_rule(
+    tags: dict[str, str],
+    elem_kind: str,
+    rule: dict[str, Any],
+) -> bool:
+    """Return True if a classify rule matches tags and element kind."""
+    kinds = rule.get("elem_kind_in")
+    if kinds is not None and elem_kind not in kinds:
+        return False
+    return match_tags(tags, rule.get("match"))

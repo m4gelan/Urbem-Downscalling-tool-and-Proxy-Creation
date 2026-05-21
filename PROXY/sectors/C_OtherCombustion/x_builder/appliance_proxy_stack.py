@@ -107,8 +107,13 @@ def _compute_stock(
     carrier = str(stock_spec["carrier"]).upper()
     if carrier == "POP":
         acc *= pop.astype(np.float64)
-    else:
+    elif carrier in ("CORINE", "NONE", "UNITY"):
+        # Dimensionless CLC/GHS linear combo only (commercial: avoid H_nres here; load carries heat).
+        pass
+    elif carrier == "H_NRES":
         acc *= np.maximum(H_nres.astype(np.float64), 0.0)
+    else:
+        raise ValueError(f"unknown stock carrier {carrier!r} (use POP, CORINE, or H_NRES)")
     return acc.astype(np.float32)
 
 

@@ -12,7 +12,7 @@ weighted by CEIP reported-emissions α on groups **G1**–**G4** in
 ``C_OtherCombustion_rules.yaml``. Use ``python -m PROXY.main build --sector C_OtherCombustion --no-enable-offroad``
 for legacy stationary-only behaviour.
 
-**Stationary X (seven bands):** with ``appliance_proxy.enabled: true`` in ``othercombustion.yaml`` (default), ``X_k = S_k × L_k`` uses warped **POP**, **H_res / H_nres**, **HDD** (Hotmaps ``hdd_curr``), **GHS-SMOD** (rural settlement mask vs CLC 111/112/121), and **CLC L3** indicators only — configured under ``appliance_proxy`` in ``C_OtherCombustion_rules.yaml``. Set ``appliance_proxy.enabled: false`` to restore the legacy stack (**Hotmaps heat + GFA** ``R_base`` / ``C_base``, CORINE ``mr`` / ``mc``, optional ``rural_bias``).
+**Stationary X (seven bands):** with ``appliance_proxy.enabled: true`` in ``othercombustion.yaml`` (default), ``X_k = S_k × L_k`` uses warped **POP**, **H_res / H_nres**, **HDD** (Hotmaps ``hdd_curr``), **GHS-SMOD** (rural settlement mask vs CLC 111/112/121), and **CLC L3** indicators only — configured under ``appliance_proxy`` in ``C_OtherCombustion_rules.yaml``. Residential **stock** uses ``carrier: POP``; commercial **stock** uses ``carrier: CORINE`` (mask weights only) so **H_nres** is not doubled when the **load** uses ``H_NRES``. Set ``appliance_proxy.enabled: false`` to restore the legacy stack (**Hotmaps heat + GFA** ``R_base`` / ``C_base``, CORINE ``mr`` / ``mc``, optional ``rural_bias``).
 
 ## GNFR C: stationary + off-road branches
 

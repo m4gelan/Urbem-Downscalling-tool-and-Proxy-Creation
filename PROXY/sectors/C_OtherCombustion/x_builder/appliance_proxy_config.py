@@ -1,5 +1,9 @@
 """
 Load and validate ``appliance_proxy`` from CEIP rules YAML (GNFR C stationary X stack).
+
+Band-level stock/load lives **only** in ``PROXY/config/ceip/profiles/C_OtherCombustion_rules.yaml``.
+This module validates that file and supplies **global** defaults (``epsilon``, ``ghs_rural_classes``)
+when those keys are omitted from YAML — it does **not** duplicate per-class definitions in Python.
 """
 
 from __future__ import annotations
@@ -13,71 +17,11 @@ from ..constants import MODEL_CLASSES
 from ..exceptions import ConfigurationError
 
 
-def _default_appliance_proxy_doc() -> dict[str, Any]:
-    """Defaults matching PROXY/config/ceip/profiles/C_OtherCombustion_rules.yaml."""
+def _default_appliance_proxy_globals() -> dict[str, Any]:
+    """Keys merged from code only when absent from YAML (no per-class defaults)."""
     return {
         "ghs_rural_classes": [11, 12, 13],
         "epsilon": 1.0e-12,
-        "R_FIREPLACE": {
-            "stock": {
-                "carrier": "POP",
-                "corine_weights": {"111": 0.2, "112": 1.0, "rural_res": 0.6},
-            },
-            "load": {
-                "type": "product",
-                "terms": [{"name": "H_RES", "exponent": 0.6}, {"name": "HDD", "exponent": 0.4}],
-            },
-        },
-        "R_HEATING_STOVE": {
-            "stock": {
-                "carrier": "POP",
-                "corine_weights": {"111": 0.2, "112": 1.0, "rural_res": 0.6},
-            },
-            "load": {
-                "type": "product",
-                "terms": [{"name": "H_RES", "exponent": 0.6}, {"name": "HDD", "exponent": 0.4}],
-            },
-        },
-        "R_COOKING_STOVE": {
-            "stock": {
-                "carrier": "POP",
-                "corine_weights": {"111": 1.0, "112": 1.0, "rural_res": 0.8},
-            },
-            "load": {"type": "constant", "value": 1.0},
-        },
-        "R_BOILER_MAN": {
-            "stock": {
-                "carrier": "POP",
-                "corine_weights": {"111": 0.3, "112": 1.0, "rural_res": 0.9},
-            },
-            "load": {"type": "variable", "name": "H_RES", "exponent": 1.0},
-        },
-        "R_BOILER_AUT": {
-            "stock": {
-                "carrier": "POP",
-                "corine_weights": {"111": 1.0, "112": 1.1, "rural_res": 0.4},
-            },
-            "load": {"type": "variable", "name": "H_RES", "exponent": 1.0},
-        },
-        "C_BOILER_MAN": {
-            "stock": {
-                "carrier": "H_NRES",
-                "corine_weights": {"111": 1.0, "112": 0.7, "121": 1.5},
-                "commercial_other_weight": 0.3,
-            },
-            "load": {
-                "type": "product",
-                "terms": [{"name": "H_NRES", "exponent": 0.7}, {"name": "HDD", "exponent": 0.3}],
-            },
-        },
-        "C_BOILER_AUT": {
-            "stock": {
-                "carrier": "H_NRES",
-                "corine_weights": {"111": 1.0, "112": 0.7, "121": 1.5},
-                "commercial_other_weight": 0.3,
-            },
-            "load": {"type": "variable", "name": "H_NRES", "exponent": 1.0},
-        },
     }
 
 
@@ -97,8 +41,11 @@ def load_appliance_proxy_from_rules_yaml(rules_path: Path) -> dict[str, Any]:
     doc = yaml.safe_load(rules_path.read_text(encoding="utf-8")) or {}
     block = doc.get("appliance_proxy")
     if not isinstance(block, dict):
-        return _default_appliance_proxy_doc()
-    merged = _deep_merge(_default_appliance_proxy_doc(), block)
+        raise ConfigurationError(
+            f"{rules_path}: missing required top-level key 'appliance_proxy:' "
+            "(define all MODEL_CLASSES bands in C_OtherCombustion_rules.yaml)."
+        )
+    merged = _deep_merge(_default_appliance_proxy_globals(), block)
     validate_appliance_proxy_doc(merged)
     return merged
 
@@ -127,12 +74,17 @@ def validate_appliance_proxy_doc(block: dict[str, Any]) -> None:
 
 def _validate_stock(cls: str, stock: dict[str, Any]) -> None:
     carrier = str(stock.get("carrier", "")).upper()
-    if carrier not in ("POP", "H_NRES"):
-        raise ConfigurationError(f"{cls}.stock.carrier must be POP or H_NRES, got {carrier!r}")
-    if cls.startswith("C_") and carrier != "H_NRES":
-        raise ConfigurationError(f"{cls} commercial stock must use carrier H_NRES, got {carrier!r}")
+    if carrier not in ("POP", "CORINE", "H_NRES"):
+        raise ConfigurationError(
+            f"{cls}.stock.carrier must be POP, CORINE, or H_NRES, got {carrier!r}"
+        )
+    if cls.startswith("C_") and carrier != "CORINE":
+        raise ConfigurationError(
+            f"{cls}: commercial stock must use carrier CORINE (CLC/GHS mask only); "
+            f"put non-residential heat in load, not stock — got {carrier!r}"
+        )
     if cls.startswith("R_") and carrier != "POP":
-        raise ConfigurationError(f"{cls} residential stock must use carrier POP, got {carrier!r}")
+        raise ConfigurationError(f"{cls}: residential stock must use carrier POP, got {carrier!r}")
 
     cw = stock.get("corine_weights")
     if not isinstance(cw, dict) or not cw:

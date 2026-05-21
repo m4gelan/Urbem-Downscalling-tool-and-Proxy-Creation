@@ -1,0 +1,154 @@
+filepaths:
+  CAMS:
+    path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  OSM:
+    path: INPUT/Proxy/OSM/offroad_layers.gpkg
+  CORINE:
+    path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  Alpha:
+    path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+    config: PROXY_V2/config/alpha_methods.yaml
+
+pollutants:
+- CO
+- NOx
+- NH3
+- NMVOC
+- PM10
+- PM2.5
+- SOx
+
+cams_point_sources:
+  year: 2019
+  emission_category_indices: [12]
+  source_type_indices: [2]
+  max_match_distance_km: 20.0
+
+cams_area_sources:
+  year: 2019
+  emission_category_indices: [12]
+  source_type_indices: [1]
+
+corine:
+  band: 1
+  min_patch_area_m2: 100
+  l3_codes_121:
+    - 121
+  l3_codes_123:
+    - 123
+  l3_codes_124:
+    - 124
+  l3_codes_131:
+    - 131
+
+# OSM: ``INPUT/Preprocess/OSM/osm_engine/osm_schema.yaml`` sector ``offroad`` → offroad_layers.gpkg.
+osm:
+  metric_crs: EPSG:3035
+  domain_clip_buffer_m: 0
+  buffer_m:
+    point: 50
+    line: 35
+    polygon: 25
+  layer_order:
+    - osm_offroad_rail_lines
+    - osm_offroad_pipeline_lines
+    - osm_offroad_pipeline_facilities
+    - osm_offroad_rail_areas
+    - osm_offroad_areas
+  rasterize:
+    burn_value: 1.0
+    fill: 0.0
+    dtype: float32
+    all_touched: true
+  subgroups:
+    rail_transport:
+      slots:
+        - id: rail_diesel
+          buffer_m:
+            line: 40
+          match:
+            any_of:
+              - rail_propulsion: diesel
+        - id: rail_electric
+          buffer_m:
+            line: 40
+          match:
+            any_of:
+              - rail_propulsion: electric
+
+        - id: rail_yards
+          buffer_m:
+            polygon: 30
+          match:
+            any_of:
+              # Rail facility polygons (explicit tags)
+              - railway: depot
+              - railway: yard
+              - railway: workshop
+              - railway: halt
+              - railway: station
+              - railway: platform
+              # Standard broad-brush railway landuse
+              - landuse: railway
+              # landuse=industrial + industrial=rail_yard
+              - landuse: industrial
+                industrial: rail_yard
+              # Fallback for any missed landuse=railway
+              - landuse: railway
+ 
+    pipeline_transport:
+      slots:
+        # Compressors and compressor stations (nodes and polygons)
+        - id: oil_gas_facilities
+          buffer_m:
+            point: 80
+            polygon: 28
+          match:
+            any_of:
+              - man_made: compressor
+              - man_made: compressor_station
+              - man_made: gas_compressor
+              - pipeline: substation
+                substation: compression
+              - man_made: pumping_station
+              - substance: gas
+              - industrial: gas
+              - man_made: works
+              - industrial: oil_and_gas
+              - man_made: works
+              - industrial: petroleum
+              - man_made: works
+              - man_made: valve
+              - man_made: pipeline_valve
+              - pipeline: valve
+
+        # Hydrocarbon pipelines (lines)
+        - id: pipeline_hydrocarbon
+          buffer_m:
+            line: 45
+          match:
+            any_of:
+              - man_made: pipeline
+                substance: gas
+              - man_made: pipeline
+                substance: natural_gas
+              - man_made: pipeline
+                substance: oil
+              - man_made: pipeline
+                substance: petroleum
+    
+
+# CEIP legs ``I_Offroad_groups.yaml``: G1 rail / G2 pipeline / G3 non-road. Placeholders until S/W are wired in pipeline.
+weights:
+  rail_transport:
+    w_osm_diesel: 0.6
+    w_osm_electric: 0.05
+    w_osm_yard: 0.35
+  pipeline_transport:
+    w_osm_oil_gas_facilities: 0.7
+    w_osm_pipeline_hydrocarbon: 0.3
+  non_road_machinery:
+    w_clc_121: 0.35
+    w_clc_123: 0.15
+    w_clc_124: 0.10
+    w_clc_131: 0.40

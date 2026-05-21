@@ -1,0 +1,7 @@
+# Köppen raster integer class ID → wet or dry (EMEP Tier-2 crop operations).
+# Match ``dry_class_ids`` to the integer values in ``koppen_raster_tif`` (band metadata / legend).
+# Any ID not in ``dry_class_ids`` is treated as ``wet`` when ``wet_class_ids`` is empty.
+_version: 1
+default: wet
+dry_class_ids: []
+wet_class_ids: []
