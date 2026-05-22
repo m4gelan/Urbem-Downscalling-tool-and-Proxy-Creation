@@ -13,7 +13,8 @@ venv/
 # Data / datasets (keep local; usually large or licensed)
 data/
 INPUT/Emissions/
-INPUT/Proxy/
+INPUT/Proxy/*
+!INPUT/Proxy/Dataset_sources.md
 INPUT/OLD
 INPUT/Preprocess/OSM/_source
 Output/

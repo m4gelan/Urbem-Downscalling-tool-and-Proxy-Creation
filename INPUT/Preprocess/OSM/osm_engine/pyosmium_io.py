@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from . import log
+from . import parse_progress
 
-# flex_mem is always available in conda pyosmium; dense_mmap often is not on Windows builds.
 _IDX_FALLBACK = "flex_mem"
 
 
@@ -24,15 +24,17 @@ def pick_pyosmium_idx(
     return _IDX_FALLBACK
 
 
-def apply_file(
-    handler: Any,
-    work_pbf: Path,
-    *,
-    sector_id: str,
-    idx: str,
-) -> str:
-    """Run pyosmium apply_file; fall back to flex_mem if idx type is not compiled in."""
-    path = str(work_pbf)
+def _show_parse_progress(sector_entry: dict[str, Any], defaults: dict[str, Any]) -> bool:
+    """Return True unless progress is explicitly disabled in config."""
+    if sector_entry.get("show_parse_progress") is False:
+        return False
+    if defaults.get("show_parse_progress") is False:
+        return False
+    return sector_entry.get("show_parse_progress", defaults.get("show_parse_progress", True)) is not False
+
+
+def _apply_raw(handler: Any, path: str, idx: str, *, sector_id: str) -> str:
+    """Run pyosmium apply_file once with the given index type."""
     try:
         handler.apply_file(path, locations=True, idx=idx)
         return idx
@@ -45,3 +47,32 @@ def apply_file(
             handler.apply_file(path, locations=True, idx=_IDX_FALLBACK)
             return _IDX_FALLBACK
         raise
+
+
+def apply_file(
+    handler: Any,
+    work_pbf: Path,
+    *,
+    sector_id: str,
+    idx: str,
+    osmium_exe: str | None = None,
+    defaults: dict[str, Any] | None = None,
+    sector_entry: dict[str, Any] | None = None,
+) -> str:
+    """Run pyosmium apply_file with optional tqdm / periodic progress."""
+    defaults = defaults or {}
+    sector_entry = sector_entry or {}
+    path = str(work_pbf)
+    show = _show_parse_progress(sector_entry, defaults)
+    target, prog = parse_progress.wrap_handler(
+        handler,
+        sector_id=sector_id,
+        work_pbf=work_pbf,
+        osmium_exe=osmium_exe,
+        show_progress=show,
+    )
+    try:
+        return _apply_raw(target, path, idx, sector_id=sector_id)
+    finally:
+        if prog is not None:
+            prog.close_progress()

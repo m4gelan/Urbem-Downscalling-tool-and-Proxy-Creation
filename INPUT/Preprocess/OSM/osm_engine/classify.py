@@ -162,6 +162,9 @@ def run_classify_sector(
     out: Path,
     min_m2: float,
     pyosmium_idx: str = "flex_mem",
+    osmium_exe: str | None = None,
+    defaults: dict[str, Any] | None = None,
+    sector_entry: dict[str, Any] | None = None,
 ) -> dict[str, int]:
     """Parse work PBF with ClassifyCollector and write classified layers."""
     rules = sector.get("classify_rules")
@@ -189,7 +192,15 @@ def run_classify_sector(
         row_columns=row_columns,
         output_column=output_column,
     )
-    pyosmium_io.apply_file(col, work_pbf, sector_id=sector_id, idx=pyosmium_idx)
+    pyosmium_io.apply_file(
+        col,
+        work_pbf,
+        sector_id=sector_id,
+        idx=pyosmium_idx,
+        osmium_exe=osmium_exe,
+        defaults=defaults or {},
+        sector_entry=sector_entry or {},
+    )
     log.sector_info(
         sector_id,
         f"parse done objects={col.object_count()} kept={col.kept_count()} ({log.format_duration(t0.elapsed())})",

@@ -106,6 +106,9 @@ def run_sector(
             out=out,
             min_m2=min_m2,
             pyosmium_idx=pyosmium_idx,
+            osmium_exe=run_ctx.osmium_exe,
+            defaults=defaults,
+            sector_entry=sector_entry,
         )
         return
 
@@ -114,7 +117,15 @@ def run_sector(
     t0 = log.Timer()
     log.sector_info(sector_id, f"parse start {work_pbf.name} idx={pyosmium_idx}")
     col = RulesCollector(sec, ctx=ctx, offroad_sets=off_sets)
-    used_idx = pyosmium_io.apply_file(col, work_pbf, sector_id=sector_id, idx=pyosmium_idx)
+    used_idx = pyosmium_io.apply_file(
+        col,
+        work_pbf,
+        sector_id=sector_id,
+        idx=pyosmium_idx,
+        osmium_exe=run_ctx.osmium_exe,
+        defaults=defaults,
+        sector_entry=sector_entry,
+    )
     if used_idx != pyosmium_idx:
         log.sector_info(sector_id, f"parse using idx={used_idx}")
     log.sector_info(

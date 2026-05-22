@@ -2,7 +2,7 @@
 
 ## What this does
 
-Builds multi-layer GeoPackages (e.g. `waste_layers.gpkg`, `industry_layers.gpkg`) for **PROXY_V2** sector pipelines. Each file is read from `filepaths.OSM.path` in the matching `PROXY_V2/config/sector/*/` config.
+Builds multi-layer GeoPackages (e.g. `waste_layers.gpkg`, `industry_layers.gpkg`) for **proxy** sector pipelines. Each file is read from `filepaths.OSM.path` in the matching `proxy/config/sector/*/` config.
 
 All sectors share one **osm_engine**: YAML **rules** (`mode: rules`) or ordered **classify** rules (`mode: classify` for industry). There are no per-sector Python plugins.
 
@@ -87,14 +87,31 @@ Change **what** gets extracted: edit `osm_schema.yaml` (and industry classify ru
 - Run fewer sectors per invocation (`SECTORS_ENABLED`) if memory is tight.
 - Prefer a **country extract** PBF (e.g. Geofabrik `austria-latest.osm.pbf`) instead of filtering all of Europe to one country.
 
-## Logging
+## Logging and parse progress
 
 Messages use the `[osm]` prefix, e.g. `[osm][waste] parse done kept=8691 (27m39s)`. Increase detail with `LOG_LEVEL = "DEBUG"`.
+
+During the long **pyosmium** step you get either:
+
+- A **tqdm** bar (`[industry] pyosmium`) if `tqdm` is installed and `PARSE_PROGRESS = True` / `show_parse_progress: true`, or
+- A log line every **500,000** objects scanned.
+
+Install tqdm: `pip install tqdm`. Disable with `PARSE_PROGRESS = False` or `show_parse_progress: false` in YAML.
+
+The bar total comes from `osmium fileinfo -e -j` when osmium-tool is on `PATH` (can take up to ~2 minutes once per PBF); if that fails, the bar still runs without a percentage.
 
 ## Rules vs classify
 
 - **`mode: rules`** — `RulesCollector` matches `rules.nodes` / `lines` / `areas` in `osm_schema.yaml`; optional `augment.columns` add derived fields (`waste_family`, `tag_match_families`, …).
 - **`mode: classify`** — `ClassifyCollector` applies first-match `classify_rules` (industry only today); output column `industrial_layer`.
+
+## Parallel bbox tiles?
+
+Splitting the country into smaller bboxes and merging GeoPackages in parallel is **possible in theory** but **not implemented**: multipolygon relations can span tiles, dedupe/clip at tile edges is error-prone, and you would run several heavy bbox extracts instead of one shared extract. Practical speedups today:
+
+- Country PBF (Geofabrik) instead of Europe + bbox
+- Tighter `osmium_tag_filters` for industry
+- `tags-filter` + parse progress so you can see the run advancing
 
 ## Troubleshooting
 
@@ -103,4 +120,4 @@ Messages use the `[osm]` prefix, e.g. `[osm][waste] parse done kept=8691 (27m39s
 | osmium OOM on extract | Retry (engine retries without progress bar); use a smaller regional PBF; ensure enough RAM |
 | Fugitive / industry empty after prefilter | `prefilter_tags: false` for that sector in `osm_sector_layers.yaml` |
 | Unknown `COUNTRY` | Add mapping in `COUNTRY_TO_CNTR` in the entry script |
-| PROXY_V2 cannot find GPKG | Point `filepaths.OSM.path` at the same folder as `OUTPUT_DIR` |
+| proxy cannot find GPKG | Point `filepaths.OSM.path` at the same folder as `OUTPUT_DIR` |

@@ -10,6 +10,7 @@ defaults:
   min_polygon_area_m2: 10.0
   # flex_mem works on all pyosmium builds; dense_mmap optional on Linux if compiled in.
   pyosmium_idx: flex_mem
+  show_parse_progress: true
 
 sectors:
   - id: waste

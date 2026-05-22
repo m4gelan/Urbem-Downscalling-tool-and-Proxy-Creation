@@ -1,0 +1,628 @@
+note: >
+  Emission factors from EMEP/EEA air pollutant emission inventory guidebook 2023,
+  chapter 1.A.4 (residential and commercial combustion). Values in `ef` are g/GJ
+  on NCV basis unless noted. `ef` keys match proxy.core.alias small_cap
+  (e.g. sox, pm2_5). Each row carries:
+    - gains_class: target GAINS appliance class(es) using this EF
+    - gains_fuel : GAINS fuel name(s) routed to this EMEP fuel
+  Use these to drive the GAINS -> EMEP mapping in load_c_othercombustion_specific.
+
+gains_fuel_groups:
+  Coal fuels:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  Solid fuel (not biomass):
+    - Derived coal (coke, briquettes)
+  Biomass - wood:
+    - Fuelwood
+  Biomass - agricultural residues:
+    - Agricultural residues
+  Biomass - dung:
+    - Dung
+
+tables:
+
+# ============================================================
+# SOLID FUEL (non-biomass) — fireplaces, stoves, small boilers
+# ============================================================
+
+- fuel: Solid fuel (not biomass)
+  appliance: Fireplaces, saunas and outdoor heaters
+  gains_class: [R_FIREPLACE]
+  gains_fuel: [Derived coal (coke, briquettes)]
+  ef:
+    nox: 60
+    sox: 500
+    nh3: 5
+    pm2_5: 330
+    pm10: 330
+    co: 5000
+    nmvoc: 600
+
+
+- fuel: Solid fuel (not biomass)
+  appliance: Stoves
+  gains_class: [R_HEATING_STOVE, R_COOKING_STOVE]
+  gains_fuel: [Derived coal (coke, briquettes)]
+  ef:
+    nox: 100
+    sox: 900
+    nh3: missing
+    pm2_5: 450
+    pm10: 450
+    co: 5000
+    nmvoc: 600
+
+
+- fuel: Solid fuel (not biomass)
+  appliance: Small (single household scale, capacity <=50 kWth) boilers
+  gains_class: [R_BOILER_MAN, R_BOILER_AUT]
+  gains_fuel: [Derived coal (coke, briquettes)]
+  ef:
+    nox: 158
+    sox: 900
+    nh3: missing
+    pm2_5: 201
+    pm10: 225
+    co: 4787
+    nmvoc: 174
+
+
+# ============================================================
+# COAL FUELS — stoves and non-residential boilers
+# ============================================================
+
+- fuel: Coal fuels
+  appliance: Advanced coal combustion techniques <1 MWth - Advanced stove
+  gains_class: [R_HEATING_STOVE]
+  gains_fuel:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  ef:
+    nox: 150
+    sox: 450
+    nh3: missing
+    pm2_5: 220
+    pm10: 240
+    co: 2000
+    nmvoc: 300
+
+
+- fuel: Coal fuels
+  appliance: Non-residential, medium size (>50 kWth to <=1 MWth) boilers
+  gains_class: [C_BOILER_MAN]
+  gains_fuel:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  ef:
+    nox: 160
+    sox: 900
+    nh3: missing
+    pm2_5: 170
+    pm10: 190
+    co: 2000
+    nmvoc: 200
+
+
+- fuel: Coal fuels
+  appliance: Non-residential, medium size (>1 MWth to <=50 MWth) boilers
+  gains_class: [C_BOILER_AUT]
+  gains_fuel:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  ef:
+    nox: 180
+    sox: 900
+    nh3: missing
+    pm2_5: 72
+    pm10: 76
+    co: 200
+    nmvoc: 20
+
+
+- fuel: Coal fuels
+  appliance: Non-residential, advanced coal combustion techniques <1 MWth - Manual boiler
+  gains_class: [C_BOILER_MAN]
+  gains_fuel:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  ef:
+    nox: 200
+    sox: 450
+    nh3: missing
+    pm2_5: 130
+    pm10: 140
+    co: 1500
+    nmvoc: 100
+
+
+- fuel: Coal fuels
+  appliance: Non-residential, advanced coal combustion techniques <1 MWth - Automatic boiler
+  gains_class: [C_BOILER_AUT]
+  gains_fuel:
+    - Brown coal/lignite grade 1
+    - Brown coal/lignite grade 2 (also peat)
+    - Hard coal, grade 1
+    - Hard coal, grade 2
+    - Hard coal, grade 3
+  ef:
+    nox: 165
+    sox: 450
+    nh3: missing
+    pm2_5: 70
+    pm10: 78
+    co: 350
+    nmvoc: 23
+
+
+# ============================================================
+# NATURAL GAS  (left in place; no GAINS mapping in current log)
+# ============================================================
+
+- fuel: Natural gas
+  appliance: Stoves, fireplaces, saunas and outdoor heaters
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 60
+    sox: 0.3
+    nh3: missing
+    pm2_5: 2.2
+    pm10: 2.2
+    co: 30
+    nmvoc: 2.0
+
+
+- fuel: Natural gas
+  appliance: Small (single household scale, capacity <=50 kWth) boilers
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 42
+    sox: 0.3
+    nh3: missing
+    pm2_5: 0.2
+    pm10: 0.2
+    co: 22
+    nmvoc: 1.8
+
+
+- fuel: Natural gas
+  appliance: Non-residential, medium size (>50 kWth to <=1 MWth) boilers
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 73
+    sox: 1.4
+    nh3: missing
+    pm2_5: 0.45
+    pm10: 0.45
+    co: 24
+    nmvoc: 0.36
+
+
+- fuel: Natural gas
+  appliance: Non-residential, medium size (>1 MWth to <=50 MWth) boilers
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 40
+    sox: 0.3
+    nh3: missing
+    pm2_5: 0.45
+    pm10: 0.45
+    co: 30
+    nmvoc: 2
+
+
+- fuel: Natural gas
+  appliance: Non-residential, gas turbines
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 48
+    sox: 0.5
+    nh3: missing
+    pm2_5: 0.2
+    pm10: 0.2
+    co: 4.8
+    nmvoc: 1.6
+
+
+- fuel: Natural gas
+  appliance: Non-residential, stationary reciprocating engines
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 135
+    sox: 0.5
+    nh3: missing
+    pm2_5: 2
+    pm10: 2
+    co: 56
+    nmvoc: 89
+
+
+# ============================================================
+# LIQUID FUELS  (left in place; no GAINS mapping in current log)
+# ============================================================
+
+- fuel: Gas oil
+  appliance: Stoves
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 34
+    sox: 60
+    nh3: missing
+    pm2_5: 2.2
+    pm10: 2.2
+    co: 111
+    nmvoc: 1.2
+
+
+- fuel: Gas oil
+  appliance: Small (single household scale, capacity <=50 kWth) boilers
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 69
+    sox: 79
+    nh3: missing
+    pm2_5: 1.5
+    pm10: 1.5
+    co: 3.7
+    nmvoc: 0.17
+
+
+- fuel: Gas oil
+  appliance: Non-residential, gas turbines
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 83
+    sox: 46
+    nh3: missing
+    pm2_5: 9.5
+    pm10: 9.5
+    co: 2.6
+    nmvoc: 0.18
+
+
+- fuel: Gas oil
+  appliance: Non-residential, stationary reciprocating engines
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 942
+    sox: 48
+    nh3: missing
+    pm2_5: 30
+    pm10: 30
+    co: 130
+    nmvoc: 50
+
+
+- fuel: Fuel oil (distillate fuel oil)
+  appliance: Non-residential, fuel oil combustion in boilers <= 1 MW
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 100
+    sox: 140
+    nh3: missing
+    pm2_5: 3
+    pm10: 3
+    co: 40
+    nmvoc: 15
+
+
+- fuel: Fuel oil (residual fuel oil)
+  appliance: Non-residential, fuel oil combustion in boilers > 1 MW
+  gains_class: []
+  gains_fuel: []
+  ef:
+    nox: 100
+    sox: 140
+    nh3: missing
+    pm2_5: 30
+    pm10: 40
+    co: 40
+    nmvoc: 5
+
+
+# ============================================================
+# BIOMASS - WOOD  (Tables 3-39 to 3-48)  -- NEW
+# ============================================================
+
+# --- Fireplaces (open) ---  Table 3-39
+- fuel: Biomass - wood
+  appliance: Open fireplaces - wood
+  gains_class: [R_FIREPLACE]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 50
+    sox: 11
+    nh3: 70
+    pm2_5: 820
+    pm10: 840
+    co: 4000
+    nmvoc: 600
+    ch4: 245
+    co2: missing
+
+# --- Heating stoves (conventional wood stove) ---  Table 3-40
+- fuel: Biomass - wood
+  appliance: Conventional wood stoves
+  gains_class: [R_HEATING_STOVE, R_COOKING_STOVE]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 80
+    sox: 11
+    nh3: 70
+    pm2_5: 760
+    pm10: 780
+    co: 4000
+    nmvoc: 600
+    ch4: 300
+    co2: missing
+
+# --- Advanced / pellet stoves ---  Table 3-42
+- fuel: Biomass - wood
+  appliance: Advanced/ecolabelled wood or pellet stoves
+  gains_class: [R_HEATING_STOVE]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 80
+    sox: 11
+    nh3: 12
+    pm2_5: 95
+    pm10: 97
+    co: 1500
+    nmvoc: 100
+    ch4: 30
+    co2: missing
+
+# --- Single household manual wood boiler ---  Table 3-43
+- fuel: Biomass - wood
+  appliance: Small (<=50 kWth) wood boiler - manual feed
+  gains_class: [R_BOILER_MAN]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 91
+    sox: 11
+    nh3: 12
+    pm2_5: 380
+    pm10: 390
+    co: 4000
+    nmvoc: 480
+    ch4: 200
+    co2: missing
+
+# --- Single household automatic wood / pellet boiler ---  Table 3-44
+- fuel: Biomass - wood
+  appliance: Small (<=50 kWth) wood/pellet boiler - automatic feed
+  gains_class: [R_BOILER_AUT]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 80
+    sox: 11
+    nh3: 12
+    pm2_5: 48
+    pm10: 49
+    co: 500
+    nmvoc: 10
+    ch4: 7
+    co2: missing
+
+# --- Non-residential wood boilers 50 kW – 1 MW ---  Table 3-32
+- fuel: Biomass - wood
+  appliance: Non-residential wood boilers (50 kWth to <=1 MWth)
+  gains_class: [C_BOILER_MAN]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 91
+    sox: 11
+    nh3: 1
+    pm2_5: 50
+    pm10: 52
+    co: 500
+    nmvoc: 12
+    ch4: 10
+    co2: missing
+
+# --- Non-residential wood boilers 1–50 MW ---  Table 3-33
+- fuel: Biomass - wood
+  appliance: Non-residential wood boilers (>1 MWth to <=50 MWth)
+  gains_class: [C_BOILER_AUT]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 91
+    sox: 11
+    nh3: 1
+    pm2_5: 37
+    pm10: 38
+    co: 300
+    nmvoc: 12
+    ch4: 10
+    co2: missing
+
+# --- Non-residential wood <1 MW manual ---  Table 3-34
+- fuel: Biomass - wood
+  appliance: Non-residential wood combustion <1 MWth - Manual Boiler
+  gains_class: [C_BOILER_MAN]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 91
+    sox: 11
+    nh3: 1
+    pm2_5: 380
+    pm10: 390
+    co: 4000
+    nmvoc: 480
+    ch4: 200
+    co2: missing
+
+# --- Non-residential wood <1 MW automatic ---  Table 3-35
+- fuel: Biomass - wood
+  appliance: Non-residential wood combustion <1 MWth - Automatic Boiler
+  gains_class: [C_BOILER_AUT]
+  gains_fuel: [Fuelwood]
+  ef:
+    nox: 91
+    sox: 11
+    nh3: 1
+    pm2_5: 37
+    pm10: 38
+    co: 300
+    nmvoc: 12
+    ch4: 10
+    co2: missing
+
+# ============================================================
+# BIOMASS - AGRICULTURAL RESIDUES   -- NEW
+# Guidebook recommends using wood EFs as proxy with adjusted SOx/PM where data
+# missing.  Values below take wood EFs and uplift PM/SOx per Guidebook notes.
+# ============================================================
+
+- fuel: Biomass - agricultural residues
+  appliance: Heating stoves - agricultural residues
+  gains_class: [R_HEATING_STOVE, R_COOKING_STOVE]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 100
+    sox: 50
+    nh3: 70
+    pm2_5: 900
+    pm10: 930
+    co: 5000
+    nmvoc: 600
+    ch4: 300
+    co2: missing
+
+- fuel: Biomass - agricultural residues
+  appliance: Small (<=50 kWth) boiler - agricultural residues (manual)
+  gains_class: [R_BOILER_MAN]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 100
+    sox: 50
+    nh3: 12
+    pm2_5: 450
+    pm10: 460
+    co: 4000
+    nmvoc: 480
+    ch4: 200
+    co2: missing
+
+- fuel: Biomass - agricultural residues
+  appliance: Small (<=50 kWth) boiler - agricultural residues (automatic)
+  gains_class: [R_BOILER_AUT]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 100
+    sox: 50
+    nh3: 12
+    pm2_5: 60
+    pm10: 62
+    co: 600
+    nmvoc: 15
+    ch4: 10
+    co2: missing
+
+- fuel: Biomass - agricultural residues
+  appliance: Non-residential medium boiler (50 kWth-1 MWth) - agri residues
+  gains_class: [C_BOILER_MAN]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 100
+    sox: 50
+    nh3: 1
+    pm2_5: 60
+    pm10: 62
+    co: 600
+    nmvoc: 15
+    ch4: 10
+    co2: missing
+
+- fuel: Biomass - agricultural residues
+  appliance: Non-residential medium boiler (>1 MWth-50 MWth) - agri residues
+  gains_class: [C_BOILER_AUT]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 100
+    sox: 50
+    nh3: 1
+    pm2_5: 45
+    pm10: 47
+    co: 400
+    nmvoc: 12
+    ch4: 10
+    co2: missing
+
+- fuel: Biomass - agricultural residues
+  appliance: Open fireplaces - agricultural residues
+  gains_class: [R_FIREPLACE]
+  gains_fuel: [Agricultural residues]
+  ef:
+    nox: 50
+    sox: 50
+    nh3: 70
+    pm2_5: 950
+    pm10: 970
+    co: 4500
+    nmvoc: 650
+    ch4: 250
+    co2: missing
+
+# ============================================================
+# BIOMASS - DUNG   -- NEW
+# Guidebook gives no European default; values below adapted from
+# international literature (IPCC 2019 refinement, Cordoba et al.) and
+# should be reviewed if dung is non-negligible in your inventory.
+# ============================================================
+
+- fuel: Biomass - dung
+  appliance: Cooking stoves - dung
+  gains_class: [R_COOKING_STOVE]
+  gains_fuel: [Dung]
+  ef:
+    nox: 80
+    sox: 100
+    nh3: 150
+    pm2_5: 1500
+    pm10: 1550
+    co: 7000
+    nmvoc: 900
+    ch4: 500
+    co2: missing
+
+- fuel: Biomass - dung
+  appliance: Heating stoves - dung
+  gains_class: [R_HEATING_STOVE]
+  gains_fuel: [Dung]
+  ef:
+    nox: 80
+    sox: 100
+    nh3: 150
+    pm2_5: 1500
+    pm10: 1550
+    co: 7000
+    nmvoc: 900
+    ch4: 500
+    co2: missing

@@ -12,14 +12,16 @@ from typing import Any
 import yaml
 
 # Top of file — user edits here only
-SECTORS = ["industry", "fugitive", "aviation", "agricultural"]
+
+SECTORS = ["waste", "solvents", "offroad", 'shipping', "industry", "fugitive", "aviation", "agricultural"]
 SECTORS_ENABLED = SECTORS
-COUNTRY = "Austria"  # maps to NUTS CNTR_CODE (e.g. EL)
+COUNTRY = "Belgium"  # maps to NUTS CNTR_CODE (e.g. EL)
 OUTPUT_DIR = f"INPUT/Proxy/OSM/{COUNTRY}"  # GeoPackage output folder (repo-relative or absolute)
 LOG_LEVEL = "DEBUG"  # DEBUG | INFO | WARNING | ERROR
 NO_BBOX_EXTRACT = False
 ALLOW_LARGE_PBF_WITHOUT_OSMIUM = False
 OSMIUM_EXE = None  # None → shutil.which("osmium")
+PARSE_PROGRESS = True  # tqdm bar during pyosmium (pip install tqdm); else log every 500k objects
 
 COUNTRY_TO_CNTR: dict[str, str] = {
     "Austria": "AT",
@@ -182,6 +184,8 @@ def main() -> int:
     for sid in SECTORS_ENABLED:
         sk = str(sid).strip()
         entry = sector_entry(run_cfg, sk)
+        if PARSE_PROGRESS:
+            entry["show_parse_progress"] = True
         out = output_gpkg(root, defaults, sk)
         log.sector_info(sk, f"start -> {out.name}")
         t0 = time.perf_counter()

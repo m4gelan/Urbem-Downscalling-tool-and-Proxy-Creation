@@ -1,0 +1,238 @@
+filepaths:
+  CAMS:
+    path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  OSM:
+    path: INPUT/Proxy/OSM/Country/solvents_layers.gpkg
+  EPRTR:
+    path: INPUT/Proxy/EPRTR/F1_4_Air_Releases_Facilities.csv
+  CORINE:
+    path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  Population:
+    path: INPUT/Proxy/Population/JRC-ESTAT_Census_Population_2021_100m.tif
+  Alpha:
+    path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
+    config: proxy/config/alpha_methods.yaml
+
+pollutants:
+- CO
+- NOx
+- NH3
+- NMVOC
+- PM10
+- PM2.5
+- SOx
+
+cams_point_sources:
+  year: 2019
+  emission_category_indices: [5]
+  source_type_indices: [2]
+  max_match_distance_km: 20.0
+
+cams_area_sources:
+  year: 2019
+  emission_category_indices: [5]
+  source_type_indices: [1]
+
+eprtr_point_sources:
+  reportingYears:
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  eprtr_sector_code:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 6
+  eprtr_sub_sector_codes:
+  - 1(a)
+  - 1(b)
+  - 1(c)
+  - 1(d)
+  - 1(e)
+  - 2(a)
+  - 2(b)
+  - 2(c)(i)
+  - 2(c)(ii)
+  - 2(c)(iii)
+  - 2(e)(i)
+  - 2(e)(ii)
+  - 3(a)
+  - 3(b)
+  - 3(c)(i)
+  - 3(c)(ii)
+  - 3(e)
+  - 3(f)
+  - 3(g)
+  - 4(a)(i)
+  - 4(a)(ii)
+  - 4(a)(iii)
+  - 4(a)(iv)
+  - 4(a)(v)
+  - 4(a)(vi)
+  - 4(a)(vii)
+  - 4(a)(viii)
+  - 4(a)(ix)
+  - 4(b)(i)
+  - 4(b)(ii)
+  - 4(b)(iii)
+  - 4b(iv)
+  - 4(b)(v)
+  - 4(c)
+  - 4(d)
+  - 4(e)
+  - 4(f)
+  - 6(a)
+  - 6(b)
+  
+corine:
+  band: 1
+  min_patch_area_m2: 50000
+  max_match_distance_km: 30.0
+  l3_codes_household:
+    - 111
+    - 112
+  l3_codes_service:
+    - 121
+  l3_codes_industrial:
+    - 121
+    - 133
+  l3_codes_transport:
+    - 122
+  
+# OSM from fugitive_layers.gpkg (plugin default layer name ``osm_energy_polygons`` unless you rebuilt with --layer).
+osm:
+  metric_crs: EPSG:3035
+  domain_clip_buffer_m: 0
+  buffer_m:
+    point: 0
+    line: 0
+    polygon: 25
+  layer_order:
+    - osm_roads
+    - osm_landuse
+    - osm_buildings
+    - osm_aeroway
+  rasterize:
+    burn_value: 1.0
+    fill: 0.0
+    dtype: float32
+    all_touched: true
+  subgroups:
+    service:
+      slots:
+        - id: service
+          buffer_m:
+            polygon: 25
+          match:
+            any_of:
+              - landuse: retail
+              - landuse: commercial
+              - landuse: civic
+              - landuse: public
+    industrial:
+      slots:
+        - id: industrial
+          buffer_m:
+            polygon: 25
+          match:
+            any_of:
+              - building: industrial
+              - building: commercial
+              - building: warehouse
+              - building: service
+              - aeroway: true
+    roads:
+      slots:
+        - id: roads
+          buffer_m:
+            line: 5
+          match:
+            any_of:
+              - highway: motorway
+              - highway: motorway_link
+              - highway: trunk
+              - highway: trunk_link
+              - highway: primary
+              - highway: primary_link
+              - highway: secondary
+              - highway: secondary_link
+              - highway: tertiary
+              - highway: tertiary_link
+              - highway: residential
+
+weights:
+  household:
+    w_corine : 0.3
+    w_population: 0.7
+  service:
+    w_corine_urban: 0.4
+    w_corine_service: 0.35
+    w_osm_service: 0.25
+  industrial:
+    w_corine_industrial: 0.6
+    w_osm_industrial: 0.4
+  infrastructure:
+    w_osm_roads: 0.8
+    w_corine_transport: 0.2
+
+
+beta:
+  domestic_solvent_use:
+    household: 1.0
+    service: 0.0
+    industrial: 0.0
+    infrastructure: 0.0
+  road_paving:
+    household: 0.0
+    service: 0.0
+    industrial: 0.0
+    infrastructure: 1.0
+  asphalt_roofing:
+    household: 0.0
+    service: 0.0
+    industrial: 1.0
+    infrastructure: 0.0
+  coating_application:
+    household: 0.3
+    service: 0.25
+    industrial: 0.45
+    infrastructure: 0.0
+  degreasing:
+    household: 0.0
+    service: 0.2  
+    industrial: 0.8
+    infrastructure: 0.0
+  dry_cleaning:
+    household: 0.0
+    service: 1.0
+    industrial: 0.0
+    infrastructure: 0.0
+  chemical_products:
+    household: 0.0
+    service: 0.0
+    industrial: 1.0
+    infrastructure: 0.0
+  printing:
+    household: 0.0
+    service: 0.5
+    industrial: 0.5
+    infrastructure: 0.0
+  other:
+    household: 0.2
+    service: 0.3
+    industrial: 0.5
+    infrastructure: 0.0
