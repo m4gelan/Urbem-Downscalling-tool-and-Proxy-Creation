@@ -11,6 +11,7 @@ venv/
 .cursor
 
 # Data / datasets (keep local; usually large or licensed)
+.cursor copy/
 data/
 INPUT/Emissions/
 INPUT/Proxy/*
