@@ -9,14 +9,18 @@ __pycache__/
 .venv/
 venv/
 .cursor
-.cursorignore copy
+.cursorignore
+.cursor/
+
+
 # Data / datasets (keep local; usually large or licensed)
-.cursor copy/
 data/
 INPUT/Emissions/
 INPUT/Proxy/*
 !INPUT/Proxy/Dataset_sources.md
 INPUT/OLD
+INPUT/Proxy_weights/
+
 INPUT/Preprocess/OSM/_source
 Output/
 OLD CODES/
@@ -47,7 +51,7 @@ Comparaison/
 *.jpg
 *.html
 *.pdf
-
+*.txt
 # Archives
 *.zip
 *.7z
