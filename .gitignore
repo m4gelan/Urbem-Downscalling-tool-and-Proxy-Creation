@@ -9,7 +9,7 @@ __pycache__/
 .venv/
 venv/
 .cursor
-
+.cursorignore copy
 # Data / datasets (keep local; usually large or licensed)
 .cursor copy/
 data/
