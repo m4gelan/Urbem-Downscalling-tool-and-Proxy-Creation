@@ -5,12 +5,12 @@ import yaml
 from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
-from proxy.core.area_weights import normalize_W_per_cams_cell
+from proxy.core.area_weights import fuse_alpha_weighted_W_planes, normalize_W_per_cams_cell
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 from proxy.writers.debug_dump import KAgAreaWeightsDebug, write_k_agriculture_area_weights_debug
-from proxy.writers.area_weight_stack import write_area_weight_stack_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.visualizers.area_weights_map import write_k_agriculture_area_weights_debug_map
 
 from proxy.sector.K_Agriculture.signals.farm_buildings import build_farm_buildings
@@ -232,16 +232,16 @@ def build(
 
     a_alpha = alpha_result.alpha.astype(np.float32)
     n_poll = a_alpha.shape[0]
+    W_per_group = [W_by_group[gname] for gname in group_names]
     W_poll_stack = np.zeros((n_poll, h, w), dtype=np.float32)
     for j in range(n_poll):
-        acc = np.zeros((h, w), dtype=np.float32)
-        for i, gname in enumerate(group_names):
-            acc += np.float32(a_alpha[j, i]) * W_by_group[gname]
-        W_poll_stack[j] = acc
+        W_poll_stack[j] = fuse_alpha_weighted_W_planes(
+            W_per_group, a_alpha[j], cell_id, cams_cells,
+        )
 
     country_tag = country_profile["full_name"].replace(" ", "_")
     band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
-    out_w_tif = output_dir / f"K_Agriculture_{country_tag}_area_weights_alpha_{year}.tif"
+    out_w_tif = area_weights_tif_path(output_dir, "K_Agriculture", country_tag, year)
     write_area_weight_stack_multiband(out_w_tif, W_poll_stack, band_names, cor_tr, cor_crs)
     log.info(f"K_Agriculture alpha-fused area weights GeoTIFF: {out_w_tif}")
 

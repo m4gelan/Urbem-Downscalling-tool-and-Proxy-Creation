@@ -10,7 +10,11 @@ from rasterio.warp import Resampling
 from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
-from proxy.core.area_weights import compute_d_fugitive_S_by_subgroup, normalize_W_per_cams_cell
+from proxy.core.area_weights import (
+    compute_d_fugitive_S_by_subgroup,
+    fuse_alpha_weighted_W_planes,
+    normalize_W_per_cams_cell,
+)
 from proxy.core.point_matching.matching import match_cams_to_facilities_one_to_one
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.core.z_score import z_score_inside
@@ -25,7 +29,7 @@ from proxy.dataset_loaders.load_population import load_population
 from proxy.dataset_loaders.load_viirs import load_vnf_nightfire_buffer_mask
 from proxy.visualizers.area_weights_map import write_d_fugitive_area_weights_debug_map
 from proxy.visualizers.viz_map import write_point_match_map
-from proxy.writers.area_weight_stack import write_area_weight_stack_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
 
 
@@ -388,14 +392,13 @@ def build(
 
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
             for j in range(n_poll):
-                acc = np.zeros((ch, cw), dtype=np.float64)
-                for i in range(n_g):
-                    acc += a_alpha[j, i] * W_per_group[i].astype(np.float64)
-                W_poll_stack[j] = acc.astype(np.float32)
+                W_poll_stack[j] = fuse_alpha_weighted_W_planes(
+                    W_per_group, a_alpha[j], cell_id, cams_cells_mask,
+                )
 
             country_tag = country_profile["full_name"].replace(" ", "_")
             band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
-            out_w_tif = output_dir / f"D_Fugitive_{country_tag}_area_weights_alpha_{year}.tif"
+            out_w_tif = area_weights_tif_path(output_dir, "D_Fugitive", country_tag, year)
             write_area_weight_stack_multiband(
                 out_w_tif,
                 W_poll_stack,

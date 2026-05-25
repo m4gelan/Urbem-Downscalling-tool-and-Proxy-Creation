@@ -1,3 +1,0 @@
-"""
-UrbEm Interface - Desktop UI.
-"""

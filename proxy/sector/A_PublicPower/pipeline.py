@@ -22,7 +22,7 @@ from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.core.area_weights import combined_S_publicpower, normalize_W_per_cams_cell
 from proxy.core.z_score import z_score_inside
-from proxy.writers.area_weight_stack import write_area_weight_equal_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_equal_multiband
 
 
 def build(
@@ -224,18 +224,17 @@ def build(
         aw = cfg.get("area_weights") or {}
         w1 = float(aw.get("w1"))
         w2 = float(aw.get("w2"))
-        delta = float(aw.get("delta"))
 
         # 3 Combined score S and per-CAMS-cell weights W (cell_id from CORINE loader)
         corine_01 = corine_map.astype(np.float64)
         log.info(f"Raster ready, computing area weights...")
-        S = combined_S_publicpower(population_z, corine_01, w1=w1, w2=w2, delta=delta)
+        S = combined_S_publicpower(population_z, corine_01, w1=w1, w2=w2)
         W = normalize_W_per_cams_cell(S, cell_id, cams_cells_mask)
 
         # 4 Multi-band GeoTIFF on CORINE reference grid
         country_tag = country_profile["full_name"].replace(" ", "_")
         band_vals = W
-        out_tif = output_dir / f"A_PublicPower_{country_tag}_area_weights_{year}.tif"
+        out_tif = area_weights_tif_path(output_dir, "A_PublicPower", country_tag, year)
         write_area_weight_equal_multiband(
             out_tif,
             band_vals,

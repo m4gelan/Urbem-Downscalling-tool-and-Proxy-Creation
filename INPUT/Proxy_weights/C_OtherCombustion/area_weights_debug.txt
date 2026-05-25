@@ -1,0 +1,139 @@
+C_OtherCombustion — area weights debug (M = f_enduse * f_GAINS * s_r * EF)
+========================================================================
+
+EUROSTAT  year=2021  iso3=AUT  geo=AT
+
+Commercial vs residential split (nrg_bal_s, TJ):
+  FC_OTH_CP_E (commercial)       109123.442
+  FC_OTH_HH_E (households)     327058.129
+  total                        436181.571
+  commercial_alpha (CP/total) 0.250179
+  residential_share (HH/total) 0.749821
+
+Household end-use energy (TJ, nrg_d_hhq)
+  cooking              8024.649
+  lighting_appliances  35219.682
+  other_end_use        13290.738
+  space_heating        226865.471
+  water_heating        43317.932
+  (sum 326718.472 TJ)
+
+Residential metric shares f_by_metric
+  cooking              0.0184166
+  lighting_appliances  0.0808294
+  other_end_use        0.0305023
+  space_heating        0.520658
+  water_heating        0.0994149
+
+f_enduse by bucket
+  commercial               0.250179
+  cooking                  0.0184166
+  space_and_water_heating  0.620073
+  space_heating            0.520658
+
+f_enduse by class (bucket in parentheses):
+  C_BOILER_AUT      0.250179  (commercial)
+  C_BOILER_MAN      0.250179  (commercial)
+  R_BOILER_AUT      0.620073  (space_and_water_heating)
+  R_BOILER_MAN      0.620073  (space_and_water_heating)
+  R_COOKING_STOVE   0.0184166  (cooking)
+  R_FIREPLACE       0.520658  (space_heating)
+  R_HEATING_STOVE   0.520658  (space_heating)
+
+Eurostat API sources:
+  nrg_bal_s: cache
+  nrg_d_hhq/FC_OTH_HH_E_CK: cache
+  nrg_d_hhq/FC_OTH_HH_E_CL: cache
+  nrg_d_hhq/FC_OTH_HH_E_LE: cache
+  nrg_d_hhq/FC_OTH_HH_E_OE: cache
+  nrg_d_hhq/FC_OTH_HH_E_SH: cache
+  nrg_d_hhq/FC_OTH_HH_E_WH: cache
+
+========================================================================
+
+GAINS  year=2020  country='Austria'  mapped_rows=45  unmapped_rows=0
+
+f_GAINS by class
+  C_BOILER_AUT     0.25
+  C_BOILER_MAN     0.75
+  R_BOILER_AUT     0.0839871
+  R_BOILER_MAN     0.916013
+  R_COOKING_STOVE  0
+  R_FIREPLACE      0.00169101
+  R_HEATING_STOVE  0.998309
+
+Activity weight w_sum by class
+  C_BOILER_AUT     2.0000
+  C_BOILER_MAN     6.0000
+  R_BOILER_AUT     0.8810
+  R_BOILER_MAN     9.6087
+  R_COOKING_STOVE  0.0000
+  R_FIREPLACE      0.0127
+  R_HEATING_STOVE  7.4976
+
+Activity weight w_sum by bucket
+  commercial               8.0000
+  space_and_water_heating  10.4897
+  space_heating            7.5103
+
+Mapped GAINS rows (fuel | appliance -> class, bucket, share, s_r):
+  fuel                                 appliance                                        class            bucket                   share       s_r
+  --------------------------------------------------------------------------------------------------------------------------------------------
+  Agricultural residues                Medium boilers (<50MW) - automatic (commercial)  C_BOILER_AUT     commercial              1.0000       0.5
+  Fuelwood                             Medium boilers (<50MW) - automatic (commercial)  C_BOILER_AUT     commercial              1.0000       0.5
+  Brown coal/lignite grade 1           Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Brown coal/lignite grade 2 (also ... Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Derived coal (coke, briquettes)      Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Hard coal, grade 1                   Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Hard coal, grade 2                   Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Hard coal, grade 3                   Medium boilers (<1MW) - manual (commercial)      C_BOILER_MAN     commercial              1.0000  0.166667
+  Fuelwood                             Medium boilers (<50MW) - automatic (agr, fore... R_BOILER_AUT     space_and_water_heating  0.7000  0.794552
+  Fuelwood                             Single house boilers (<50 kW) - automatic (ho... R_BOILER_AUT     space_and_water_heating  0.1810  0.205448
+  Brown coal/lignite grade 1           Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  1.0000  0.104072
+  Brown coal/lignite grade 2 (also ... Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  1.0000  0.104072
+  Brown coal/lignite grade 1           Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Brown coal/lignite grade 2 (also ... Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Derived coal (coke, briquettes)      Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Hard coal, grade 1                   Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Hard coal, grade 2                   Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Hard coal, grade 3                   Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.6667  0.069385
+  Derived coal (coke, briquettes)      Single house boilers (<50 kW) - manual (agr, ... R_BOILER_MAN     space_and_water_heating  0.6000 0.0624434
+  Hard coal, grade 1                   Single house boilers (<50 kW) - manual (agr, ... R_BOILER_MAN     space_and_water_heating  0.6000 0.0624434
+  Hard coal, grade 2                   Single house boilers (<50 kW) - manual (agr, ... R_BOILER_MAN     space_and_water_heating  0.6000 0.0624434
+  Hard coal, grade 3                   Single house boilers (<50 kW) - manual (agr, ... R_BOILER_MAN     space_and_water_heating  0.6000 0.0624434
+  Fuelwood                             Single house boilers (<50 kW) - manual (house... R_BOILER_MAN     space_and_water_heating  0.5785 0.0602059
+  Fuelwood                             Single house boilers (<50 kW) - manual (agr, ... R_BOILER_MAN     space_and_water_heating  0.2300 0.0239366
+  Derived coal (coke, briquettes)      Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  0.1000 0.0104072
+  Hard coal, grade 1                   Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  0.1000 0.0104072
+  Hard coal, grade 2                   Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  0.1000 0.0104072
+  Hard coal, grade 3                   Medium boilers (<1MW) - manual (agr, forestry... R_BOILER_MAN     space_and_water_heating  0.1000 0.0104072
+  Fuelwood                             Fireplaces (households)                          R_FIREPLACE      space_heating           0.0127         1
+  Agricultural residues                Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           1.0000  0.133376
+  Agricultural residues                Heating stoves (households)                      R_HEATING_STOVE  space_heating           1.0000  0.133376
+  Dung                                 Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           1.0000  0.133376
+  Dung                                 Heating stoves (households)                      R_HEATING_STOVE  space_heating           1.0000  0.133376
+  Brown coal/lignite grade 1           Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Brown coal/lignite grade 2 (also ... Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Derived coal (coke, briquettes)      Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Hard coal, grade 1                   Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Hard coal, grade 2                   Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Hard coal, grade 3                   Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.3333 0.0444542
+  Derived coal (coke, briquettes)      Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           0.3000 0.0400128
+  Hard coal, grade 1                   Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           0.3000 0.0400128
+  Hard coal, grade 2                   Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           0.3000 0.0400128
+  Hard coal, grade 3                   Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           0.3000 0.0400128
+  Fuelwood                             Heating stoves (households)                      R_HEATING_STOVE  space_heating           0.2278 0.0303831
+  Fuelwood                             Heating stoves (agr, forestry, other)            R_HEATING_STOVE  space_heating           0.0700 0.00933632
+
+========================================================================
+
+M matrix  [rows=pollutant, cols=class]  kg/TJ after f_enduse * f_GAINS * s_r * EF
+
+pollutant,R_FIREPLACE,R_HEATING_STOVE,R_COOKING_STOVE,R_BOILER_MAN,R_BOILER_AUT,C_BOILER_MAN,C_BOILER_AUT
+CO,3.52175,2102.25,0,191.17,26.0391,312.724,21.8907
+NOx,0.0440219,53.2976,0,4.34912,4.16625,25.0179,5.97302
+NH3,0.0616307,31.9485,0,0.57351,0.624938,0,0.0625447
+NMVOC,0.528263,273.742,0,22.9404,0.520781,31.2724,0.750537
+PM10,0.739568,402.661,0,18.6391,2.55183,29.7087,2.65815
+PM2.5,0.721959,387.598,0,18.1611,2.49975,26.5815,2.56433
+SOx,0.00968482,101.091,0,0.525717,0.57286,140.726,1.90761

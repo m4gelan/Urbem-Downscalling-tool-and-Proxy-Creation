@@ -194,11 +194,14 @@ _OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 _SATELLITE_TILES = (
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 )
+# Fixed PNG/HTML default: street map (readable labels/roads). Satellite kept as optional layer in HTML.
+_BASEMAP_URL = _OSM_TILES
 _MAX_DISPLAY_PX = 2400
-_EXPORT_DPI = 200
-_TITLE_BAND_IN = 0.55
-_FOOTER_BAND_IN = 0.32
-_HPAD_IN = 0.12
+_MIN_EXPORT_LONG_PX = 1400
+_TITLE_PX = 52
+_FOOTER_PX = 34
+_COLORBAR_PX = 44
+_CAMS_OUTLINE_RGB = (100, 100, 100)
 # Per CAMS cell: hide values below this fraction of the cell max (transparent on map, not colormap floor).
 _CAMS_DISPLAY_FLOOR_FRAC = 0.05
 
@@ -527,6 +530,22 @@ class RenderedLayer:
     kind: str
 
 
+def _crop_display_wh(
+    arrays: dict[str, np.ndarray],
+    cell_id: np.ndarray,
+    *,
+    bbox_wgs84: tuple[float, float, float, float],
+    transform: rasterio.Affine,
+    raster_crs: Any,
+) -> tuple[tuple[int, int], tuple[float, float, float, float]]:
+    keys = {k: v for k, v in arrays.items() if k != "cid"}
+    keys["cid"] = cell_id
+    cropped, _, bbox_use = _crop_to_wgs84_bbox(keys, transform, raster_crs, bbox_wgs84)
+    hh, ww = cropped["cid"].shape
+    sc = min(1.0, _MAX_DISPLAY_PX / max(hh, ww))
+    return (max(2, int(round(ww * sc))), max(2, int(round(hh * sc)))), bbox_use
+
+
 def _prepare_layers(
     sector: str,
     arrays: dict[str, np.ndarray],
@@ -537,6 +556,7 @@ def _prepare_layers(
     cams_cells: dict[int, dict[str, Any]],
     cell_id: np.ndarray,
     style_overrides: dict[str, LayerStyle] | None = None,
+    render_wh: tuple[int, int] | None = None,
 ) -> tuple[list[RenderedLayer], tuple[float, float, float, float], tuple[int, int]]:
     keys = {k: v for k, v in arrays.items() if k != "cid"}
     keys["cid"] = cell_id
@@ -544,9 +564,12 @@ def _prepare_layers(
     west, south, east, north = bbox_use
     cid = cropped["cid"].astype(np.int64)
     hh, ww = cid.shape
-    sc = min(1.0, _MAX_DISPLAY_PX / max(hh, ww))
-    dst_h = max(2, int(round(hh * sc)))
-    dst_w = max(2, int(round(ww * sc)))
+    if render_wh is not None:
+        dst_w, dst_h = int(render_wh[0]), int(render_wh[1])
+    else:
+        sc = min(1.0, _MAX_DISPLAY_PX / max(hh, ww))
+        dst_h = max(2, int(round(hh * sc)))
+        dst_w = max(2, int(round(ww * sc)))
 
     def warp(src: np.ndarray, nearest: bool, dtype: np.dtype, fill: Any) -> np.ndarray:
         res = Resampling.nearest if nearest else Resampling.bilinear
@@ -668,11 +691,22 @@ def _sample_mosaic_bilinear(mosaic: np.ndarray, fx: np.ndarray, fy: np.ndarray) 
     return np.clip(top * (1.0 - wy) + bot * wy, 0.0, 255.0).astype(np.uint8)
 
 
+def _export_wh(dst_wh: tuple[int, int]) -> tuple[int, int]:
+    w, h = dst_wh
+    long = max(w, h)
+    if long >= _MIN_EXPORT_LONG_PX:
+        return w, h
+    s = _MIN_EXPORT_LONG_PX / long
+    return max(2, int(round(w * s))), max(2, int(round(h * s)))
+
+
 def _basemap_rgb_for_bbox(
     bbox_wgs84: tuple[float, float, float, float],
     dst_wh: tuple[int, int],
+    *,
+    tiles_url: str = _BASEMAP_URL,
 ) -> np.ndarray:
-    """OpenStreetMap standard tiles, bilinear-resampled to the overlay grid."""
+    """Map tiles bilinear-resampled to the overlay grid (OpenStreetMap by default)."""
     west, south, east, north = bbox_wgs84
     dst_w, dst_h = dst_wh
     z = _zoom_for_bbox(west, south, east, north, dst_w)
@@ -686,7 +720,7 @@ def _basemap_rgb_for_bbox(
     mosaic = np.zeros((mosaic_h, mosaic_w, 3), dtype=np.uint8)
     for ty in range(y0, y1 + 1):
         for tx in range(x0, x1 + 1):
-            tile = _fetch_basemap_tile(_OSM_TILES, z, tx, ty)
+            tile = _fetch_basemap_tile(tiles_url, z, tx, ty)
             row = (ty - y0) * 256
             col = (tx - x0) * 256
             mosaic[row : row + 256, col : col + 256] = tile
@@ -711,20 +745,24 @@ def _blend_rgba_on_rgb(base: np.ndarray, overlay: np.ndarray) -> np.ndarray:
     return np.clip(bg * (1.0 - a) + fg * a, 0, 255).astype(np.uint8)
 
 
-def _draw_cams_outlines_on_ax(
-    ax: Any,
+def _draw_cams_outlines_on_rgb(
+    img: np.ndarray,
     cams_cells: dict[int, dict[str, Any]],
     bbox_use: tuple[float, float, float, float],
-    dst_wh: tuple[int, int],
-) -> None:
+    img_wh: tuple[int, int],
+) -> np.ndarray:
+    from PIL import Image, ImageDraw
+
     west, south, east, north = bbox_use
-    dst_w, dst_h = dst_wh
+    w, h = img_wh
     lon_span = max(east - west, 1e-12)
     lat_span = max(north - south, 1e-12)
+    pil = Image.fromarray(img)
+    draw = ImageDraw.Draw(pil)
 
     def to_px(lon: float, lat: float) -> tuple[float, float]:
-        x = (lon - west) / lon_span * (dst_w - 1)
-        y = (north - lat) / lat_span * (dst_h - 1)
+        x = (lon - west) / lon_span * (w - 1)
+        y = (north - lat) / lat_span * (h - 1)
         return x, y
 
     for row in cams_cells.values():
@@ -732,18 +770,63 @@ def _draw_cams_outlines_on_ax(
         cw, ce, cs, cn = b["west"], b["east"], b["south"], b["north"]
         if ce < west or cw > east or cn < south or cs > north:
             continue
-        ring = (to_px(cw, cs), to_px(ce, cs), to_px(ce, cn), to_px(cw, cn), to_px(cw, cs))
-        xs, ys = zip(*ring)
-        ax.plot(xs, ys, color="#888888", linewidth=0.6, alpha=0.55, linestyle=(0, (4, 3)))
+        ring = [to_px(cw, cs), to_px(ce, cs), to_px(ce, cn), to_px(cw, cn), to_px(cw, cs)]
+        draw.line(ring, fill=_CAMS_OUTLINE_RGB, width=1)
+    return np.asarray(pil)
 
 
-def _bbox_footer(bbox_use: tuple[float, float, float, float], dst_wh: tuple[int, int]) -> str:
+def _colorbar_rgb(cmap_name: str, vmin: float, vmax: float, height: int, width: int = _COLORBAR_PX) -> np.ndarray:
+    cmap = _get_cmap(cmap_name)
+    t = np.linspace(1.0, 0.0, height, dtype=np.float32)[:, np.newaxis]
+    rgba = (cmap(t) * 255.0).astype(np.uint8)
+    bar = np.repeat(rgba, width, axis=1)
+    return bar[:, :, :3]
+
+
+def _bbox_footer(bbox_use: tuple[float, float, float, float], export_wh: tuple[int, int]) -> str:
     west, south, east, north = bbox_use
-    dst_w, dst_h = dst_wh
-    return (
-        f"WGS84 {west:.4f}, {south:.4f} → {east:.4f}, {north:.4f}  |  "
-        f"{dst_w}×{dst_h} px @ {_EXPORT_DPI} dpi"
-    )
+    ew, eh = export_wh
+    return f"WGS84 {west:.4f}, {south:.4f} → {east:.4f}, {north:.4f}  |  {ew}×{eh} px"
+
+
+def _save_fixed_png(
+    out_file: Path,
+    map_rgb: np.ndarray,
+    *,
+    title: str,
+    footer: str,
+    colorbar: np.ndarray | None = None,
+    cbar_vmin: float | None = None,
+    cbar_vmax: float | None = None,
+) -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    mh, mw = map_rgb.shape[:2]
+    bar_w = colorbar.shape[1] if colorbar is not None else 0
+    canvas_w = mw + bar_w
+    canvas_h = mh + _TITLE_PX + _FOOTER_PX
+    canvas = np.full((canvas_h, canvas_w, 3), 255, dtype=np.uint8)
+    canvas[_TITLE_PX : _TITLE_PX + mh, :mw] = map_rgb
+    if colorbar is not None:
+        bh = min(colorbar.shape[0], mh)
+        canvas[_TITLE_PX : _TITLE_PX + bh, mw : mw + bar_w] = colorbar[:bh]
+
+    pil = Image.fromarray(canvas)
+    draw = ImageDraw.Draw(pil)
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 18)
+        font_footer = ImageFont.truetype("arial.ttf", 11)
+        font_cbar = ImageFont.truetype("arial.ttf", 9)
+    except OSError:
+        font_title = ImageFont.load_default()
+        font_footer = font_title
+        font_cbar = font_title
+    draw.text((12, 10), title, fill=(26, 26, 26), font=font_title)
+    draw.text((12, _TITLE_PX + mh + 6), footer, fill=(85, 85, 85), font=font_footer)
+    if colorbar is not None and cbar_vmax is not None and cbar_vmin is not None:
+        draw.text((mw + 4, _TITLE_PX + 2), f"{cbar_vmax:.4g}", fill=(60, 60, 60), font=font_cbar)
+        draw.text((mw + 4, _TITLE_PX + mh - 14), f"{cbar_vmin:.4g}", fill=(60, 60, 60), font=font_cbar)
+    pil.save(out_file, format="PNG", optimize=True)
 
 
 def _write_fixed_images(
@@ -755,67 +838,56 @@ def _write_fixed_images(
     dst_wh: tuple[int, int],
     cams_cells: dict[int, dict[str, Any]],
 ) -> Path:
-    import matplotlib.pyplot as plt
+    from PIL import Image
 
     from proxy.core import log
 
     out_dir = out_path.with_suffix("")
     out_dir.mkdir(parents=True, exist_ok=True)
     sector_label = sector.replace("_", " ")
-    footer = _bbox_footer(bbox_use, dst_wh)
-    dst_w, dst_h = dst_wh
-    map_w_in = dst_w / _EXPORT_DPI
-    map_h_in = dst_h / _EXPORT_DPI
-    fig_w = map_w_in + 2 * _HPAD_IN
-    fig_h = map_h_in + _TITLE_BAND_IN + _FOOTER_BAND_IN + _HPAD_IN
-    ax_left = _HPAD_IN / fig_w
-    ax_width = map_w_in / fig_w
-    ax_bottom = _FOOTER_BAND_IN / fig_h
-    ax_height = map_h_in / fig_h
+    ew, eh = _export_wh(dst_wh)
+    footer = _bbox_footer(bbox_use, (ew, eh))
 
     try:
-        basemap = _basemap_rgb_for_bbox(bbox_use, dst_wh)
+        basemap = _basemap_rgb_for_bbox(bbox_use, (ew, eh))
     except Exception as exc:
         log.warning(f"FIXED_IMAGE basemap fetch failed ({exc}); saving overlays only")
         basemap = None
 
     for layer in layers:
-        if basemap is not None and basemap.shape[:2] == layer.rgba.shape[:2]:
-            img = _blend_rgba_on_rgb(basemap, layer.rgba)
+        rgba = layer.rgba
+        if rgba.shape[0] != eh or rgba.shape[1] != ew:
+            log.warning(
+                f"FIXED_IMAGE layer {layer.key!r} size {rgba.shape[1]}x{rgba.shape[0]} "
+                f"!= export {ew}x{eh}; resizing"
+            )
+            res = (
+                Image.Resampling.NEAREST
+                if layer.kind in ("mask_rgb", "corine_gray", "osm_blue")
+                else Image.Resampling.LANCZOS
+            )
+            rgba = np.asarray(Image.fromarray(rgba).resize((ew, eh), resample=res))
+
+        if basemap is not None and basemap.shape[:2] == (eh, ew):
+            img = _blend_rgba_on_rgb(basemap, rgba)
         else:
-            img = layer.rgba[:, :, :3]
+            img = rgba[:, :, :3].copy()
 
-        fig = plt.figure(figsize=(fig_w, fig_h), facecolor="white")
-        ax = fig.add_axes([ax_left, ax_bottom, ax_width, ax_height])
-        ax.imshow(img, origin="upper", aspect="equal", interpolation="nearest")
-        ax.set_xlim(-0.5, dst_w - 0.5)
-        ax.set_ylim(dst_h - 0.5, -0.5)
-        ax.axis("off")
-        _draw_cams_outlines_on_ax(ax, cams_cells, bbox_use, dst_wh)
-
-        title_y = 1.0 - _HPAD_IN / fig_h / 2
-        fig.text(
-            0.5,
-            title_y,
-            f"{sector_label}  ·  {layer.title}",
-            ha="center",
-            va="top",
-            fontsize=13,
-            fontweight="semibold",
-            color="#1a1a1a",
-        )
-        fig.text(0.5, _FOOTER_BAND_IN / fig_h / 2, footer, ha="center", va="center", fontsize=8, color="#555555")
-
+        img = _draw_cams_outlines_on_rgb(img, cams_cells, bbox_use, (ew, eh))
+        cbar = None
         if layer.kind == "float":
-            cax = fig.add_axes([ax_left + ax_width + 0.01, ax_bottom, 0.015, ax_height])
-            sm = plt.cm.ScalarMappable(cmap=_get_cmap(layer.cmap), norm=plt.Normalize(layer.vmin, layer.vmax))
-            cb = fig.colorbar(sm, cax=cax)
-            cb.ax.tick_params(labelsize=7)
-            cb.set_label(f"{layer.vmin:.4g} – {layer.vmax:.4g}", fontsize=8)
+            cbar = _colorbar_rgb(layer.cmap, layer.vmin, layer.vmax, eh)
 
         out_file = out_dir / f"{_slug(sector)}__{_slug(layer.title)}.png"
-        fig.savefig(out_file, dpi=_EXPORT_DPI, pad_inches=0)
-        plt.close(fig)
+        _save_fixed_png(
+            out_file,
+            img,
+            title=f"{sector_label}  ·  {layer.title}",
+            footer=footer,
+            colorbar=cbar,
+            cbar_vmin=layer.vmin if layer.kind == "float" else None,
+            cbar_vmax=layer.vmax if layer.kind == "float" else None,
+        )
     return out_dir
 
 
@@ -895,7 +967,7 @@ def _write_interactive_map(
     <div style="position:fixed;bottom:20px;left:12px;z-index:9999;background:white;padding:10px 12px;
       border:1px solid #888;font-size:11px;max-width:420px;max-height:45vh;overflow-y:auto;">
       <b>{sector} area weights (DEBUG)</b><br>
-      Base: <b>Satellite</b> (toggle layers in control, top-right)<br>
+      Base: <b>OpenStreetMap</b> (Satellite optional in layer control, top-right)<br>
       Bbox WGS84: {west:.3f},{south:.3f} … {east:.3f},{north:.3f}<br>
       Display ~ {dst_w}×{dst_h} px{extra}
       <hr style="margin:6px 0;">
@@ -921,9 +993,16 @@ def _emit_sector_viz(
     legend_html: str = "",
     style_overrides: dict[str, LayerStyle] | None = None,
 ) -> Path:
+    render_wh = None
+    if map_type() == "FIXED_IMAGE":
+        base_wh, _ = _crop_display_wh(
+            arrays, cell_id, bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
+        )
+        render_wh = _export_wh(base_wh)
     layers, bbox_use, dst_wh = _prepare_layers(
         sector, arrays, bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
         cams_cells=cams_cells, cell_id=cell_id, style_overrides=style_overrides,
+        render_wh=render_wh,
     )
     if map_type() == "FIXED_IMAGE":
         return _write_fixed_images(

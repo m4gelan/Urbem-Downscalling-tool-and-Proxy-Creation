@@ -45,6 +45,5 @@ corine:
 # S = w1*pop_z + w2*pop_z**(1 - delta*CORINE); CORINE mask is 0/1 eligibility.
 # multiband_raster_field: duplicate "S" or per-cell-normalised "W" into each pollutant band.
 area_weights:
-  w1: 0.5
-  w2: 0.5
-  delta: 0.5
+  w1: 0.4
+  w2: 0.6

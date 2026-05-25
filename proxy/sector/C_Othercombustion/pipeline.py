@@ -20,7 +20,7 @@ from proxy.visualizers.area_weights_map import (
     parse_c_othercombustion_debug_viz,
     write_c_othercombustion_area_weights_debug_map,
 )
-from proxy.writers.area_weight_stack import open_area_weight_stack, write_area_weight_plane
+from proxy.writers.area_weight_stack import area_weights_tif_path, open_area_weight_stack, write_area_weight_plane
 
 
 def build(
@@ -163,7 +163,6 @@ def build(
             pop_z=xb.pop_z,
             residential_w1=float(orb.get("residential_w1")),
             residential_w2=float(orb.get("residential_w2")),
-            residential_delta=float(orb.get("residential_delta")),
             alpha_result=alpha_result,
             pollutant_labels=pol_list,
         )
@@ -195,7 +194,7 @@ def build(
         gc.collect()
 
         country_tag = country_profile["full_name"].replace(" ", "_")
-        out_tif = output_dir / f"C_OtherCombustion_{country_tag}_area_weights_{year}.tif"
+        out_tif = area_weights_tif_path(output_dir, "C_Othercombustion", country_tag, year)
         band_labels = [cams_pollutant_var(p) for p in alpha_result.pollutant_labels]
         dst = open_area_weight_stack(out_tif, ch, cw, len(band_labels), xb.transform, xb.crs)
 

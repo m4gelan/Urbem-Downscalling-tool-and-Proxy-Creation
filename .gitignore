@@ -20,7 +20,7 @@ INPUT/Preprocess/OSM/_source
 Output/
 OLD CODES/
 report/
-
+Comparaison/
 # Common data / geospatial formats
 *.csv
 *.tsv

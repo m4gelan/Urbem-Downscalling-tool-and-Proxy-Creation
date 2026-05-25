@@ -2,13 +2,25 @@
 
 This repository builds spatial proxy layers for each GNFR sector of CAMS emissions (area weights and point matching).
 
-## Quick start — use pre-built proxies
+## Quick Start: Use Pre-Built Proxies
 
 For countries that have already been processed, sector-specific proxy weights are available for download:
 
 **Google Drive link:** *(add link here)*
 
-After downloading, place the files under `Output/Proxy_weights/`.
+After downloading, place the files in the same repository as `proxy/` and `UrbEm_Visualizer/`, under:
+
+```text
+INPUT/Proxy_weights/
+```
+
+Pre-built proxy weights are currently available for:
+
+- France
+- Austria
+- Greece
+
+If your country is listed above, you can skip proxy generation and go directly to [Run the visualizer](#run-the-visualizer).
 
 ## Build proxies yourself
 
@@ -16,9 +28,15 @@ If your country is not covered, or you want to regenerate the proxies, download 
 
 **Google Drive link:** *(add link here)*
 
-The folder contains the datasets required by the proxy pipeline. Two preprocessing steps are required before running it.
+The folder contains the datasets required by the proxy pipeline. Before running the pipeline, install the Python requirements and prepare the input layers below.
 
 ### Prerequisites
+
+- Install the Python requirements:
+
+```bash
+pip install -r requirements.txt
+```
 
 - Download the OSM Europe GeoPackage (see [INPUT/Proxy/Dataset_sources.md](INPUT/Proxy/Dataset_sources.md)).
 
@@ -54,4 +72,24 @@ This merges the Copernicus tile zips into a single GeoTIFF.
 python proxy/entry.py
 ```
 
-Expect roughly one hour for all sectors on a typical country.
+Expect roughly one hour for all sectors on a typical country. The generated proxy weights are written under:
+
+```text
+INPUT/Proxy_weights/
+```
+
+## Run the Visualizer
+
+Once proxy weights are available, start the interface with:
+
+If not done before
+```bash
+pip install -r requirements.txt
+```
+
+Then
+```bash
+python UrbEm_Visualizer/run.py
+```
+
+This launches the local user interface. From there, select or create a run configuration, validate the required inputs, run the downscaling workflow, and inspect the results.

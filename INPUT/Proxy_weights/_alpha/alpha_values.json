@@ -1,0 +1,507 @@
+{
+  "status": "ok",
+  "country": "GR",
+  "pollutant_filter": null,
+  "workbook_path": "C:\\Users\\leopi\\PDM_local\\INPUT\\Proxy\\Alpha\\Reported_Emissions_EU27_2018_2023.xlsx",
+  "mapping_path": "C:\\Users\\leopi\\PDM_local\\PROXY\\config\\alpha\\mapping_gnfr_to_nfr2.yaml",
+  "grouped_subsectors_path": "C:\\Users\\leopi\\PDM_local\\PROXY\\config\\alpha\\grouped_subsectors.yaml",
+  "records": [
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3a_domestic",
+      "pollutant": "NMVOC",
+      "alpha": 0.4078183929062362,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3b_road_paving",
+      "pollutant": "NMVOC",
+      "alpha": 0.0002741677339578012,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3b_road_paving",
+      "pollutant": "PM10",
+      "alpha": 0.020754925201830327,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3b_road_paving",
+      "pollutant": "PM2.5",
+      "alpha": 0.0026895480910476186,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3c_asphalt_roofing",
+      "pollutant": "CO",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3c_asphalt_roofing",
+      "pollutant": "NMVOC",
+      "alpha": 0.0008630622334366359,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3c_asphalt_roofing",
+      "pollutant": "PM10",
+      "alpha": 0.1417139825841149,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3c_asphalt_roofing",
+      "pollutant": "PM2.5",
+      "alpha": 0.04983055103561652,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3d_coating",
+      "pollutant": "NMVOC",
+      "alpha": 0.3265794073391159,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3e_degreasing",
+      "pollutant": "NMVOC",
+      "alpha": 0.04195002693801036,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3f_dry_cleaning",
+      "pollutant": "NMVOC",
+      "alpha": 0.003860162824634939,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3g_chemical_products",
+      "pollutant": "NMVOC",
+      "alpha": 0.11221378310653614,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3h_printing",
+      "pollutant": "NMVOC",
+      "alpha": 0.059147278866815735,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3i_other",
+      "pollutant": "NMVOC",
+      "alpha": 0.04729371805125613,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3i_other",
+      "pollutant": "PM10",
+      "alpha": 0.8375310922140548,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3i_other",
+      "pollutant": "PM2.5",
+      "alpha": 0.9474799008733359,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3_all",
+      "pollutant": "CO",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3_all",
+      "pollutant": "NMVOC",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3_all",
+      "pollutant": "PM10",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "E_Solvents",
+      "subsector": "d3_all",
+      "pollutant": "PM2.5",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "solid",
+      "pollutant": "NH3",
+      "alpha": 1.0,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "solid",
+      "pollutant": "NMVOC",
+      "alpha": 0.5702500575390944,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "solid",
+      "pollutant": "PM10",
+      "alpha": 0.00016700536530872448,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "solid",
+      "pollutant": "PM2.5",
+      "alpha": 2.668311400697765e-05,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "ww",
+      "pollutant": "NMVOC",
+      "alpha": 0.003229696635537136,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "CO",
+      "alpha": 0.9999950049476322,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "NMVOC",
+      "alpha": 0.42486442002396646,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "NOX",
+      "alpha": 0.9984073029457127,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "PM10",
+      "alpha": 0.9989620481757578,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "PM2.5",
+      "alpha": 0.9991809689764245,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    },
+    {
+      "country": "GR",
+      "gnfr_sector": "J_Waste",
+      "subsector": "res",
+      "pollutant": "SOX",
+      "alpha": 0.9957452775415202,
+      "n_years": 6,
+      "years": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ]
+    }
+  ],
+  "diagnostics": []
+}

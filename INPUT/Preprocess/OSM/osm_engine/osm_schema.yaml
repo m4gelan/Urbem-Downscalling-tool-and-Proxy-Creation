@@ -46,13 +46,30 @@ sectors:
   solvents:
     mode: rules
     osmium_tag_filters:
-      - w/highway
-      - nwr/landuse
-      - nwr/building
+      - w/highway=motorway
+      - w/highway=motorway_link
+      - w/highway=trunk
+      - w/highway=trunk_link
+      - w/highway=primary
+      - w/highway=primary_link
+      - w/highway=secondary
+      - w/highway=secondary_link
+      - w/highway=tertiary
+      - w/highway=tertiary_link
+      - w/highway=residential
+      - nwr/landuse=residential
+      - nwr/landuse=commercial
+      - nwr/landuse=retail
+      - nwr/landuse=industrial
+      - nwr/landuse=port
+      - nwr/landuse=civic
+      - nwr/landuse=public
+      - nwr/building=residential
+      - nwr/building=commercial
+      - nwr/building=industrial
+      - nwr/building=warehouse
+      - nwr/building=service
       - nwr/aeroway
-      - nwr/man_made=works
-      - nwr/shop
-      - nwr/amenity
     augment:
       copy_tags: [name, landuse, building, highway, aeroway, shop, amenity, man_made]
     strategies: { nodes: first, lines: first, areas: multi }
@@ -102,9 +119,9 @@ sectors:
           layers: [osm_poi_points]
           when: with_optional
       areas:
-        - match: { tag: { key: landuse, in: [residential, commercial, retail, industrial, port] } }
+        - match: { tag: { key: landuse, in: [residential, commercial, retail, industrial, port, civic, public] } }
           layers: [osm_landuse]
-        - match: { tag: { key: building, in: [residential, commercial, industrial] } }
+        - match: { tag: { key: building, in: [residential, commercial, industrial, warehouse, service] } }
           layers: [osm_buildings]
         - match: { tag: { key: aeroway, exists: true } }
           layers: [osm_aeroway]
@@ -362,11 +379,34 @@ sectors:
       - nwr/landuse=railway
       - nwr/landuse=quarry
       - nwr/landuse=brownfield
-      - nwr/industrial
-      - nwr/man_made
+      - nwr/industrial=refinery
+      - nwr/industrial=oil
+      - nwr/industrial=fuel
+      - nwr/industrial=petroleum
+      - nwr/industrial=oil_mill
+      - nwr/industrial=oil_terminal
+      - nwr/industrial=fuel_depot
+      - nwr/industrial=chemical
+      - nwr/industrial=steel_mill
+      - nwr/industrial=smelter
+      - nwr/industrial=factory
+      - nwr/industrial=mine
+      - nwr/industrial=wellsite
+      - nwr/man_made=works
+      - nwr/man_made=petroleum_well
+      - nwr/man_made=gasometer
+      - nwr/man_made=silo
+      - nwr/man_made=kiln
+      - nwr/man_made=storage_tank
+      - nwr/man_made=chimney
+      - nwr/man_made=water_tower
       - nwr/power=plant
       - nwr/power=generator
-      - nwr/building
+      - nwr/building=industrial
+      - nwr/building=manufacture
+      - nwr/building=factory
+      - nwr/building=warehouse
+      - nwr/building=silo
       - nwr/amenity=fuel_depot
       - nwr/craft=oil_mill
       - nwr/product

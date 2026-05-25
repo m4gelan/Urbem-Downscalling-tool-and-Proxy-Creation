@@ -26,6 +26,8 @@ class RunContext:
     osmium_exe: str | None
     no_bbox_extract: bool
     allow_large_pbf: bool
+    mainland_bbox_extract: bool = False
+    temp_dir: Path | None = None
     boundary: gpd.GeoDataFrame | None = None
     boundary_wgs: gpd.GeoDataFrame | None = None
     bbox_wgs84: str | None = None
@@ -44,8 +46,18 @@ def ensure_boundary(ctx: RunContext) -> None:
     if ctx.boundary is not None:
         return
     ctx.boundary, _n = common.load_boundary(ctx.nuts, ctx.cntr_code)
-    ctx.bbox_wgs84 = common.bbox_str_wgs84(ctx.boundary)
     ctx.boundary_wgs = ctx.boundary.to_crs(4326)
+
+
+def _temp_root(ctx: RunContext) -> Path:
+    if ctx.temp_root is not None:
+        return ctx.temp_root
+    if ctx.temp_dir is not None:
+        ctx.temp_dir.mkdir(parents=True, exist_ok=True)
+        ctx.temp_root = Path(tempfile.mkdtemp(prefix="osm_run_", dir=str(ctx.temp_dir)))
+    else:
+        ctx.temp_root = Path(tempfile.mkdtemp(prefix="osm_run_"))
+    return ctx.temp_root
 
 
 def ensure_bbox_pbf(ctx: RunContext) -> Path:
@@ -68,11 +80,15 @@ def ensure_bbox_pbf(ctx: RunContext) -> Path:
         return ctx.pbf
 
     t0 = log.Timer()
-    if ctx.temp_root is None:
-        ctx.temp_root = Path(tempfile.mkdtemp(prefix="osm_run_"))
-    out = ctx.temp_root / "shared_bbox_extract.osm.pbf"
-    log.info(f"bbox extract {ctx.bbox_wgs84} ...")
-    common.extract_bbox(ctx.osmium_exe, ctx.bbox_wgs84, ctx.pbf, out)
+    bbox_boundary, _n = common.load_boundary(
+        ctx.nuts, ctx.cntr_code, mainland_bbox=ctx.mainland_bbox_extract
+    )
+    bbox_wgs84 = common.bbox_str_wgs84(bbox_boundary)
+    ctx.bbox_wgs84 = bbox_wgs84
+    out = _temp_root(ctx) / "shared_bbox_extract.osm.pbf"
+    log.info(f"temp dir {ctx.temp_root}")
+    log.info(f"bbox extract {bbox_wgs84} ...")
+    common.extract_bbox(ctx.osmium_exe, bbox_wgs84, ctx.pbf, out)
     ctx.bbox_pbf = out
     log.info(f"bbox extract -> {log.format_mib(out)} ({log.format_duration(t0.elapsed())})")
     return out
@@ -102,7 +118,7 @@ def prepare_work_pbf(
         return ctx.filter_cache[key]
 
     if ctx.temp_root is None:
-        ctx.temp_root = Path(tempfile.mkdtemp(prefix="osm_run_"))
+        ctx.temp_root = _temp_root(ctx)
     out = ctx.temp_root / f"tags_filtered_{key}.osm.pbf"
     t0 = log.Timer()
     log.info(f"tags-filter ({len(filt)} expressions) ...")

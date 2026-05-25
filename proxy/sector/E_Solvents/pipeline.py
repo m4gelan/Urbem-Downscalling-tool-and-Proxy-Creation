@@ -13,6 +13,7 @@ from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
 from proxy.core.area_weights import (
     combine_S_solvents_subsectors,
     compute_E_solvents_S_by_activity,
+    fuse_alpha_weighted_W_planes,
     normalize_W_per_cams_cell,
 )
 from proxy.core.point_matching.matching import match_cams_to_facilities_one_to_one
@@ -27,7 +28,7 @@ from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
 from proxy.visualizers.area_weights_map import write_e_solvents_area_weights_debug_map
 from proxy.visualizers.viz_map import write_point_match_map
-from proxy.writers.area_weight_stack import write_area_weight_stack_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
 
 
@@ -344,14 +345,13 @@ def build(
 
         W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
         for j in range(n_poll):
-            acc = np.zeros((ch, cw), dtype=np.float32)
-            for i in range(n_g):
-                acc += np.float32(a_alpha[j, i]) * W_per_group[i]
-            W_poll_stack[j] = acc
+            W_poll_stack[j] = fuse_alpha_weighted_W_planes(
+                W_per_group, a_alpha[j], cell_id, cams_cells_mask,
+            )
 
         country_tag = country_profile["full_name"].replace(" ", "_")
         band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
-        out_w_tif = output_dir / f"E_Solvents_{country_tag}_area_weights_alpha_{year}.tif"
+        out_w_tif = area_weights_tif_path(output_dir, "E_Solvents", country_tag, year)
         write_area_weight_stack_multiband(
             out_w_tif,
             W_poll_stack,

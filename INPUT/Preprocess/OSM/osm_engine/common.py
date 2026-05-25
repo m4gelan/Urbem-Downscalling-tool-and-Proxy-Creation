@@ -103,7 +103,9 @@ def extract_bbox(osmium_exe: str, bbox: str, source: Path, out: Path) -> None:
                     stacklevel=2,
                 )
     raise RuntimeError(
-        "osmium extract failed twice (with and without progress bar)."
+        "osmium extract failed twice (with and without progress bar). "
+        "On Windows, 'Write failed: The printer is out of paper' usually means the disk is full. "
+        f"Output path: {out}. Free space on that drive before retrying."
     ) from last
 
 
@@ -151,12 +153,22 @@ def tags_filter(osmium_exe: str, source: Path, out: Path, filters: Iterable[str]
     raise RuntimeError("osmium tags-filter failed twice.") from last
 
 
-def load_boundary(nuts_path: Path, cntr_code: str | None) -> tuple[gpd.GeoDataFrame, int]:
+def load_boundary(
+    nuts_path: Path,
+    cntr_code: str | None,
+    *,
+    mainland_bbox: bool = False,
+) -> tuple[gpd.GeoDataFrame, int]:
     gdf = gpd.read_file(nuts_path)
     if cntr_code is not None:
         gdf = gdf[gdf["CNTR_CODE"] == cntr_code.upper()].copy()
         if gdf.empty:
             raise SystemExit(f"No features for CNTR_CODE={cntr_code!r} in {nuts_path}")
+    if mainland_bbox and "LEVL_CODE" in gdf.columns and "NUTS_ID" in gdf.columns:
+        # NUTS2 mainland only — avoids FR/ES bbox spanning overseas territories on europe PBF.
+        gdf = gdf[(gdf["LEVL_CODE"] == 2) & (~gdf["NUTS_ID"].str.startswith("FRY"))].copy()
+        if gdf.empty:
+            raise SystemExit(f"No mainland NUTS2 features for CNTR_CODE={cntr_code!r} in {nuts_path}")
     n_features = len(gdf)
     return gdf.dissolve(), n_features
 

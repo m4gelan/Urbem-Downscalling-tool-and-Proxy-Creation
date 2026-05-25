@@ -11,7 +11,7 @@ from shapely.geometry import Point as ShpPoint
 from . import augment
 from . import common
 from . import log
-from .predicates import match_tags
+from .predicates import build_rule_index, first_matching_rule, matching_rules, match_tags
 
 
 def _when_ok(rule: dict[str, Any], ctx: dict[str, Any]) -> bool:
@@ -24,20 +24,14 @@ def _when_ok(rule: dict[str, Any], ctx: dict[str, Any]) -> bool:
     return True
 
 
-def _apply_area_first(rules: list[dict[str, Any]], tags: dict[str, str]) -> list[dict[str, Any]]:
-    """Return first matching area rule only."""
-    for r in rules:
-        if match_tags(tags, r.get("match")):
-            return [r]
-    return []
+def _active_rules(rules: list[dict[str, Any]], ctx: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return rules whose when-clause passes."""
+    return [r for r in rules if _when_ok(r, ctx)]
 
 
-def _line_strategy_first(rules: list[dict[str, Any]], tags: dict[str, str]) -> list[dict[str, Any]]:
-    """Return first matching line rule only."""
-    for r in rules:
-        if match_tags(tags, r.get("match")):
-            return [r]
-    return []
+def _relevant_keys(rule_index: dict[str, set[int]]) -> frozenset[str]:
+    """Tag keys that appear in indexed rules."""
+    return frozenset(rule_index.keys())
 
 
 class RulesCollector(osmium.SimpleHandler):
@@ -61,6 +55,17 @@ class RulesCollector(osmium.SimpleHandler):
         self._line_mode = st.get("lines", "first")
         self._node_mode = st.get("nodes", "first")
         self._store_osm_tags = sector.get("store_osm_tags", log.debug_enabled())
+
+        raw = sector.get("rules") or {}
+        self._line_rules = _active_rules(raw.get("lines") or [], ctx)
+        self._area_rules = _active_rules(raw.get("areas") or [], ctx)
+        self._node_rules = _active_rules(raw.get("nodes") or [], ctx)
+        self._line_index = build_rule_index(self._line_rules)
+        self._area_index = build_rule_index(self._area_rules)
+        self._node_index = build_rule_index(self._node_rules)
+        self._line_keys = _relevant_keys(self._line_index)
+        self._area_keys = _relevant_keys(self._area_index)
+        self._node_keys = _relevant_keys(self._node_index)
 
     def _row(
         self,
@@ -96,18 +101,14 @@ class RulesCollector(osmium.SimpleHandler):
 
     def _emit_node(self, n: osmium.osm.Node, tags: dict[str, str]) -> None:
         """Match node rules and append rows."""
-        rules = self.sector.get("rules", {}).get("nodes") or []
-        to_apply: list[dict[str, Any]]
+        if self._node_keys and not any(k in tags for k in self._node_keys):
+            return
+
         if self._node_mode == "first":
-            to_apply = []
-            for r in rules:
-                if not _when_ok(r, self.ctx):
-                    continue
-                if match_tags(tags, r.get("match")):
-                    to_apply = [r]
-                    break
+            rule = first_matching_rule(tags, self._node_rules, self._node_index)
+            to_apply = [rule] if rule else []
         else:
-            to_apply = [r for r in rules if _when_ok(r, self.ctx) and match_tags(tags, r.get("match"))]
+            to_apply = matching_rules(tags, self._node_rules, self._node_index)
 
         for r in to_apply:
             for layer in r.get("layers", []):
@@ -120,14 +121,6 @@ class RulesCollector(osmium.SimpleHandler):
                     return
                 self.buckets[layer].append(self._row(tags, n.id, "node", geom, r))
 
-    def _line_rules(self) -> list[dict[str, Any]]:
-        """Return line rules from sector schema."""
-        return self.sector.get("rules", {}).get("lines") or []
-
-    def _area_rules(self) -> list[dict[str, Any]]:
-        """Return area rules from sector schema."""
-        return self.sector.get("rules", {}).get("areas") or []
-
     def node(self, n: osmium.osm.Node) -> None:
         """Handle OSM nodes."""
         self._emit_node(n, common.tags_to_dict(n.tags))
@@ -135,11 +128,14 @@ class RulesCollector(osmium.SimpleHandler):
     def way(self, w: osmium.osm.Way) -> None:
         """Handle OSM ways as lines."""
         tags = common.tags_to_dict(w.tags)
-        rules = [r for r in self._line_rules() if _when_ok(r, self.ctx)]
+        if self._line_keys and not any(k in tags for k in self._line_keys):
+            return
+
         if self._line_mode == "first":
-            to_apply = _line_strategy_first(rules, tags)
+            rule = first_matching_rule(tags, self._line_rules, self._line_index)
+            to_apply = [rule] if rule else []
         else:
-            to_apply = [r for r in rules if match_tags(tags, r.get("match"))]
+            to_apply = matching_rules(tags, self._line_rules, self._line_index)
 
         for r in to_apply:
             try:
@@ -155,11 +151,14 @@ class RulesCollector(osmium.SimpleHandler):
     def area(self, a: osmium.osm.Area) -> None:
         """Handle OSM areas (polygons)."""
         tags = common.tags_to_dict(a.tags)
-        rules = [r for r in self._area_rules() if _when_ok(r, self.ctx)]
+        if self._area_keys and not any(k in tags for k in self._area_keys):
+            return
+
         if self._area_mode == "multi":
-            to_apply = [r for r in rules if match_tags(tags, r.get("match"))]
+            to_apply = matching_rules(tags, self._area_rules, self._area_index)
         else:
-            to_apply = _apply_area_first(rules, tags)
+            rule = first_matching_rule(tags, self._area_rules, self._area_index)
+            to_apply = [rule] if rule else []
 
         for r in to_apply:
             try:

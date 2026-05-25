@@ -13,7 +13,37 @@ from shapely.geometry import Point as ShpPoint
 from . import common
 from . import log
 from . import pyosmium_io
-from .predicates import match_classify_rule
+from .predicates import build_rule_index, match_classify_rule
+
+# Relevant tag keys for industry sector (pre-filter for performance)
+INDUSTRY_RELEVANT_KEYS = frozenset({
+    'landuse', 'industrial', 'man_made', 'power', 'building',
+    'amenity', 'craft', 'product', 'content', 'plant:source',
+    'generator:source', 'plant_source', 'generator_source'
+})
+
+
+def first_classify_value(
+    tags: dict[str, str],
+    elem_kind: str,
+    rules: list[dict[str, Any]],
+    rule_index: dict[str, set[int]] | None = None,
+) -> str | None:
+    """Return industrial_layer (or other output column value) from first matching classify rule."""
+    if rule_index:
+        candidates: set[int] = set()
+        for tag_key in tags:
+            candidates.update(rule_index.get(tag_key, ()))
+        if not candidates:
+            return None
+        for i, rule in enumerate(rules):
+            if i in candidates and match_classify_rule(tags, elem_kind, rule):
+                return str(rule["value"])
+        return None
+    for rule in rules:
+        if match_classify_rule(tags, elem_kind, rule):
+            return str(rule["value"])
+    return None
 
 
 def _expand_tags(tags: dict[str, str]) -> dict[str, str]:
@@ -26,18 +56,6 @@ def _expand_tags(tags: dict[str, str]) -> dict[str, str]:
     if gs:
         out["generator_source"] = gs
     return out
-
-
-def first_classify_value(
-    tags: dict[str, str],
-    elem_kind: str,
-    rules: list[dict[str, Any]],
-) -> str | None:
-    """Return industrial_layer (or other output column value) from first matching classify rule."""
-    for r in rules:
-        if match_classify_rule(tags, elem_kind, r):
-            return str(r["value"])
-    return None
 
 
 def _layer_for_elem_kind(sector: dict[str, Any], elem_kind: str) -> str:
@@ -71,6 +89,8 @@ class ClassifyCollector(osmium.SimpleHandler):
         self.wkb_factory = osmium.geom.WKBFactory()
         self.buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._n_obj = 0
+        # Build rule index for fast lookup
+        self.rule_index = build_rule_index(rules)
 
     def _make_row(
         self,
@@ -96,7 +116,11 @@ class ClassifyCollector(osmium.SimpleHandler):
 
     def _emit(self, tags: dict[str, str], elem_kind: str, osm_id: int, osm_etype: str, geometry: Any) -> None:
         """Classify tags and append row to the appropriate layer bucket."""
-        value = first_classify_value(tags, elem_kind, self.rules)
+        # Early rejection: skip if no relevant tags present (performance optimization)
+        if not any(k in INDUSTRY_RELEVANT_KEYS for k in tags):
+            return
+        
+        value = first_classify_value(tags, elem_kind, self.rules, self.rule_index)
         if not value:
             return
         layer = _layer_for_elem_kind(self.sector, elem_kind)

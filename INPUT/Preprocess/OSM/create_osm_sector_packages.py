@@ -14,11 +14,14 @@ import yaml
 # Top of file — user edits here only
 
 SECTORS = ["waste", "solvents", "offroad", 'shipping', "industry", "fugitive", "aviation", "agricultural"]
-SECTORS_ENABLED = SECTORS
-COUNTRY = "Belgium"  # maps to NUTS CNTR_CODE (e.g. EL)
+SECTORS_ENABLED = SECTORS#[s for s in SECTORS if s != "waste"]
+COUNTRY = "Spain"  # maps to NUTS CNTR_CODE (e.g. EL)
 OUTPUT_DIR = f"INPUT/Proxy/OSM/{COUNTRY}"  # GeoPackage output folder (repo-relative or absolute)
 LOG_LEVEL = "DEBUG"  # DEBUG | INFO | WARNING | ERROR
 NO_BBOX_EXTRACT = False
+MAINLAND_BBOX_EXTRACT = True  # FR/ES: NUTS2 mainland bbox when cutting from europe-latest
+COUNTRY_PBF = None # e.g. INPUT/Preprocess/OSM/_source/france-latest.osm.pbf
+TEMP_DIR = None  # e.g. G:/osm_temp — temp PBFs (needs ~15–25 GiB free for FR from europe)
 ALLOW_LARGE_PBF_WITHOUT_OSMIUM = False
 OSMIUM_EXE = None  # None → shutil.which("osmium")
 PARSE_PROGRESS = True  # tqdm bar during pyosmium (pip install tqdm); else log every 500k objects
@@ -161,8 +164,9 @@ def main() -> int:
     defaults["output_dir"] = OUTPUT_DIR
 
     cntr = cntr_code_for_country(COUNTRY)
-    pbf = resolve_under_root(root, defaults["pbf"])
+    pbf = resolve_under_root(root, COUNTRY_PBF or defaults["pbf"])
     nuts = resolve_under_root(root, defaults["nuts_gpkg"])
+    temp_dir = resolve_under_root(root, TEMP_DIR) if TEMP_DIR else None
 
     from osm_engine import common
 
@@ -179,35 +183,39 @@ def main() -> int:
         osmium_exe=osmium_exe,
         no_bbox_extract=NO_BBOX_EXTRACT,
         allow_large_pbf=ALLOW_LARGE_PBF_WITHOUT_OSMIUM,
+        mainland_bbox_extract=MAINLAND_BBOX_EXTRACT,
+        temp_dir=temp_dir,
     )
 
-    for sid in SECTORS_ENABLED:
-        sk = str(sid).strip()
-        entry = sector_entry(run_cfg, sk)
-        if PARSE_PROGRESS:
-            entry["show_parse_progress"] = True
-        out = output_gpkg(root, defaults, sk)
-        log.sector_info(sk, f"start -> {out.name}")
-        t0 = time.perf_counter()
-        try:
-            run_sector(
-                sk,
-                run_ctx=run_ctx,
-                sector_entry=entry,
-                defaults=defaults,
-                out=out,
-            )
-        except SystemExit:
-            raise
-        except Exception as e:
-            log.error(f"sector {sk!r} failed: {e}")
-            raise
-        log.sector_info(sk, f"done ({log.format_duration(time.perf_counter() - t0)})")
-        gc.collect()
+    try:
+        for sid in SECTORS_ENABLED:
+            sk = str(sid).strip()
+            entry = sector_entry(run_cfg, sk)
+            if PARSE_PROGRESS:
+                entry["show_parse_progress"] = True
+            out = output_gpkg(root, defaults, sk)
+            log.sector_info(sk, f"start -> {out.name}")
+            t0 = time.perf_counter()
+            try:
+                run_sector(
+                    sk,
+                    run_ctx=run_ctx,
+                    sector_entry=entry,
+                    defaults=defaults,
+                    out=out,
+                )
+            except SystemExit:
+                raise
+            except Exception as e:
+                log.error(f"sector {sk!r} failed: {e}")
+                raise
+            log.sector_info(sk, f"done ({log.format_duration(time.perf_counter() - t0)})")
+            gc.collect()
 
-    pipeline.cleanup_run_context(run_ctx, keep_temp=False)
-    log.info(f"all done {len(SECTORS_ENABLED)} sectors ({log.format_duration(time.perf_counter() - t_run)})")
-    return 0
+        log.info(f"all done {len(SECTORS_ENABLED)} sectors ({log.format_duration(time.perf_counter() - t_run)})")
+        return 0
+    finally:
+        pipeline.cleanup_run_context(run_ctx, keep_temp=False)
 
 
 if __name__ == "__main__":

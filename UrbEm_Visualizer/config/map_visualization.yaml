@@ -1,0 +1,62 @@
+emission_unit: "kg/yr/cell"
+
+basemaps:
+  dark:
+    label: Dark
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    attribution: "&copy; OpenStreetMap &copy; CARTO"
+    default: true
+  street:
+    label: Street
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    attribution: "&copy; OpenStreetMap contributors"
+  satellite:
+    label: Satellite
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    attribution: "&copy; Esri"
+
+point_icon:
+  size_px: 32
+  hover_size_px: 40
+
+sectors:
+  A_PublicPower:
+    tree_label: PublicPower
+    accent: "#f5c542"
+    icon: bolt
+  B_Industry:
+    tree_label: Industry
+    accent: "#e85d5c"
+    icon: factory
+  C_OtherCombustion:
+    tree_label: OtherCombustion
+    accent: "#9b7ede"
+    icon: flame
+  D_Fugitive:
+    tree_label: Fugitive
+    accent: "#5bc0de"
+    icon: wind
+  E_Solvents:
+    tree_label: Solvents
+    accent: "#3ecf8e"
+    icon: droplet
+  G_Shipping:
+    tree_label: Shipping
+    accent: "#4f7cff"
+    icon: ship
+  H_Aviation:
+    tree_label: Aviation
+    accent: "#ff8c42"
+    icon: plane
+  I_Offroad:
+    tree_label: Offroad
+    accent: "#c9a227"
+    icon: truck
+  J_Waste:
+    tree_label: Waste
+    accent: "#6bcf7f"
+    icon: recycle
+  K_Agriculture:
+    tree_label: Agriculture
+    accent: "#8bc34a"
+    icon: leaf

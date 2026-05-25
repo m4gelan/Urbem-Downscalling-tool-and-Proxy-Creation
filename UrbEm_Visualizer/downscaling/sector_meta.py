@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
+from UrbEm_Visualizer.dataset_loaders.check import load_expected
+from UrbEm_Visualizer.paths import project_root
+
+_SECTOR_FOLDER_ALIAS = {"C_OtherCombustion": "C_Othercombustion"}
+
+_LABELS = {
+    "A_PublicPower": "Public power",
+    "B_Industry": "Industry",
+    "C_OtherCombustion": "Other combustion",
+    "D_Fugitive": "Fugitive",
+    "E_Solvents": "Solvents",
+    "G_Shipping": "Shipping",
+    "H_Aviation": "Aviation",
+    "I_Offroad": "Off-road",
+    "J_Waste": "Waste",
+    "K_Agriculture": "Agriculture",
+}
+
+
+def sector_label(sector_id: str) -> str:
+    return _LABELS.get(sector_id, sector_id.replace("_", " "))
+
+
+def sector_folder(sector_id: str) -> str:
+    return _SECTOR_FOLDER_ALIAS.get(sector_id, sector_id)
+
+
+def sector_config_path(sector_id: str) -> Path:
+    folder = sector_folder(sector_id)
+    return project_root() / "proxy" / "config" / "sector" / folder / f"{folder}_sector_config.yaml"
+
+
+def load_sector_yaml(sector_id: str) -> dict:
+    path = sector_config_path(sector_id)
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: invalid sector config")
+    return data
+
+
+def sector_order(config: dict) -> list[str]:
+    spec = load_expected()
+    order: list[str] = []
+    sectors_cfg = config.get("sectors") or {}
+    for sid in spec["sectors"]:
+        if sid in sectors_cfg:
+            order.append(sid)
+    for sid in (spec.get("optional_sectors") or {}):
+        if sid in sectors_cfg:
+            order.append(sid)
+    return order
+
+
+def sector_mode(sector_id: str) -> str:
+    spec = load_expected()
+    if sector_id in spec["sectors"]:
+        return spec["sectors"][sector_id]["mode"]
+    return spec["optional_sectors"][sector_id]["mode"]

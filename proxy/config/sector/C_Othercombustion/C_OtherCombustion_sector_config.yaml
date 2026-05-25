@@ -66,9 +66,8 @@ corine:
     - 121
 
 offroad:
-  residential_w1: 0.5
-  residential_w2: 0.5
-  residential_delta: 0.5
+  residential_w1: 0.4
+  residential_w2: 0.6
 
 ghsl_smod:
   rural_codes: [11, 12, 13, 21, 22]

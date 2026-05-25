@@ -17,7 +17,7 @@ from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_emodnet import load_emodnet
 from proxy.dataset_loaders.load_osm import load_osm, rasterize_osm
 from proxy.visualizers.area_weights_map import write_shipping_area_weights_map
-from proxy.writers.area_weight_stack import write_area_weight_equal_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_equal_multiband
 
 
 def build(
@@ -90,6 +90,10 @@ def build(
             resolution_m=resolution_m,
             pad_m=pad_m,
         )
+        if not cams_cells:
+            log.warning("G_Shipping area_weights: no CAMS area cells for this filter; skipping.")
+            return
+
         # 2 Load CORINE, EMODNET and OSM Raster Maps
         corine_map, cor_tr, cor_crs, cell_id = load_corine(
             repo_root / corine_filepath.replace("\\", "/"),
@@ -163,7 +167,7 @@ def build(
         # 5 Multi-band GeoTIFF on CORINE reference grid
         country_tag = country_profile["full_name"].replace(" ", "_")
         band_vals = W
-        out_tif = output_dir / f"G_Shipping_{country_tag}_area_weights_{year}.tif"
+        out_tif = area_weights_tif_path(output_dir, "G_Shipping", country_tag, year)
         write_area_weight_equal_multiband(
             out_tif,
             band_vals,

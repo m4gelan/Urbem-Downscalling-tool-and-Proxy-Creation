@@ -47,19 +47,12 @@ def combined_S_publicpower(
     corine_value_01: np.ndarray,
     *,
     w1: float,
-    w2: float,
-    delta: float,
+    w2: float
 ) -> np.ndarray:
-    """
-    ``S = w1 * pop_z + w2 * pop_z ** (1 - delta * CORINE_value)``.
-
-    ``CORINE_value`` is treated as eligibility in ``{0, 1}`` (from the sector CORINE mask).
-    """
-    p = np.maximum(pop_z.astype(np.float32, copy=False), np.float32(0.0))
-    c = np.clip(corine_value_01.astype(np.float32, copy=False), np.float32(0.0), np.float32(1.0))
-    exp = np.maximum(np.float32(1.0) - np.float32(delta) * c, np.float32(1e-12))
-    term2 = np.power(p, exp)
-    return (np.float32(w1) * p + np.float32(w2) * term2).astype(np.float32, copy=False)
+    # S_pp = w1 * S_pop + w2 * S_u121 * S_pop, where S_u121 == corine_value_01, S_pop == pop_z
+    p = np.maximum(pop_z.astype(np.float32, copy=False), 0.0)
+    c = np.clip(corine_value_01.astype(np.float32, copy=False), 0.0, 1.0)
+    return (w1 * p + w2 * c * p).astype(np.float32, copy=False)
 
 
 def combined_S_shipping(
@@ -343,9 +336,8 @@ def normalize_W_per_cams_cell(
 ) -> np.ndarray:
     """
     ``W_j = S_j / sum_{k in C} S_k`` for pixels ``j`` in the same CAMS cell ``C``.
+    If ``sum_{k in C} S_k == 0`` but the cell has valid pixels, ``W_j = 1 / |C|``.
     Pixels with ``cell_id < 0`` get ``0``.
-
-    ``cell_id`` is expected country-restricted (invalid ids already ``-1``); chunked to limit peak RAM.
     """
     if not cams_cells:
         return np.zeros(S.shape, dtype=np.float32)
@@ -354,27 +346,52 @@ def normalize_W_per_cams_cell(
     flat_id = np.asarray(cell_id, dtype=np.int32).ravel()
     max_k = int(max(cams_cells))
     sums = np.zeros(max_k + 1, dtype=np.float64)
+    counts = np.zeros(max_k + 1, dtype=np.int64)
     n = flat_s.size
 
     for start in range(0, n, _CHUNK_PIXELS):
         end = min(start + _CHUNK_PIXELS, n)
         fid = flat_id[start:end]
         w = flat_s[start:end]
-        w0 = np.where(fid >= 0, w, np.float32(0.0))
-        np.add.at(sums, np.maximum(fid, 0), w0)
-
-    if not np.any(sums > 0):
-        return np.zeros(S.shape, dtype=np.float32)
+        valid = fid >= 0
+        w0 = np.where(valid, w, np.float32(0.0))
+        idx = np.maximum(fid, 0)
+        np.add.at(sums, idx, w0)
+        np.add.at(counts, idx, valid.astype(np.int64))
 
     out_flat = np.zeros(n, dtype=np.float32)
     for start in range(0, n, _CHUNK_PIXELS):
         end = min(start + _CHUNK_PIXELS, n)
         fid = flat_id[start:end]
         w = flat_s[start:end]
-        d = sums[np.maximum(fid, 0)]
-        np.divide(w, d, out=out_flat[start:end], where=(fid >= 0) & (d > 0.0))
+        valid = fid >= 0
+        cid = np.maximum(fid, 0)
+        d = sums[cid]
+        c = counts[cid]
+        pos = valid & (d > 0.0)
+        np.divide(w, d, out=out_flat[start:end], where=pos)
+        uniform = valid & (d <= 0.0) & (c > 0)
+        out_flat[start:end][uniform] = (1.0 / c[uniform]).astype(np.float32)
 
     return out_flat.reshape(S.shape)
+
+
+def fuse_alpha_weighted_W_planes(
+    W_planes: list[np.ndarray],
+    alpha_row: np.ndarray,
+    cell_id: np.ndarray,
+    cams_cells: dict[int, dict[str, Any]],
+) -> np.ndarray:
+    """``sum_i alpha[i] * W_planes[i]`` then per-CAMS-cell normalization (export sums to 1 per cell)."""
+    if not W_planes:
+        raise ValueError("W_planes must be non-empty")
+    alphas = np.asarray(alpha_row, dtype=np.float32).ravel()
+    if alphas.shape[0] != len(W_planes):
+        raise ValueError(f"alpha length {alphas.shape[0]} != {len(W_planes)} weight planes")
+    acc = np.zeros_like(np.asarray(W_planes[0], dtype=np.float32), dtype=np.float32)
+    for a, w in zip(alphas, W_planes):
+        acc += float(a) * np.asarray(w, dtype=np.float32)
+    return normalize_W_per_cams_cell(acc, cell_id, cams_cells)
 
 
 def combined_S_offroad_branches(
@@ -424,7 +441,9 @@ def fuse_offroad_combined_band(
     S_off = combined_S_offroad_branches(S_forest, S_residential, S_commercial, beta_F=bF, beta_R=bR, beta_B=bB)
     W_o = normalize_W_per_cams_cell(S_off, cell_id, cams_cells)
     W_s = np.asarray(W_stationary, dtype=np.float32)
-    W_c = (a_stat * W_s + a_off * W_o).astype(np.float32)
+    W_c = fuse_alpha_weighted_W_planes(
+        [W_s, W_o], np.array([a_stat, a_off], dtype=np.float32), cell_id, cams_cells,
+    )
     return W_s, W_o, W_c
 
 
@@ -511,7 +530,6 @@ def build_offroad_S_from_corine(
     pop_z: np.ndarray,
     residential_w1: float,
     residential_w2: float,
-    residential_delta: float,
     alpha_result: AlphaMatrixResult | None = None,
     pollutant_labels: list[str] | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -535,11 +553,11 @@ def build_offroad_S_from_corine(
     log.info("--- building mask for residential ---")
     cor_res = _mask(l3_residential)
     S_residential = combined_S_publicpower(
-        pop_z, cor_res, w1=residential_w1, w2=residential_w2, delta=residential_delta,
+        pop_z, cor_res, w1=residential_w1, w2=residential_w2,
     )
     log.info(
         f"  S sum={float(S_residential.sum()):.6g} "
-        f"w1={residential_w1} w2={residential_w2} delta={residential_delta}"
+        f"w1={residential_w1} w2={residential_w2}"
     )
     if alpha_result is not None and pollutant_labels:
         _log_branch_alpha_beta(alpha_result, pollutant_labels, "residential")

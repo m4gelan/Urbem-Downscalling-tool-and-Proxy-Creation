@@ -7,6 +7,11 @@ import numpy as np
 import rasterio
 
 
+def area_weights_tif_path(output_dir: Path, sector_key: str, country_tag: str, year: int) -> Path:
+    """``{Sector}_{Country}_area_weights_{year}.tif`` — same pattern for all sectors."""
+    return output_dir / f"{sector_key}_{country_tag}_area_weights_{int(year)}.tif"
+
+
 def _gtiff_meta(h: int, w: int, count: int, transform: Any, crs: Any) -> dict[str, Any]:
     return {
         "driver": "GTiff",

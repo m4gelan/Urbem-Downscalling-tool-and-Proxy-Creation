@@ -31,7 +31,7 @@ SECTORS = [
 ]
 # To Enable Proxy creation for a specific sector, add the sector key to the list below
 # FOR SECTOR SPECIFIC RUN
-SECTORS_ENABLED = [ "K_Agriculture"]
+SECTORS_ENABLED = ["J_Waste", "K_Agriculture"]
 
 # Enable all sectors except "F_Roads"
 SECTORS_ENABLED = [s for s in SECTORS if s != "F_Roads"]
@@ -41,17 +41,18 @@ AREA_WEIGHTS = True
 POINT_MATCHING = True
 
 # SELECT COUNTRY FOR PROXY CREATION
-COUNTRY = "Austria"
-CITY = "Vienna"
+COUNTRY = "France"
+CITY = "Paris"
 
 # SELECT LOG LEVEL FOR PROXY CREATION | DEBUG FOR MAPS, INFO FOR PROGRESS REPORT
-LOG_LEVEL = "DEBUG"  # DEBUG | INFO 
+LOG_LEVEL = "INFO"  # DEBUG | INFO 
 MAP_TYPE = 'FIXED_IMAGE' # FIXED_IMAGE / INTERACTIVE
 
 EPSG_CRS = "EPSG:3035"
 RESOLUTION_M = 100.0 # 100 m resolution for out output grids
 PAD_M = 10.0 # 10 m padding around the points
 
+filepaths_path = "proxy/config/filepaths.yaml"
 
 if LOG_LEVEL == "DEBUG":
     bouding_box_yaml = yaml.safe_load(open("proxy/visualizers/bouding_boxes.yaml", "r"))
@@ -97,6 +98,7 @@ def main() -> int:
         return 1
 
     allowed = set(SECTORS)
+    total_time = 0
     for sector_key in SECTORS_ENABLED:
         _release_python_memory()
 
@@ -160,10 +162,11 @@ def main() -> int:
             f"file : {_sector_output_tif(out_dir)}\n"
             f"time : {_format_duration(elapsed)}"
         )
+        total_time += elapsed
     if len(SECTORS_ENABLED) > 0:
         log.info("--------------------------------")
         log.info(f"All sectors processed successfully")
-        log.info(f"Total sectors processed: {len(SECTORS_ENABLED)} | Total time: {_format_duration(elapsed)}")
+        log.info(f"Total sectors processed: {len(SECTORS_ENABLED)} | Total time: {_format_duration(total_time)}")
         log.info(f"--------------------------------")
     return 0
  

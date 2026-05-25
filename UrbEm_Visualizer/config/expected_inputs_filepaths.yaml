@@ -1,0 +1,39 @@
+# Expected INPUT layout (paths relative to project root unless absolute).
+# Area weights: {Sector}_{Country}_area_weights_{year}.tif
+
+year: 2019
+
+input_root: INPUT
+
+cams:
+  path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+
+proxy_weights_root: INPUT/Proxy_weights
+
+sectors:
+  A_PublicPower:
+    mode: both
+  B_Industry:
+    mode: both
+  C_OtherCombustion:
+    mode: area_only
+  D_Fugitive:
+    mode: both
+  E_Solvents:
+    mode: both
+  H_Aviation:
+    mode: point_only
+  I_Offroad:
+    mode: area_only
+  J_Waste:
+    mode: both
+  K_Agriculture:
+    mode: area_only
+
+optional_sectors:
+  G_Shipping:
+    mode: area_only
+    missing_prompt: >
+      No file found for G_Shipping. This sector is optional for some countries —
+      do you accept? Otherwise, we advise checking if a proxy file can be created
+      in the proxy pipeline.
