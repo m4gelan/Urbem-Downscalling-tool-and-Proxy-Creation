@@ -133,9 +133,9 @@ classes:
 
 area_weights_debug:
   viz_classes:
+    - R_HEATING_STOVE
     - C_BOILER_AUT
-    - C_BOILER_MAN
   viz_pollutants:
-    - NOx
-    - PM2.5
+    - NMVOC
+    - SOx
 

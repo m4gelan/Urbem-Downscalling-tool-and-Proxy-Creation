@@ -84,7 +84,7 @@ def df_to_raster(df: pd.DataFrame, template: GridTemplate) -> AreaRaster:
             xi = template.x_index.get(float(rec.x))
             yi = template.y_index.get(float(rec.y))
             if xi is not None and yi is not None:
-                arr[yi, xi] = float(rec.emission)
+                arr[yi, xi] += np.float32(rec.emission)
     return AreaRaster(data=arr, transform=template.transform, crs=template.crs)
 
 

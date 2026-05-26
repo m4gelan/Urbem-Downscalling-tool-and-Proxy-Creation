@@ -9,6 +9,8 @@ import yaml
 from pyproj import Transformer
 
 from UrbEm_Visualizer.downscaling.sector_meta import sector_mode
+from UrbEm_Visualizer.paths import project_root
+from UrbEm_Visualizer.visualization.scale import _fmt_sci
 from UrbEm_Visualizer.visualization.emission_style import (
     colormap_for,
     default_threshold,
@@ -32,6 +34,10 @@ def _grid_path(sector_dir: Path, stem: str, fmt: str) -> Path | None:
     return p if p.is_file() else None
 
 
+def _coord_key(lon: float, lat: float) -> tuple[float, float]:
+    return round(lon, 5), round(lat, 5)
+
+
 def load_manifest(output_dir: Path) -> dict:
     with open(output_dir / "manifest.yaml", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
@@ -41,7 +47,8 @@ def load_manifest(output_dir: Path) -> dict:
     return config
 
 
-def domain_wgs84(domain: dict) -> tuple[float, float, float, float]:
+def domain_corners_wgs84(domain: dict) -> list[list[float]]:
+    """Closed ring [lon, lat] for domain rectangle in its CRS (true footprint on map)."""
     tr = Transformer.from_crs(str(domain["crs"]), "EPSG:4326", always_xy=True)
     xmin, ymin, xmax, ymax = (
         float(domain["xmin"]),
@@ -49,9 +56,16 @@ def domain_wgs84(domain: dict) -> tuple[float, float, float, float]:
         float(domain["xmax"]),
         float(domain["ymax"]),
     )
-    xs = [xmin, xmax, xmin, xmax]
-    ys = [ymin, ymin, ymax, ymax]
+    xs = [xmin, xmax, xmax, xmin, xmin]
+    ys = [ymin, ymin, ymax, ymax, ymin]
     lons, lats = tr.transform(xs, ys)
+    return [[float(lons[i]), float(lats[i])] for i in range(len(xs))]
+
+
+def domain_wgs84(domain: dict) -> tuple[float, float, float, float]:
+    ring = domain_corners_wgs84(domain)
+    lons = [p[0] for p in ring]
+    lats = [p[1] for p in ring]
     return float(min(lons)), float(min(lats)), float(max(lons)), float(max(lats))
 
 
@@ -244,6 +258,110 @@ class RunContext:
         self._cache[key] = out
         return out
 
+    def _sector_link_path(self, sector_id: str) -> Path | None:
+        ps = (self.config.get("sectors") or {}).get(sector_id, {}).get("point_source") or {}
+        rel = ps.get("path")
+        if not rel:
+            return None
+        p = Path(str(rel))
+        if not p.is_absolute():
+            p = project_root() / p
+        return p if p.is_file() else None
+
+    def appointed_facility_at(self, sector_id: str, lon: float, lat: float) -> dict | None:
+        key = _coord_key(lon, lat)
+        cache_key = ("appointed", sector_id, key)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        path = self.output_dir / sector_id / "point_matched_appointed.csv"
+        if not path.is_file() or path.stat().st_size < 10:
+            self._cache[cache_key] = None
+            return None
+
+        df = pd.read_csv(path)
+        lon_k = round(lon, 5)
+        lat_k = round(lat, 5)
+        match = df[
+            (df["facility_lon"].astype(float).round(5) == lon_k)
+            & (df["facility_lat"].astype(float).round(5) == lat_k)
+        ]
+        if match.empty:
+            self._cache[cache_key] = None
+            return None
+
+        rec = match.iloc[0]
+
+        def _cell(name: str):
+            if name not in rec.index:
+                return None
+            v = rec[name]
+            return None if pd.isna(v) else v
+
+        pollutants = []
+        for pol in self.pollutants:
+            col = f"emis_{pol}"
+            if col not in df.columns:
+                continue
+            val = float(rec[col] or 0)
+            pollutants.append({
+                "pollutant": pol,
+                "emission": val,
+                "emission_label": _fmt_sci(val) if val > 0 else "—",
+            })
+        details = []
+        for col in df.columns:
+            if col.startswith("meta_") and pd.notna(rec.get(col)):
+                label = col[5:].replace("_", " ").strip().title()
+                details.append({"label": label, "value": str(rec[col])})
+
+        out = {
+            "sector_id": sector_id,
+            "match_status": str(_cell("match_status") or "matched_appointed"),
+            "dataset": _cell("match_dataset"),
+            "facility_name": _cell("facility_name"),
+            "facility_id": _cell("facility_id"),
+            "cams_point_id": int(_cell("cams_point_id") or -1),
+            "pollutants": pollutants,
+            "details": details,
+        }
+        if not out["dataset"]:
+            link = self._sector_link_path(sector_id)
+            if link:
+                from UrbEm_Visualizer.downscaling.point_meta import (
+                    flatten_meta_to_row,
+                    load_match_sidecar,
+                    meta_for_cams,
+                )
+
+                meta = meta_for_cams(load_match_sidecar(link), out["cams_point_id"])
+                flat = flatten_meta_to_row(meta)
+                out["dataset"] = meta.get("dataset") or flat.get("match_dataset")
+                out["facility_name"] = out["facility_name"] or meta.get("facility_name") or flat.get("facility_name")
+                out["facility_id"] = out["facility_id"] or meta.get("facility_id") or flat.get("facility_id")
+                if meta.get("match_distance_km") is not None:
+                    out["match_distance_km"] = float(meta["match_distance_km"])
+                for d in meta.get("details") or []:
+                    if isinstance(d, dict) and d.get("label"):
+                        details.append({
+                            "label": str(d["label"]),
+                            "value": str(d.get("value", "")),
+                        })
+                for k, v in flat.items():
+                    if k.startswith("meta_") and v:
+                        details.append({
+                            "label": k[5:].replace("_", " ").title(),
+                            "value": str(v),
+                        })
+                out["details"] = details
+        if _cell("match_distance_km") is not None:
+            try:
+                out["match_distance_km"] = float(rec["match_distance_km"])
+            except (TypeError, ValueError):
+                pass
+        self._cache[cache_key] = out
+        return out
+
     def _read_csv_grid(self, path: Path, pollutant: str) -> pd.DataFrame:
         if path.stat().st_size < 10:
             return pd.DataFrame(columns=["x", "y", "emission"])
@@ -257,7 +375,7 @@ class RunContext:
         out = df[df["pollutant"].astype(str) == pollutant].copy()
         out["x"] = pd.to_numeric(out["x"], errors="coerce")
         out["y"] = pd.to_numeric(out["y"], errors="coerce")
-        out["emission"] = pd.to_numeric(out["emission"], errors="coerce").fillna(0)
+        out["emission"] = pd.to_numeric(out["emission"], errors="coerce").fillna(0).astype(np.float32)
         return out[out["emission"] > 0]
 
     def _read_nc_grid(self, path: Path, pollutant: str) -> pd.DataFrame:
@@ -265,7 +383,7 @@ class RunContext:
         try:
             if pollutant not in [str(p) for p in da.coords["pollutant"].values]:
                 raise ValueError(f"pollutant {pollutant!r} not in {path.name}")
-            plane = da.sel(pollutant=pollutant).values.astype(np.float64)
+            plane = da.sel(pollutant=pollutant).values.astype(np.float32)
             h, w = plane.shape
             xmin = float(self.domain["xmin"])
             ymin = float(self.domain["ymin"])

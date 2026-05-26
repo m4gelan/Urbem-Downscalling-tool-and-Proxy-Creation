@@ -12,6 +12,7 @@ from shapely.geometry import Point
 
 from proxy.core import log
 
+
 def _cams_mass(cams: dict[str, Any]) -> float:
     pols = cams.get("pollutants") or {}
     if not pols:
@@ -48,6 +49,129 @@ def _facility_lon_lat(match_row: dict[str, Any]) -> tuple[float, float] | None:
             if lon is not None and lat is not None:
                 return float(lon), float(lat)
     return None
+
+
+def extract_facility_meta(match_row: dict[str, Any]) -> dict[str, Any]:
+    """Compact facility metadata for sidecar export and UI."""
+    if match_row.get("matched") != "yes":
+        return {}
+
+    src = str(match_row.get("match_source") or "").strip().lower()
+    info: dict[str, Any] | None = None
+    fid: str | None = None
+
+    if src == "corine" or match_row.get("corine_facility_info"):
+        src = src or "corine"
+        info = match_row.get("corine_facility_info")
+        fid = match_row.get("corine_facility_id")
+        label = "Airport polygons (CORINE)"
+    elif src == "osm" or match_row.get("osm_facility_info"):
+        src = src or "osm"
+        info = match_row.get("osm_facility_info")
+        fid = match_row.get("osm_facility_id")
+        label = "Airport polygons (OSM)"
+    elif src == "uwwtd" or match_row.get("uwwtd_facility_info"):
+        src = src or "uwwtd"
+        info = match_row.get("uwwtd_facility_info")
+        fid = match_row.get("uwwtd_facility_id")
+        label = "UWWTD"
+    elif match_row.get("jrc_point_info"):
+        src = src or "jrc"
+        info = match_row.get("jrc_point_info")
+        fid = match_row.get("jrc_point_id")
+        label = "JRC"
+    elif match_row.get("eprtr_point_info"):
+        src = src or "eprtr"
+        info = match_row.get("eprtr_point_info")
+        fid = match_row.get("eprtr_point_id")
+        label = "E-PRTR"
+    else:
+        return {}
+
+    info = dict(info) if isinstance(info, dict) else {}
+    name = (
+        info.get("facility_name")
+        or info.get("name_g")
+        or info.get("name")
+        or info.get("installationPartName")
+        or ""
+    )
+    details: list[dict[str, str]] = []
+    if src == "jrc":
+        if info.get("name_g"):
+            details.append({"label": "Unit", "value": str(info["name_g"])})
+        if info.get("type_g"):
+            details.append({"label": "Fuel / type", "value": str(info["type_g"])})
+        if info.get("capacity_g"):
+            details.append({"label": "Capacity (MW)", "value": str(info["capacity_g"])})
+    elif src == "eprtr":
+        if info.get("facility_name"):
+            details.append({"label": "Facility", "value": str(info["facility_name"])})
+        if info.get("eprtr_annex"):
+            details.append({"label": "Annex I activity", "value": str(info["eprtr_annex"])})
+        if info.get("reporting_year"):
+            details.append({"label": "Reporting year", "value": str(info["reporting_year"])})
+    elif src in ("osm", "corine"):
+        if info.get("name"):
+            details.append({"label": "Name", "value": str(info["name"])})
+        if info.get("icao"):
+            details.append({"label": "ICAO", "value": str(info["icao"])})
+        if info.get("iata"):
+            details.append({"label": "IATA", "value": str(info["iata"])})
+        if info.get("l3_label"):
+            details.append({"label": "CORINE class", "value": str(info["l3_label"])})
+    elif src == "uwwtd":
+        if info.get("name"):
+            details.append({"label": "Plant", "value": str(info["name"])})
+        if info.get("uwwtp_id"):
+            details.append({"label": "UWWTD id", "value": str(info["uwwtp_id"])})
+
+    if fid:
+        details.insert(0, {"label": "Facility id", "value": str(fid)})
+
+    fac_ll = _facility_lon_lat(match_row)
+    out = {
+        "dataset_key": src,
+        "dataset": label,
+        "facility_id": str(fid) if fid else None,
+        "facility_name": str(name).strip() or None,
+        "details": details,
+        "match_distance_km": match_row.get("scoring_value"),
+    }
+    if fac_ll:
+        out["facility_lon"] = fac_ll[0]
+        out["facility_lat"] = fac_ll[1]
+    return out
+
+
+def _sidecar_row(match_row: dict[str, Any]) -> dict[str, Any]:
+    cams = match_row["cams"]
+    out: dict[str, Any] = {
+        "cams_lon": float(cams["longitude"]),
+        "cams_lat": float(cams["latitude"]),
+        "pollutants": {k: float(v) for k, v in (cams.get("pollutants") or {}).items()},
+        "matched": str(match_row.get("matched") or "no"),
+    }
+    fac = _facility_lon_lat(match_row)
+    if fac:
+        out["facility_lon"], out["facility_lat"] = fac
+    meta = extract_facility_meta(match_row)
+    if meta:
+        out.update(meta)
+    return out
+
+
+def write_match_sidecar(matches: dict[int, dict[str, Any]], out_tif: Path) -> Path | None:
+    if not matches:
+        return None
+    rows = {str(pid): _sidecar_row(m) for pid, m in matches.items()}
+    out_json = Path(out_tif).with_name(f"{Path(out_tif).stem}_matches.json")
+    import json
+
+    out_json.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    n_yes = sum(1 for m in matches.values() if m.get("matched") == "yes")
+    log.info(f"Wrote point link sidecar: {out_json} ({len(rows)} CAMS, {n_yes} matched)")
+    return out_json
 
 
 def write_cams_facility_link_tif(
@@ -150,4 +274,5 @@ def write_cams_facility_link_tif(
         )
 
     log.info(f"Wrote 2-band link GeoTIFF: {out_tif} ({len(matches)} CAMS, {n_linked} matched)")
+    write_match_sidecar(matches, out_tif)
     return out_tif

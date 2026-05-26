@@ -17,12 +17,15 @@ def _pollutants_in_csv(path: Path) -> set[str]:
     if path.stat().st_size < 10:
         return set()
     try:
-        df = pd.read_csv(path, nrows=50000)
+        header = pd.read_csv(path, nrows=0)
     except pd.errors.EmptyDataError:
         return set()
-    if not _CSV_COLS.issubset(df.columns):
-        raise ValueError(f"missing columns {sorted(_CSV_COLS - set(df.columns))}")
-    return set(df["pollutant"].dropna().astype(str).unique())
+    if not _CSV_COLS.issubset(header.columns):
+        raise ValueError(f"missing columns {sorted(_CSV_COLS - set(header.columns))}")
+    pols: set[str] = set()
+    for chunk in pd.read_csv(path, usecols=["pollutant"], chunksize=200_000):
+        pols.update(chunk["pollutant"].dropna().astype(str).unique())
+    return pols
 
 
 def _pollutants_in_nc(path: Path) -> set[str]:

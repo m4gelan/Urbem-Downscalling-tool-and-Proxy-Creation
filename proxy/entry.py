@@ -31,10 +31,10 @@ SECTORS = [
 ]
 # To Enable Proxy creation for a specific sector, add the sector key to the list below
 # FOR SECTOR SPECIFIC RUN
-SECTORS_ENABLED = ["J_Waste", "K_Agriculture"]
-
+#SECTORS_ENABLED = ["E_Solvents", "G_Shipping", "H_Aviation", "I_Offroad", "J_Waste", "K_Agriculture"]
+SECTORS_ENABLED = ["E_Solvents"]
 # Enable all sectors except "F_Roads"
-SECTORS_ENABLED = [s for s in SECTORS if s != "F_Roads"]
+#SECTORS_ENABLED = [s for s in SECTORS if s != "F_Roads"]
 
 # Select True or false to enable or disable area weights / Point Matching (Not all sectors support point matching)
 AREA_WEIGHTS = True
@@ -42,10 +42,10 @@ POINT_MATCHING = True
 
 # SELECT COUNTRY FOR PROXY CREATION
 COUNTRY = "France"
-CITY = "Paris"
+CITY = "Lyon"
 
 # SELECT LOG LEVEL FOR PROXY CREATION | DEBUG FOR MAPS, INFO FOR PROGRESS REPORT
-LOG_LEVEL = "INFO"  # DEBUG | INFO 
+LOG_LEVEL = "DEBUG"  # DEBUG | INFO 
 MAP_TYPE = 'FIXED_IMAGE' # FIXED_IMAGE / INTERACTIVE
 
 EPSG_CRS = "EPSG:3035"

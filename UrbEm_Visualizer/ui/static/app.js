@@ -324,6 +324,13 @@ function updateCrsLabels() {
   document.getElementById("bb-ymin-l").textContent = wgs ? "Lat min" : "Y min (m)";
   document.getElementById("bb-xmax-l").textContent = wgs ? "Lon max" : "X max (m)";
   document.getElementById("bb-ymax-l").textContent = wgs ? "Lat max" : "Y max (m)";
+  const note = document.getElementById("b3-map-note");
+  if (note) {
+    note.textContent =
+      "Domain outline follows " +
+      domainCrs +
+      " (4 corners). CAMS cell edges are approximate lat/lon rectangles — lines may not align exactly.";
+  }
 }
 
 function readBBoxInputs() {
@@ -353,19 +360,15 @@ async function transformBBox(xmin, ymin, xmax, ymax, fromCrs, toCrs) {
   return data;
 }
 
-function setDrawnRectFromWgs(west, south, east, north) {
-  if (!bboxMap) return;
+function setDrawnPolygonFromRing(ring) {
+  if (typeof L === "undefined") return;
+  if (!bboxMap || !drawLayer || !ring || ring.length < 4) return;
   if (drawnRect) {
     drawLayer.removeLayer(drawnRect);
     drawnRect = null;
   }
-  drawnRect = L.rectangle(
-    [
-      [south, west],
-      [north, east],
-    ],
-    { color: "#4f7cff", weight: 2, fillOpacity: 0.08 }
-  );
+  const latlngs = ring.slice(0, -1).map(([lon, lat]) => [lat, lon]);
+  drawnRect = L.polygon(latlngs, { color: "#4f7cff", weight: 2, fillOpacity: 0.08 });
   drawLayer.addLayer(drawnRect);
 }
 
@@ -373,7 +376,17 @@ async function syncMapFromInputs(fit) {
   const b = readBBoxInputs();
   if ([b.xmin, b.ymin, b.xmax, b.ymax].some((v) => Number.isNaN(v))) return false;
   const wgs = await transformBBox(b.xmin, b.ymin, b.xmax, b.ymax, domainCrs, "EPSG:4326");
-  setDrawnRectFromWgs(wgs.xmin, wgs.ymin, wgs.xmax, wgs.ymax);
+  if (wgs.ring) {
+    setDrawnPolygonFromRing(wgs.ring);
+  } else {
+    setDrawnPolygonFromRing([
+      [wgs.xmin, wgs.ymin],
+      [wgs.xmax, wgs.ymin],
+      [wgs.xmax, wgs.ymax],
+      [wgs.xmin, wgs.ymax],
+      [wgs.xmin, wgs.ymin],
+    ]);
+  }
   if (fit && drawnRect && bboxMap) {
     bboxMap.fitBounds(drawnRect.getBounds(), { padding: [24, 24] });
   }
@@ -441,6 +454,9 @@ async function pollCamsJob(jobId) {
 }
 
 async function initB3Map() {
+  if (typeof L === "undefined") {
+    throw new Error("Leaflet failed to load — hard-refresh the page (Ctrl+F5)");
+  }
   const st = document.getElementById("b3-status");
   const prog = document.getElementById("cams-progress-wrap");
   prog.classList.remove("hidden");
@@ -949,17 +965,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   let downscaleJobId = null;
   let downscalePollTimer = null;
 
+  function sectorProgressPct(s) {
+    if (s.status === "done") return 100;
+    if (s.status === "waiting") return 0;
+    if (s.progress != null) return s.progress;
+    return 0;
+  }
+
   function renderProcessingState(state) {
     const list = document.getElementById("processing-sectors");
     const alert = document.getElementById("processing-alert");
     list.innerHTML = "";
-    const doneSet = (s, pol) => (s.pollutants_done || []).includes(pol);
-    const allDone = (s) =>
-      s.status === "done" || (s.pollutants || []).every((p) => doneSet(s, p));
 
     (state.sectors || []).forEach((s) => {
       const row = document.createElement("div");
-      row.className = "processing-row";
+      row.className = "processing-row processing-row--" + (s.status || "waiting");
       const head = document.createElement("div");
       head.className = "processing-row-head";
       const name = document.createElement("div");
@@ -972,22 +992,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       head.appendChild(st);
       row.appendChild(head);
 
-      const polBox = document.createElement("div");
-      polBox.className = "processing-pollutants";
-      const nextPol =
-        s.status === "running"
-          ? (s.pollutants || []).find((p) => !(s.pollutants_done || []).includes(p))
-          : null;
-      (s.pollutants || []).forEach((pol) => {
-        const span = document.createElement("span");
-        let cls = "processing-pol";
-        if (doneSet(s, pol) || allDone(s)) cls += " done";
-        else if (pol === nextPol) cls += " active";
-        span.className = cls;
-        span.textContent = pol;
-        polBox.appendChild(span);
-      });
-      row.appendChild(polBox);
+      const pct = sectorProgressPct(s);
+      const barWrap = document.createElement("div");
+      barWrap.className = "processing-bar-wrap";
+      const track = document.createElement("div");
+      track.className = "progress-track processing-bar-track";
+      const fill = document.createElement("div");
+      fill.className = "progress-fill processing-bar-fill";
+      if (s.status === "running" && pct < 3) {
+        track.classList.add("processing-bar-indeterminate");
+        fill.style.width = "30%";
+      } else {
+        fill.style.width = pct + "%";
+      }
+      if (s.status === "done") fill.classList.add("done");
+      if (s.status === "error") fill.classList.add("error");
+      track.appendChild(fill);
+      barWrap.appendChild(track);
+
+      const cap = document.createElement("div");
+      cap.className = "processing-bar-caption";
+      if (s.status === "running" && s.step) {
+        cap.textContent = s.step;
+      } else if (s.status === "done") {
+        cap.textContent = "Complete";
+      } else if (s.status === "error") {
+        cap.textContent = s.step || "Failed";
+      } else if (s.status === "waiting") {
+        cap.textContent = "Waiting";
+      }
+      barWrap.appendChild(cap);
+      row.appendChild(barWrap);
       list.appendChild(row);
     });
 

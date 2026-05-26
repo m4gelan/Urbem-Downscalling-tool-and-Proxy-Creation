@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio import features as rio_features
+from rasterio.crs import CRS as RioCRS
+from rasterio.transform import array_bounds
 from shapely.geometry import box
 from shapely.ops import unary_union
 
@@ -242,19 +244,38 @@ def rasterize_osm(
     burn = float(rasterize_cfg["burn_value"])
     dtype = np.dtype(rasterize_cfg["dtype"])
     all_touched = bool(rasterize_cfg["all_touched"])
-    acc = np.full((height, width), fill, dtype=np.float64)
+    acc = np.full((height, width), fill, dtype=np.float32)
     if gdf is None or gdf.empty:
         return acc.astype(dtype, copy=False)
-    g = gdf.to_crs(raster_crs)
-    shapes = ((geom, burn) for geom in g.geometry if geom is not None and not geom.is_empty)
+
+    dst_crs = RioCRS.from_user_input(raster_crs)
+    if gdf.crs is not None and RioCRS.from_user_input(gdf.crs) == dst_crs:
+        g = gdf
+    else:
+        g = gdf.to_crs(raster_crs)
+
+    left, bottom, right, top = array_bounds(height, width, transform)
+    g = gpd.clip(g, gpd.GeoDataFrame(geometry=[box(left, bottom, right, top)], crs=raster_crs))
+
+    res = min(abs(float(transform.a)), abs(float(transform.e)))
+    tol = res * 0.5 if res > 0 else 0.0
+
+    def _burn_shapes():
+        for geom in g.geometry:
+            if geom is None or geom.is_empty:
+                continue
+            if tol > 0:
+                geom = geom.simplify(tol, preserve_topology=True)
+            yield (geom, burn)
+
     # Paint burn_value onto pixels touched by geometry (all_touched from config); other pixels stay fill.
     rio_features.rasterize(
-        shapes,
+        _burn_shapes(),
         out_shape=(height, width),
         transform=transform,
         fill=fill,
         out=acc,
-        dtype=np.float64,
+        dtype=np.float32,
         all_touched=all_touched,
         merge_alg=rasterio.enums.MergeAlg.replace,
     )

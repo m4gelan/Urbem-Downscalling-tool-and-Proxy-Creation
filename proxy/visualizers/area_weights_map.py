@@ -79,8 +79,10 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
         "u121": LayerStyle("CORINE u121 industrial", kind="mask_rgb", rgb=(30, 144, 200), show=False),
         "S_default": LayerStyle("Stock S", cmap="YlOrBr", show=False, opacity=0.84),
         "L_default": LayerStyle("Load L", cmap="PuBu", show=False, opacity=0.84),
-        "ws_default": LayerStyle("W stationary", cmap="inferno", scale_per_cams=True, show=False, opacity=0.86),
-        "wo_default": LayerStyle("W offroad", cmap="cividis", scale_per_cams=True, show=False, opacity=0.86),
+        "X_default": LayerStyle("X = S·L", cmap="YlOrRd", show=True, opacity=0.86),
+        "off_forest": LayerStyle("W offroad forestry", cmap="Greens", scale_per_cams=True, show=False, opacity=0.86),
+        "off_residential": LayerStyle("W offroad residential", cmap="YlGn", scale_per_cams=True, show=False, opacity=0.86),
+        "off_commercial": LayerStyle("W offroad commercial", cmap="BuGn", scale_per_cams=True, show=False, opacity=0.86),
         "wc_default": LayerStyle("W combined", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86),
     },
     "D_Fugitive": {
@@ -502,12 +504,22 @@ def _style_for_key(sector: str, key: str, overrides: dict[str, LayerStyle] | Non
         return LayerStyle("GEM oil/gas", kind="mask_rgb", rgb=(28, 28, 28), show=False, nearest=True)
     if key == "vnf":
         return LayerStyle("VIIRS Nightfire VNF", kind="mask_rgb", rgb=(255, 140, 0), show=False, nearest=True)
-    if key.startswith("ws_") or key.startswith("wo_") or key.startswith("wc_"):
-        prefix = key[:2] + "_"
-        branch = {"ws": "stationary", "wo": "offroad", "wc": "combined"}[key[:2]]
+    if key.startswith("wc_"):
         pk = key[3:]
-        base = sec.get(key, sec.get(f"{prefix}default", LayerStyle(f"W {branch} {pk}", cmap="inferno", scale_per_cams=True, show=key.startswith("wc_"), opacity=0.86)))
-        return replace(base, title=f"W {branch} {pk}")
+        base = sec.get(key, sec.get("wc_default", LayerStyle(f"W combined {pk}", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86)))
+        return replace(base, title=f"W combined {pk}")
+    if key.startswith("X_"):
+        cls = key[2:]
+        base = sec.get("X_default", LayerStyle(f"X {cls}", cmap="YlOrRd", show=True, opacity=0.86))
+        return replace(base, title=f"X {cls}")
+    if key in ("off_forest", "off_residential", "off_commercial"):
+        labels = {
+            "off_forest": "W offroad forestry",
+            "off_residential": "W offroad residential",
+            "off_commercial": "W offroad commercial",
+        }
+        base = sec.get(key, LayerStyle(labels[key], cmap="cividis", scale_per_cams=True, show=False, opacity=0.86))
+        return replace(base, title=labels[key])
     if key.startswith("S_") or key.startswith("L_"):
         kind, cls = key[0], key[2:]
         dk = f"{kind}_default"
@@ -1110,8 +1122,8 @@ def write_c_othercombustion_area_weights_debug_map(
     model_classes: tuple[str, ...],
     bbox_wgs84: tuple[float, float, float, float],
     x_build: Any,
-    W_stationary_poll: dict[str, np.ndarray],
-    W_offroad_poll: dict[str, np.ndarray],
+    X_by_class: dict[str, np.ndarray],
+    offroad_W: dict[str, np.ndarray],
     W_combined_poll: dict[str, np.ndarray],
 ) -> Path:
     viz_classes, viz_pollutants = parse_c_othercombustion_debug_viz(
@@ -1129,12 +1141,16 @@ def write_c_othercombustion_area_weights_debug_map(
     for cls in viz_classes:
         arrays[f"S_{cls}"] = np.asarray(x_build.stock_by_class[cls], dtype=np.float32)
         arrays[f"L_{cls}"] = np.asarray(x_build.load_by_class[cls], dtype=np.float32)
+        arrays[f"X_{cls}"] = np.asarray(X_by_class[cls], dtype=np.float32)
+    for branch in ("forest", "residential", "commercial"):
+        arrays[f"off_{branch}"] = np.asarray(offroad_W[branch], dtype=np.float32)
     for pk in viz_pollutants:
-        arrays[f"ws_{pk}"] = np.asarray(W_stationary_poll[pk], dtype=np.float32)
-        arrays[f"wo_{pk}"] = np.asarray(W_offroad_poll[pk], dtype=np.float32)
         arrays[f"wc_{pk}"] = np.asarray(W_combined_poll[pk], dtype=np.float32)
     pol_txt = ", ".join(sorted(viz_pollutants))
-    legend = f"Classes: {', '.join(viz_classes)} · W: stat/offroad/combined — {pol_txt}"
+    legend = (
+        f"Classes: {', '.join(viz_classes)} · "
+        f"X + offroad F/R/B + W combined — {pol_txt}"
+    )
     return _emit_sector_viz(
         out_html, "C_Othercombustion", arrays,
         bbox_wgs84=bbox_wgs84, transform=x_build.transform, raster_crs=x_build.crs,

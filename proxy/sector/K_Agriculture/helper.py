@@ -484,23 +484,34 @@ def z_score_by_cams_cell(
     if not use.any():
         return out
 
-    for cid in np.unique(cell_id[use]):
-        m = use & (cell_id == int(cid))
-        n = int(m.sum())
+    flat = np.flatnonzero(use)
+    cids = cell_id.ravel()[flat]
+    vals = frp.ravel()[flat].astype(np.float64)
+    out_flat = out.ravel()
+
+    order = np.argsort(cids, kind="stable")
+    cids = cids[order]
+    flat = flat[order]
+    vals = vals[order]
+    breaks = np.concatenate(([0], np.flatnonzero(np.diff(cids)) + 1, [cids.size]))
+
+    for a, b in zip(breaks[:-1], breaks[1:]):
+        idx = flat[a:b]
+        n = b - a
         if n == 1:
-            out[m] = 1.0
+            out_flat[idx] = 1.0
             continue
-        v = frp[m].astype(np.float32)
+        v = vals[a:b]
         mu = float(v.mean())
         sigma = float(v.std())
         if sigma <= 0.0:
-            out[m] = 1.0
+            out_flat[idx] = 1.0
             continue
         z = (v - mu) / sigma
         z_min = float(z.min())
         z_max = float(z.max())
         if z_max <= z_min:
-            out[m] = 1.0
+            out_flat[idx] = 1.0
         else:
-            out[m] = ((z - z_min) / (z_max - z_min)).astype(np.float32)
+            out_flat[idx] = ((z - z_min) / (z_max - z_min)).astype(np.float32)
     return out

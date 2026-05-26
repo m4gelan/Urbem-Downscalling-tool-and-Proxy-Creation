@@ -19,6 +19,8 @@ Pre-built proxy weights are currently available for:
 - France
 - Austria
 - Greece
+- Belgium
+- Spain
 
 If your country is listed above, you can skip proxy generation and go directly to [Run the visualizer](#run-the-visualizer).
 

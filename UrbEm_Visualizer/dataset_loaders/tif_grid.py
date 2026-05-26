@@ -13,8 +13,8 @@ from UrbEm_Visualizer.downscaling.spatial import FineGrid
 
 
 def pixel_centre_axes(transform: rasterio.Affine, height: int, width: int) -> tuple[np.ndarray, np.ndarray]:
-    x = transform.c + (np.arange(width, dtype=np.float64) + 0.5) * transform.a
-    y = transform.f + (np.arange(height, dtype=np.float64) + 0.5) * transform.e
+    x = transform.c + (np.arange(width, dtype=np.float32) + 0.5) * transform.a
+    y = transform.f + (np.arange(height, dtype=np.float32) + 0.5) * transform.e
     return x, y
 
 
@@ -43,8 +43,8 @@ def cell_id_on_raster(
         yy, xx = np.meshgrid(py[i0:i1], px, indexing="ij")
         lon, lat = tr.transform(xx, yy)
         cid = cell_id_from_lonlat(
-            np.asarray(lon, dtype=np.float64).ravel(),
-            np.asarray(lat, dtype=np.float64).ravel(),
+            np.asarray(lon, dtype=np.float32).ravel(),
+            np.asarray(lat, dtype=np.float32).ravel(),
             lon_bounds,
             lat_bounds,
             nlon,
@@ -185,19 +185,6 @@ def deposit_point(
     lat: float,
     mass: float,
 ) -> None:
-    tr = Transformer.from_crs("EPSG:4326", grid.crs, always_xy=True)
-    x, y = tr.transform(lon, lat)
-    res = float(min(abs(grid.transform.a), abs(grid.transform.e)))
-    tol = 0.51 * res
-    px, py = pixel_centre_axes(grid.transform, grid.height, grid.width)
-    dx = np.abs(px - x)
-    dy = np.abs(py[:, None] - y)
-    hit = (dx <= tol) & (dy <= tol)
-    n = int(np.count_nonzero(hit))
-    if n <= 0:
-        r, c = lonlat_to_rowcol(grid, lon, lat)
-        if 0 <= r < grid.height and 0 <= c < grid.width:
-            plane[r, c] += np.float32(mass)
-        return
-    share = np.float32(mass) / np.float32(n)
-    plane[hit] += share
+    r, c = lonlat_to_rowcol(grid, lon, lat)
+    if 0 <= r < grid.height and 0 <= c < grid.width:
+        plane[r, c] += np.float32(mass)

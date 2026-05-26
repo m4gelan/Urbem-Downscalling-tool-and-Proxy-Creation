@@ -1,0 +1,159 @@
+Area weights debug maps — by sector
+Source: proxy/visualizers/area_weights_map.py
+
+Output modes (proxy.entry.MAP_TYPE):
+  INTERACTIVE  — single Folium HTML, all layers togglable
+  FIXED_IMAGE  — one PNG per layer (OpenStreetMap basemap + CAMS cell outlines)
+
+Sectors WITHOUT area-weight maps:
+  F_Roads      — not implemented
+  H_Aviation   — point matching only
+
+Dynamic layers: names in {braces} come from sector config / run data (inventory groups,
+subgroups, pollutants, OSM slots, etc.). One map layer is emitted per key present at runtime.
+
+================================================================================
+A_PublicPower
+================================================================================
+Inputs / masks:
+  - CORINE mask
+  - Population z-score
+
+Weights:
+  - Weight W — {pollutant}          (one map per pollutant in the run)
+
+================================================================================
+B_Industry
+================================================================================
+Inputs / masks:
+  - CORINE L3 121 industrial
+  - CORINE L3 131 mineral
+  - OSM refineries                  (osm_refineries_petroleum)
+  - OSM manufacturing               (osm_manufacturing_combustion_residual)
+  - OSM mineral                     (osm_mineral)
+  - OSM chemical metal              (osm_chemical_metal)
+  - OSM {group}                     (one per key in osm_by_group)
+
+Weights:
+  - W inventory group — {group}     (W_{group}, one per inventory group)
+  - W fused pollutant — {pollutant}   (wp_{pollutant}, one per pollutant)
+    e.g. W fused PM10, W fused CO
+
+================================================================================
+C_Othercombustion
+================================================================================
+Inputs / masks:
+  - Population z-score
+  - Hotmaps H_res z-score
+  - Hotmaps H_nres z-score
+  - HDD z-score
+  - CORINE u111 continuous urban
+  - CORINE u112 discontinuous urban
+  - CORINE u121 industrial
+
+Stock / load (2 model classes from area_weights_debug.viz_classes):
+  - S stock {class}                 (S_{class})
+  - L load {class}                  (L_{class})
+
+Weights (2 pollutants from area_weights_debug.viz_pollutants):
+  - W stationary — {pollutant}      (ws_{pollutant})
+  - W offroad — {pollutant}         (wo_{pollutant})
+  - W combined — {pollutant}        (wc_{pollutant})
+
+================================================================================
+D_Fugitive
+================================================================================
+Inputs / masks:
+  - CORINE L3 121
+  - CORINE L3 123 ports
+  - CORINE L3 131 mineral
+  - Population z-score
+  - GEM coal mines
+  - GEM oil/gas
+  - VIIRS Nightfire VNF
+  - OSM {subgroup} / {slot_id}      (osm__{subgroup}__{slot_id}, one per OSM slot)
+
+Weights:
+  - W subgroup — {subgroup}         (W_{subgroup})
+  - W fused pollutant — {pollutant} (wp_{pollutant})
+    e.g. W fused NMVOC, W fused NOx
+
+================================================================================
+E_Solvents
+================================================================================
+Inputs / masks:
+  - CORINE household
+  - CORINE service
+  - CORINE industrial
+  - CORINE transport
+  - OSM {subgroup} / {slot_id}      (osm__{subgroup}__{slot_id})
+
+Weights:
+  - W subsector — {subsector}       (W_{subsector})
+  - W fused pollutant — {pollutant} (wp_{pollutant})
+    e.g. W fused NMVOC, W fused NOx
+
+================================================================================
+G_Shipping
+================================================================================
+Inputs / masks:
+  - CORINE mask
+  - OSM shipping
+  - EMODNET z-score
+
+Weights:
+  - Weight W — {pollutant}          (one map per pollutant in the run)
+
+================================================================================
+I_Offroad
+================================================================================
+Inputs / masks:
+  - CORINE L3 121
+  - CORINE L3 123 ports
+  - CORINE L3 124 transport
+  - CORINE L3 131 mineral
+  - OSM {subgroup} / {slot_id}      (osm__{subgroup}__{slot_id})
+
+Weights:
+  - W subgroup — {subgroup}         (W_{subgroup})
+  - W fused pollutant — {pollutant} (wp_{pollutant})
+    e.g. W fused NMVOC, W fused NOx
+
+================================================================================
+J_Waste
+================================================================================
+Inputs / masks:
+  - OSM waste layers
+  - CORINE CLC 132 dump sites
+  - CORINE CLC 121 industrial
+  - Imperviousness z-score
+  - UWWTD treatment plants
+  - UWWTD agglomerations
+  - GHSL rural mask
+  - Population z-score
+
+Weights:
+  - W solid waste                   (Ws)
+  - W wastewater                    (Ww)
+  - W residual                      (Wr)
+  - W fused pollutant — {pollutant} (wp_{pollutant})
+    e.g. W fused NMVOC, W fused SOx
+
+================================================================================
+K_Agriculture
+================================================================================
+Weights by group (wg_{group}, one map per group in W_by_group):
+  - W livestock
+  - W manure
+  - W grazed pastures
+  - W farm buildings
+  - W inorganic N
+  - W crop NMVOC
+  - W broad agricultural
+  - W biomass burning
+  - W {group}                       (any other group key at runtime)
+
+Weights fused by pollutant (wp_{pollutant}):
+  - W fused NH3
+  - W fused NMVOC
+  - W fused {pollutant}             (one per pollutant in the run: CO, NOx, PM10, …)

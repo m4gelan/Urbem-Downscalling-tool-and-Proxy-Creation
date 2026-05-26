@@ -19,6 +19,7 @@ const UrbEmViz = (function () {
   let map = null;
   let basemapLayer = null;
   let domainLayer = null;
+  let camsLayer = null;
   const areaLayers = {};
   const pointLayers = {};
   let layerState = {};
@@ -224,7 +225,10 @@ const UrbEmViz = (function () {
           pointToLayer: (f, latlng) =>
             L.marker(latlng, { icon: makePointIcon(f.properties) }),
           onEachFeature: (f, layer) => {
-            layer.on("click", () => openFacility(f.properties, latlng));
+            layer.on("click", () => {
+              const ll = layer.getLatLng();
+              openFacility(f.properties, ll);
+            });
           },
         }
       ).addTo(map);
@@ -240,30 +244,81 @@ const UrbEmViz = (function () {
     });
     const r = await fetch(`${API}/api/viz/facility?${q}`);
     const data = await r.json();
+    if (data.error) {
+      console.warn("facility lookup:", data.error);
+      return;
+    }
     const panel = document.getElementById("facility-panel");
     panel.classList.remove("hidden");
-    document.getElementById("facility-title").textContent = `Facility (${pollutant})`;
+
+    const sectorLabel = (data.sectors && data.sectors[0] && data.sectors[0].label) || "";
+    const title = data.facility_name || sectorLabel || "Point source";
+    document.getElementById("facility-title").textContent = title;
+
+    const ds = document.getElementById("facility-dataset");
+    ds.classList.remove("hidden", "facility-dataset-warn");
+    if (data.dataset) {
+      ds.textContent = `Source dataset: ${data.dataset}`;
+    } else if (data.match_status === "matched_appointed") {
+      ds.textContent = "Source dataset: unknown (re-run proxy matching for metadata)";
+      ds.classList.add("facility-dataset-warn");
+    } else if (data.match_status) {
+      ds.textContent = `Match: ${data.match_status.replace(/_/g, " ")}`;
+    } else {
+      ds.textContent = "";
+      ds.classList.add("hidden");
+    }
+
+    const nameEl = document.getElementById("facility-name");
+    if (data.facility_name && data.facility_name !== title) {
+      nameEl.textContent = data.facility_name;
+      nameEl.classList.remove("hidden");
+    } else {
+      nameEl.textContent = "";
+      nameEl.classList.add("hidden");
+    }
+
+    const metaDl = document.getElementById("facility-meta");
+    metaDl.innerHTML = "";
+    (data.details || []).forEach((d) => {
+      if (!d.label || d.value == null || d.value === "") return;
+      const dt = document.createElement("dt");
+      dt.textContent = d.label;
+      const dd = document.createElement("dd");
+      dd.textContent = d.value;
+      metaDl.appendChild(dt);
+      metaDl.appendChild(dd);
+    });
+    if (data.match_distance_km != null) {
+      const dt = document.createElement("dt");
+      dt.textContent = "Match distance";
+      const dd = document.createElement("dd");
+      dd.textContent = `${Number(data.match_distance_km).toFixed(2)} km`;
+      metaDl.appendChild(dt);
+      metaDl.appendChild(dd);
+    }
+
     document.getElementById("facility-coords").textContent =
-      `${latlng.lat.toFixed(5)}°, ${latlng.lng.toFixed(5)}°`;
+      `${latlng.lat.toFixed(5)}°, ${latlng.lng.toFixed(5)}°` +
+      (data.cams_point_id != null && data.cams_point_id >= 0 ? ` · CAMS #${data.cams_point_id}` : "");
+
     const tbody = document.getElementById("facility-tbody");
     tbody.innerHTML = "";
-    const barBox = document.getElementById("facility-bars");
-    barBox.innerHTML = "";
-    let maxEm = 0;
-    (data.sectors || []).forEach((row) => {
-      maxEm = Math.max(maxEm, row.emission);
+    const unit = data.unit || "kg/yr/cell";
+    (data.pollutants || []).forEach((row) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        `<td>${row.label}</td><td>${row.emission_label || fmtSci(row.emission)}</td><td>${row.ratio_label || "—"}</td>`;
+        `<td>${row.pollutant}</td><td>${row.emission_label || fmtSci(row.emission)}</td><td>${unit}</td>`;
       tbody.appendChild(tr);
     });
-    (data.sectors || []).forEach((row) => {
-      const w = maxEm > 0 ? (row.emission / maxEm) * 100 : 0;
-      const div = document.createElement("div");
-      div.className = "facility-bar-row";
-      div.innerHTML = `<span>${row.label}</span><div class="facility-bar-track"><div class="facility-bar-fill" style="width:${w}%"></div></div>`;
-      barBox.appendChild(div);
-    });
+    if (!tbody.children.length && (data.sectors || []).length) {
+      (data.sectors || []).forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          `<td>${pollutant}</td><td>${row.emission_label || fmtSci(row.emission)}</td><td>${unit}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
   }
 
   async function refreshViewportCard() {
@@ -485,6 +540,9 @@ const UrbEmViz = (function () {
   }
 
   async function open(outputDir) {
+    if (typeof L === "undefined") {
+      throw new Error("Leaflet failed to load — hard-refresh the page (Ctrl+F5)");
+    }
     const r = await fetch(`${API}/api/viz/open`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -536,6 +594,28 @@ const UrbEmViz = (function () {
     domainLayer = L.geoJSON(dom, {
       style: { color: "#4f7cff", weight: 2, fillOpacity: 0, dashArray: "6 4" },
     }).addTo(map);
+
+    try {
+      const cams = await (await fetch(`${API}/api/viz/cams-grid`)).json();
+      if (!cams.error && cams.features) {
+        if (camsLayer) map.removeLayer(camsLayer);
+        camsLayer = L.geoJSON(cams, {
+          style: { fillColor: "#8b91a8", fillOpacity: 0.12, color: "#6b7289", weight: 0.7 },
+          interactive: false,
+        }).addTo(map);
+        domainLayer.bringToFront();
+      }
+    } catch (e) {
+      console.warn("CAMS grid overlay:", e);
+    }
+
+    const note = document.getElementById("viz-map-note");
+    if (note && meta.domain_crs) {
+      note.textContent =
+        "Domain outline follows " +
+        meta.domain_crs +
+        " (4 corners). CAMS cell edges are approximate lat/lon rectangles — lines may not align exactly with emissions.";
+    }
 
     document.getElementById("btn-facility-close").onclick = closeFacility;
     document.getElementById("btn-viz-stats").onclick = showAnalytics;

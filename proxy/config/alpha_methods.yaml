@@ -331,8 +331,12 @@ sectors:
       nmvoc:
         method: 0
       co:
-        method: 0
+        method: 1
+        pool: EU27
       pm10:
         method: 0
       pm2_5:
         method: 0
+      sox:
+        method: 1
+        pool: EU27

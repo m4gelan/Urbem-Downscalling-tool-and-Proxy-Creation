@@ -29,6 +29,23 @@ def output_dir_for_run(config_path: Path, config: dict) -> Path:
     return project_root() / "Output" / "UrbEm" / str(run_name)
 
 
+def _sector_step_plan(sec: dict, mode: str) -> list[tuple[str, float]]:
+    aw = sec.get("area_weights") or {}
+    ps = sec.get("point_source") or {}
+    has_area = bool(aw.get("path")) and mode in ("both", "area_only")
+    has_point = bool(ps.get("path")) and mode in ("both", "point_only")
+    steps: list[tuple[str, float]] = [("Loading CAMS", 0.12)]
+    if has_area and has_point:
+        steps.append(("Area downscaling", 0.48))
+        steps.append(("Point sources", 0.35))
+    elif has_area:
+        steps.append(("Area downscaling", 0.83))
+    elif has_point:
+        steps.append(("Point sources", 0.83))
+    total = sum(w for _, w in steps)
+    return [(label, w / total) for label, w in steps]
+
+
 def run_downscaling(
     config_path: Path,
     *,
@@ -59,8 +76,8 @@ def run_downscaling(
             "id": sid,
             "label": sector_label(sid),
             "status": "waiting",
-            "pollutants": pollutants,
-            "pollutants_done": [],
+            "progress": 0,
+            "step": "",
         }
         for sid in order
     ]
@@ -89,18 +106,31 @@ def run_downscaling(
                 push()
                 return state
 
-            sectors_state[i]["status"] = "running"
-            sectors_state[i]["pollutants_done"] = []
-            push()
             sec = config["sectors"][sid]
             mode = sector_mode(sid)
             res: dict[str, Any] = {}
-            area_da = None
-            point_da = None
+            plan = _sector_step_plan(sec, mode)
 
+            sectors_state[i]["status"] = "running"
+            sectors_state[i]["progress"] = 0
+            sectors_state[i]["step"] = plan[0][0]
+            push()
+
+            def _set_progress(step: int, sub: float, label: str | None = None) -> None:
+                base = sum(w for _, w in plan[:step])
+                _, w = plan[step]
+                pct = int((base + w * max(0.0, min(1.0, sub))) * 100)
+                sectors_state[i]["progress"] = min(pct, 99)
+                sectors_state[i]["step"] = label or plan[step][0]
+                push()
+
+            step = 0
+            _set_progress(step, 0.0)
             cams_cells, cams_grid_meta = prepare_sector_cams(
                 cams_nc, sid, config["country"], int(config["year"]), pollutants,
             )
+            _set_progress(step, 1.0)
+            step += 1
 
             if cams_grid_meta:
                 cache_key = sid
@@ -114,11 +144,12 @@ def run_downscaling(
             aw = sec.get("area_weights") or {}
             if aw.get("path") and mode in ("both", "area_only"):
                 aw_path = resolve_path(aw["path"], root)
+                _set_progress(step, 0.0)
+                n_pol = len(pollutants) or 1
+
                 def _pol_done(pol: str) -> None:
-                    done = sectors_state[i]["pollutants_done"]
-                    if pol not in done:
-                        done.append(pol)
-                    push()
+                    pi = pollutants.index(pol) if pol in pollutants else n_pol - 1
+                    _set_progress(step, (pi + 1) / n_pol, f"Area — {pol}")
 
                 area_da, wlog, fails, sector_clip = downscale_area(
                     grid=grid,
@@ -144,13 +175,18 @@ def run_downscaling(
                     return state
                 res["area_emission"] = area_da
                 clip_log.extend(sector_clip)
+                _set_progress(step, 1.0)
+                step += 1
 
             ps = sec.get("point_source") or {}
             if ps.get("path") and mode in ("both", "point_only"):
                 ps_path = resolve_path(ps["path"], root)
-                aw_path = None
-                if aw.get("path"):
-                    aw_path = resolve_path(aw["path"], root)
+                aw_path = resolve_path(aw["path"], root) if aw.get("path") else None
+                _set_progress(step, 0.0)
+
+                def _point_prog(label: str, sub: float) -> None:
+                    _set_progress(step, sub, label)
+
                 point_da, g1, g2, g3 = run_point_sector(
                     grid=grid,
                     link_path=ps_path,
@@ -163,17 +199,17 @@ def run_downscaling(
                     layer_mode=layer_mode,
                     cell_id=cell_id,
                     area_weight_path=aw_path,
+                    on_progress=_point_prog,
                 )
                 res["point_emission"] = point_da
                 res["point_appointed"] = g1
                 res["point_not_appointed"] = g2
                 res["point_unmatched"] = g3
-                if not aw.get("path") or mode not in ("both", "area_only"):
-                    sectors_state[i]["pollutants_done"] = list(pollutants)
-                    push()
+                _set_progress(step, 1.0)
 
             sector_results[sid] = res
-            sectors_state[i]["pollutants_done"] = list(pollutants)
+            sectors_state[i]["progress"] = 100
+            sectors_state[i]["step"] = "Complete"
             sectors_state[i]["status"] = "done"
             push()
 

@@ -191,12 +191,13 @@ def points_geojson(
 
 
 def domain_bbox_geojson(ctx: RunContext) -> dict[str, Any]:
-    w, s, e, n = domain_wgs84_from_ctx(ctx)
-    coords = [[w, s], [e, s], [e, n], [w, n], [w, s]]
+    from UrbEm_Visualizer.visualization.load_run import domain_corners_wgs84
+
+    ring = domain_corners_wgs84(ctx.domain)
     return {
         "type": "Feature",
-        "properties": {"name": "Domain"},
-        "geometry": {"type": "Polygon", "coordinates": [coords]},
+        "properties": {"name": "Domain", "crs": str(ctx.domain.get("crs", ""))},
+        "geometry": {"type": "Polygon", "coordinates": [ring]},
     }
 
 
@@ -213,39 +214,103 @@ def facility_detail(
     pollutant: str,
     sector_ids: list[str],
 ) -> dict[str, Any]:
-    tr = Transformer.from_crs("EPSG:4326", str(ctx.domain["crs"]), always_xy=True)
-    x, y = tr.transform(lon, lat)
-    rows = []
+    from UrbEm_Visualizer.visualization.map_config import sector_viz_meta
+    from UrbEm_Visualizer.visualization.scale import _fmt_sci
+
+    facilities = []
     for sid in _real_sector_ids(sector_ids):
         if not ctx.sector_layers(sid)["point"]:
             continue
+        rec = ctx.appointed_facility_at(sid, lon, lat)
+        if rec:
+            sm = sector_viz_meta(sid)
+            facilities.append({
+                **rec,
+                "sector": sid,
+                "sector_label": sm.get("tree_label", sid),
+            })
+            continue
         if ctx.use_facility_points(sid):
             df = ctx.facility_points_df(sid, pollutant)
+            for row in df.itertuples(index=False):
+                if _round_key(float(row.lon), float(row.lat)) == _round_key(lon, lat):
+                    facilities.append({
+                        "sector_id": sid,
+                        "sector": sid,
+                        "sector_label": sector_viz_meta(sid).get("tree_label", sid),
+                        "match_status": str(getattr(row, "match_status", "unknown")),
+                        "pollutants": [{
+                            "pollutant": pollutant,
+                            "emission": float(row.emission),
+                            "emission_label": _fmt_sci(float(row.emission)),
+                        }],
+                    })
+                    break
+
+    if not facilities:
+        tr = Transformer.from_crs("EPSG:4326", str(ctx.domain["crs"]), always_xy=True)
+        x, y = tr.transform(lon, lat)
+        rows = []
+        for sid in _real_sector_ids(sector_ids):
+            if not ctx.sector_layers(sid)["point"]:
+                continue
+            df = ctx.grid_df(sid, "point", pollutant)
+            if df.empty:
+                continue
+            to_wgs = ctx._to_wgs
             for rec in df.itertuples(index=False):
-                if _round_key(float(rec.lon), float(rec.lat)) == _round_key(lon, lat):
+                plon, plat = to_wgs.transform(float(rec.x), float(rec.y))
+                if _round_key(plon, plat) == _round_key(lon, lat):
                     rows.append({
                         "sector": sid,
                         "label": sector_viz_meta(sid).get("tree_label", sid),
                         "emission": float(rec.emission),
                     })
-            continue
-        df = ctx.grid_df(sid, "point", pollutant)
-        if df.empty:
-            continue
-        to_wgs = ctx._to_wgs
-        for rec in df.itertuples(index=False):
-            plon, plat = to_wgs.transform(float(rec.x), float(rec.y))
-            if _round_key(plon, plat) == _round_key(lon, lat):
-                rows.append({
-                    "sector": sid,
-                    "label": sector_viz_meta(sid).get("tree_label", sid),
-                    "emission": float(rec.emission),
-                })
+        return {
+            "pollutant": pollutant,
+            "unit": ctx.unit,
+            "lon": lon,
+            "lat": lat,
+            "facilities": [],
+            "sectors": rows,
+            "total": sum(r["emission"] for r in rows),
+        }
+
+    primary = facilities[0]
+    all_pollutants: dict[str, float] = {}
+    for fac in facilities:
+        for p in fac.get("pollutants") or []:
+            pol = p["pollutant"]
+            all_pollutants[pol] = all_pollutants.get(pol, 0.0) + float(p["emission"])
+
+    pollutant_rows = [
+        {
+            "pollutant": pol,
+            "emission": val,
+            "emission_label": _fmt_sci(val),
+        }
+        for pol, val in sorted(all_pollutants.items(), key=lambda x: ctx.pollutants.index(x[0]) if x[0] in ctx.pollutants else 999)
+    ]
+
     return {
         "pollutant": pollutant,
         "unit": ctx.unit,
         "lon": lon,
         "lat": lat,
-        "sectors": rows,
-        "total": sum(r["emission"] for r in rows),
+        "match_status": primary.get("match_status"),
+        "dataset": primary.get("dataset"),
+        "facility_name": primary.get("facility_name"),
+        "facility_id": primary.get("facility_id"),
+        "details": primary.get("details") or [],
+        "match_distance_km": primary.get("match_distance_km"),
+        "cams_point_id": primary.get("cams_point_id"),
+        "pollutants": pollutant_rows,
+        "sectors": [
+            {
+                "sector": f["sector"],
+                "label": f["sector_label"],
+            }
+            for f in facilities
+        ],
+        "facilities": facilities,
     }

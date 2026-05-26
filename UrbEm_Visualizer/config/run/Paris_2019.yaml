@@ -1,0 +1,65 @@
+country: France
+year: 2019
+input_root: INPUT
+paths:
+  cams: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  proxy_weights_root: INPUT/Proxy_weights
+sectors:
+  A_PublicPower:
+    area_weights:
+      path: INPUT/Proxy_weights/A_PublicPower/A_PublicPower_France_area_weights_2019.tif
+    point_source:
+      path: INPUT/Proxy_weights/A_PublicPower/A_PublicPower_France_point_source_2019.tif
+  B_Industry:
+    area_weights:
+      path: INPUT/Proxy_weights/B_Industry/B_Industry_France_area_weights_2019.tif
+    point_source:
+      path: INPUT/Proxy_weights/B_Industry/B_Industry_France_point_source_2019.tif
+  C_OtherCombustion:
+    area_weights:
+      path: INPUT/Proxy_weights/C_OtherCombustion/C_Othercombustion_France_area_weights_2019.tif
+  D_Fugitive:
+    area_weights:
+      path: INPUT/Proxy_weights/D_Fugitive/D_Fugitive_France_area_weights_2019.tif
+    point_source:
+      path: INPUT/Proxy_weights/D_Fugitive/D_Fugitive_France_point_source_2019.tif
+  E_Solvents:
+    area_weights:
+      path: INPUT/Proxy_weights/E_Solvents/E_Solvents_France_area_weights_2019.tif
+    point_source:
+      path: INPUT/Proxy_weights/E_Solvents/E_Solvents_France_point_source_2019.tif
+  H_Aviation:
+    point_source:
+      path: INPUT/Proxy_weights/H_Aviation/H_Aviation_France_point_source_2019.tif
+  I_Offroad:
+    area_weights:
+      path: INPUT/Proxy_weights/I_Offroad/I_Offroad_France_area_weights_2019.tif
+  J_Waste:
+    area_weights:
+      path: INPUT/Proxy_weights/J_Waste/J_Waste_France_area_weights_2019.tif
+    point_source:
+      path: INPUT/Proxy_weights/J_Waste/J_Waste_France_point_source_2019.tif
+  K_Agriculture:
+    area_weights:
+      path: INPUT/Proxy_weights/K_Agriculture/K_Agriculture_France_area_weights_2019.tif
+  G_Shipping:
+    area_weights:
+      path: INPUT/Proxy_weights/G_Shipping/G_Shipping_France_area_weights_2019.tif
+absent_sources: []
+pollutants:
+- NOx
+- NMVOC
+- CO
+- SO2
+- NH3
+- PM10
+- PM2.5
+domain:
+  crs: EPSG:3035
+  xmin: 3746987.755740856
+  ymin: 2877499.271759326
+  xmax: 3771661.4067202955
+  ymax: 2902288.3876638375
+output:
+  format: csv
+  layer_mode: separate

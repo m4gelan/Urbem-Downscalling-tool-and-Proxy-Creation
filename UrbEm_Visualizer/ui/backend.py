@@ -481,6 +481,38 @@ def api_viz_domain():
     return jsonify(domain_bbox_geojson(ctx))
 
 
+@app.route("/api/viz/cams-grid", methods=["GET"])
+def api_viz_cams_grid():
+    from UrbEm_Visualizer.dataset_loaders.cams_grid import load_domain_cams_geojson
+    from UrbEm_Visualizer.visualization.session import get_context
+
+    ctx = get_context()
+    if ctx is None:
+        return jsonify({"error": "no visualization session"}), 400
+    cfg = ctx.config
+    cams_rel = (cfg.get("paths") or {}).get("cams")
+    if not cams_rel:
+        return jsonify({"error": "manifest paths.cams missing"}), 400
+    if not cfg.get("country") or not cfg.get("year"):
+        return jsonify({"error": "manifest country/year missing"}), 400
+    cams_path = Path(cams_rel)
+    if not cams_path.is_absolute():
+        cams_path = project_root() / cams_rel
+    if not cams_path.is_file():
+        return jsonify({"error": f"CAMS file not found: {cams_path}"}), 404
+    try:
+        gj = load_domain_cams_geojson(
+            cams_path,
+            str(cfg["country"]),
+            int(cfg["year"]),
+            list(cfg["pollutants"]),
+            ctx.domain,
+        )
+        return jsonify(gj)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/viz/tiles/<sector_id>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
 def api_viz_tiles(sector_id: str, z: int, x: int, y: int):
     from flask import Response
@@ -570,7 +602,7 @@ def api_viz_facility():
     from UrbEm_Visualizer.visualization.analytics import facility_comparison
 
     return jsonify(
-        facility_comparison(ctx, float(lon), float(lat), pollutant)
+        facility_comparison(ctx, float(lon), float(lat), pollutant, active)
     )
 
 

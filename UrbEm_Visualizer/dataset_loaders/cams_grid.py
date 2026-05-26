@@ -179,8 +179,8 @@ def _load_cells_union(
 
     with xr.open_dataset(cams_nc, engine="netcdf4") as ds:
         country_idx = cams_country_index_from_iso3(ds, iso3)
-        lon_src = np.asarray(ds["longitude_source"].values, dtype=np.float64).ravel()
-        lat_src = np.asarray(ds["latitude_source"].values, dtype=np.float64).ravel()
+        lon_src = np.asarray(ds["longitude_source"].values, dtype=np.float32).ravel()
+        lat_src = np.asarray(ds["latitude_source"].values, dtype=np.float32).ravel()
         src_type = np.asarray(ds["source_type_index"].values, dtype=np.int64).ravel()
         emis_cat = np.asarray(ds["emission_category_index"].values, dtype=np.int64).ravel()
         country_index = np.asarray(ds["country_index"].values, dtype=np.int64).ravel()
@@ -197,13 +197,13 @@ def _load_cells_union(
         np.clip(lat_idx, 0, nlat - 1, out=lat_idx)
         pol_mat = np.column_stack([
             np.nan_to_num(
-                np.asarray(ds[cams_pollutant_var(lab)].values, dtype=np.float64).ravel(),
+                np.asarray(ds[cams_pollutant_var(lab)].values, dtype=np.float32).ravel(),
                 nan=0.0,
                 posinf=0.0,
                 neginf=0.0,
             )
             for lab in labels
-        ])
+        ]).astype(np.float32)
 
     base = (
         np.isfinite(lon_src)
@@ -256,6 +256,45 @@ def cells_to_geojson(cells: dict[int, dict[str, Any]]) -> dict[str, Any]:
     return {"type": "FeatureCollection", "features": features}
 
 
+def _cell_in_domain_envelope(cell: dict[str, Any], west: float, south: float, east: float, north: float) -> bool:
+    b = cell["cell_bounds_wgs84"]
+    return not (
+        b["east"] < west or b["west"] > east or b["north"] < south or b["south"] > north
+    )
+
+
+def load_domain_cams_geojson(
+    cams_path: Path,
+    country: str,
+    year: int,
+    pollutants: list[str],
+    domain: dict,
+) -> dict[str, Any]:
+    iso3 = country_iso3(country)
+    filters = _collect_cams_filters(project_root())
+    cells, _ = _load_cells_union(
+        cams_path,
+        iso3=iso3,
+        year=year,
+        filters=filters,
+        pollutants=pollutants,
+    )
+    if not cells:
+        raise ValueError(f"No CAMS grid cells for {country} ({iso3})")
+    w, s, e, n = domain_wgs84_from_domain(domain)
+    picked = {cid: row for cid, row in cells.items() if _cell_in_domain_envelope(row, w, s, e, n)}
+    gj = cells_to_geojson(picked)
+    gj["cell_count"] = len(picked)
+    gj["crs"] = str(domain.get("crs", ""))
+    return gj
+
+
+def domain_wgs84_from_domain(domain: dict) -> tuple[float, float, float, float]:
+    from UrbEm_Visualizer.visualization.load_run import domain_wgs84
+
+    return domain_wgs84(domain)
+
+
 def load_country_cams_geojson(
     cams_path: Path,
     country: str,
@@ -297,16 +336,18 @@ def transform_bbox(
     ymax: float,
     from_crs: str,
     to_crs: str,
-) -> dict[str, float]:
+) -> dict[str, float | list[list[float]]]:
     tr = Transformer.from_crs(from_crs, to_crs, always_xy=True)
-    xs = [xmin, xmax, xmax, xmin]
-    ys = [ymin, ymin, ymax, ymax]
+    xs = [xmin, xmax, xmax, xmin, xmin]
+    ys = [ymin, ymin, ymax, ymax, ymin]
     xo, yo = tr.transform(xs, ys)
+    ring = [[float(xo[i]), float(yo[i])] for i in range(len(xs))]
     return {
         "xmin": float(min(xo)),
         "ymin": float(min(yo)),
         "xmax": float(max(xo)),
         "ymax": float(max(yo)),
+        "ring": ring,
     }
 
 

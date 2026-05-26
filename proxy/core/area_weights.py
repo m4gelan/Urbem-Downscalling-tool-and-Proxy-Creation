@@ -17,7 +17,7 @@ def _strip_weight_row(row: Any) -> dict[str, float]:
 
 
 def _clip_01(x: np.ndarray) -> np.ndarray:
-    return np.clip(np.asarray(x, dtype=np.float64), 0.0, 1.0)
+    return np.clip(np.asarray(x, dtype=np.float32), 0.0, 1.0)
 
 
 def _osm_term(
@@ -195,7 +195,7 @@ def compute_d_fugitive_S_by_subgroup(
     OSM slots are combined with weights ``w_osm_*``; binary rasters and CORINE masks are clipped to ``[0, 1]``;
     population uses ``population_z`` with NaNs cleared like industry.
     """
-    pop = np.nan_to_num(np.asarray(population_z, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
+    pop = np.nan_to_num(np.asarray(population_z, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
     c121 = _clip_01(corine_121)
     c123 = _clip_01(corine_123)
     c131 = _clip_01(corine_131)
@@ -388,9 +388,15 @@ def fuse_alpha_weighted_W_planes(
     alphas = np.asarray(alpha_row, dtype=np.float32).ravel()
     if alphas.shape[0] != len(W_planes):
         raise ValueError(f"alpha length {alphas.shape[0]} != {len(W_planes)} weight planes")
-    acc = np.zeros_like(np.asarray(W_planes[0], dtype=np.float32), dtype=np.float32)
-    for a, w in zip(alphas, W_planes):
-        acc += float(a) * np.asarray(w, dtype=np.float32)
+    w0 = np.asarray(W_planes[0], dtype=np.float32)
+    acc = np.empty_like(w0)
+    scratch = np.empty_like(w0)
+    np.multiply(w0, float(alphas[0]), out=acc)
+    for a, w in zip(alphas[1:], W_planes[1:]):
+        if float(a) == 0.0:
+            continue
+        np.multiply(np.asarray(w, dtype=np.float32), float(a), out=scratch)
+        np.add(acc, scratch, out=acc)
     return normalize_W_per_cams_cell(acc, cell_id, cams_cells)
 
 

@@ -12,17 +12,17 @@ from UrbEm_Visualizer.visualization.scale import _fmt_sci
 
 
 def _gini(values: np.ndarray) -> float:
-    v = np.sort(values[values > 0].astype(np.float64))
+    v = np.sort(values[values > 0].astype(np.float32))
     if v.size < 2:
         return 0.0
     n = v.size
-    idx = np.arange(1, n + 1, dtype=np.float64)
+    idx = np.arange(1, n + 1, dtype=np.float32)
     return float((2.0 * np.sum(idx * v) / (n * np.sum(v))) - (n + 1.0) / n)
 
 
 def _lorenz_curve(values: np.ndarray) -> dict[str, Any]:
     xs = list(range(0, 101, 10))
-    v = values[values > 0].astype(np.float64)
+    v = values[values > 0].astype(np.float32)
     if v.size == 0:
         return {"x_pct": xs, "y_cum_pct": [0.0] * len(xs), "pct90_x": None}
     v = np.sort(v)[::-1]
@@ -45,7 +45,7 @@ def _lorenz_curve(values: np.ndarray) -> dict[str, Any]:
 
 
 def _log_histogram(values: np.ndarray, bins: int = 30) -> dict[str, Any]:
-    v = values[values > 0].astype(np.float64)
+    v = values[values > 0].astype(np.float32)
     if v.size == 0:
         return {"bin_centers": [], "counts": []}
     logv = np.log10(v)
@@ -227,12 +227,22 @@ def viewport_stats(
     }
 
 
-def facility_comparison(ctx: RunContext, lon: float, lat: float, pollutant: str) -> dict[str, Any]:
+def facility_comparison(
+    ctx: RunContext,
+    lon: float,
+    lat: float,
+    pollutant: str,
+    sector_ids: list[str] | None = None,
+) -> dict[str, Any]:
     from UrbEm_Visualizer.visualization.geojson_layers import facility_detail
 
-    base = facility_detail(ctx, lon, lat, pollutant, _sector_area_ids(ctx))
+    if sector_ids is None:
+        sector_ids = [s for s in ctx.sector_ids() if ctx.sector_layers(s)["point"]]
+    base = facility_detail(ctx, lon, lat, pollutant, sector_ids)
+    if base.get("pollutants"):
+        return base
     rows = []
-    for row in base.get("sectors", []):
+    for row in base.get("sectors") or []:
         sid = row["sector"]
         df = ctx.grid_df(sid, "area", pollutant)
         median = float(np.median(df["emission"])) if not df.empty else 0.0

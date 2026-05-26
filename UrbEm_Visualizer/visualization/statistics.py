@@ -84,7 +84,7 @@ def compute_statistics(
 def _histogram(values: list[float], bins: int = 24) -> dict[str, Any]:
     if not values:
         return {"labels": [], "counts": []}
-    arr = np.asarray(values, dtype=np.float64)
+    arr = np.asarray(values, dtype=np.float32)
     counts, edges = np.histogram(arr, bins=bins)
     labels = [f"{edges[i]:.2g}–{edges[i + 1]:.2g}" for i in range(len(counts))]
     return {"labels": labels, "counts": [int(c) for c in counts]}

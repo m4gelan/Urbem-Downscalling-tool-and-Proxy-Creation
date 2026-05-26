@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +29,11 @@ from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
 from proxy.visualizers.area_weights_map import write_e_solvents_area_weights_debug_map
 from proxy.visualizers.viz_map import write_point_match_map
-from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
+from proxy.writers.area_weight_stack import (
+    area_weights_tif_path,
+    open_area_weight_stack,
+    write_area_weight_plane,
+)
 from proxy.writers.point_link import write_cams_facility_link_tif
 
 
@@ -327,53 +332,61 @@ def build(
             activity_keys=activity_keys,
             subsector_order=group_names,
         )
+        del S_by_activity
+        gc.collect()
+
         W_by_subsector: dict[str, np.ndarray] = {}
-        for sname, S_s in S_by_subsector.items():
+        for sname, S_s in list(S_by_subsector.items()):
             W_s = normalize_W_per_cams_cell(S_s, cell_id, cams_cells_mask)
             W_by_subsector[sname] = W_s
             log.info(
-                f"E_Solvents subsector={sname} S_sum={float(np.sum(S_s)):.6g} W_sum={float(np.sum(W_s)):.6g}"
+                f"E_Solvents subsector={sname} S_sum={float(np.sum(S_s)):.6g} "
+                f"W_sum={float(np.sum(W_s)):.6g}"
             )
+            del S_s
+        S_by_subsector.clear()
+        del S_by_subsector
+        gc.collect()
 
         W_per_group = [W_by_subsector[g] for g in group_names]
 
-        a_alpha = alpha_result.alpha.astype(np.float64)
-        n_poll = a_alpha.shape[0]
+        a_alpha = alpha_result.alpha.astype(np.float32)
+        n_poll = int(a_alpha.shape[0])
         n_g = len(W_per_group)
         if a_alpha.shape[1] != n_g:
             raise ValueError(f"alpha columns {a_alpha.shape[1]} != subsector groups {n_g}")
 
-        W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
-        for j in range(n_poll):
-            W_poll_stack[j] = fuse_alpha_weighted_W_planes(
-                W_per_group, a_alpha[j], cell_id, cams_cells_mask,
-            )
-
         country_tag = country_profile["full_name"].replace(" ", "_")
         band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
         out_w_tif = area_weights_tif_path(output_dir, "E_Solvents", country_tag, year)
-        write_area_weight_stack_multiband(
-            out_w_tif,
-            W_poll_stack,
-            band_names,
-            cor_tr,
-            cor_crs,
-        )
+        dst = open_area_weight_stack(out_w_tif, ch, cw, n_poll, cor_tr, cor_crs)
+
+        w_poll: dict[str, np.ndarray] = {}
+        make_viz = log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None
+        for j in range(n_poll):
+            W_c = fuse_alpha_weighted_W_planes(
+                W_per_group, a_alpha[j], cell_id, cams_cells_mask,
+            )
+            write_area_weight_plane(dst, j + 1, band_names[j], W_c)
+            if make_viz:
+                pk = band_names[j].lower()
+                if pk in ("nmvoc", "nox"):
+                    w_poll[pk] = W_c
+
+        dst.close()
+        del W_per_group
+        if not make_viz:
+            del W_by_subsector
+        gc.collect()
         log.info(f"E_Solvents alpha-fused area weights GeoTIFF: {out_w_tif}")
 
-        if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
+        if make_viz:
 
             def _pollutant_row_index(want_small: str) -> int | None:
                 for jj, lab in enumerate(alpha_result.pollutant_labels):
                     if cams_pollutant_var(lab) == want_small:
                         return jj
                 return None
-
-            w_poll: dict[str, np.ndarray] = {}
-            for key in ("nmvoc", "nox"):
-                ix = _pollutant_row_index(key)
-                if ix is not None:
-                    w_poll[key] = W_poll_stack[ix]
 
             legend_bits: list[str] = []
             for disp, small in (("NMVOC", "nmvoc"), ("NOx", "nox")):
@@ -410,3 +423,6 @@ def build(
                 log.info(f"E_Solvents area-weights debug map: {map_html}")
             except Exception as exc:
                 log.error(f"E_Solvents area-weights debug map failed: {exc}")
+            finally:
+                del W_by_subsector
+                gc.collect()

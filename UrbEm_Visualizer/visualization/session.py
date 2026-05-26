@@ -43,6 +43,7 @@ def build_meta(ctx: RunContext) -> dict[str, Any]:
         "unit": ctx.unit,
         "layer_mode": ctx.layer_mode,
         "domain_wgs84": {"west": w, "south": s, "east": e, "north": n},
+        "domain_crs": str(ctx.domain.get("crs", "")),
         "sectors": sectors,
         "map_config": load_map_config(),
         "sector_scale": ctx.sector_scale,

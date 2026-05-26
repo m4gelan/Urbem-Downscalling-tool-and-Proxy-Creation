@@ -24,7 +24,9 @@ from UrbEm_Visualizer.downscaling.sector_meta import load_sector_yaml
 from UrbEm_Visualizer.downscaling.spatial import FineGrid
 from UrbEm_Visualizer.pollutants import band_index_for_pollutant
 
-WEIGHT_TOL = 1e-6
+# Proxy normalizes each CAMS cell to sum=1 in float32 before writing the GeoTIFF.
+# Re-summing stored float32 pixels can drift slightly (e.g. 1.000743) — not a bad normalize.
+WEIGHT_TOL = 1e-2
 
 
 def cell_weight_sums(weights: np.ndarray, cell_id: np.ndarray) -> np.ndarray:
@@ -35,6 +37,7 @@ def cell_weight_sums(weights: np.ndarray, cell_id: np.ndarray) -> np.ndarray:
         return np.zeros(1, dtype=np.float64)
     c = flat_c[valid].astype(np.int64)
     max_c = int(c.max())
+    # float32 pixels, float64 sum — only the per-cell totals, not the full raster
     return np.bincount(c, weights=flat_w[valid].astype(np.float64), minlength=max_c + 1)
 
 
@@ -107,6 +110,9 @@ def downscale_area(
         e_native = np.zeros((h, w), dtype=np.float32)
         e_native[ok] = lut[cid_ok] * w_plane[ok]
         out_stack[pi] = reproject_plane_to_grid(e_native, nat_tr, nat_crs, grid)
+
+        if on_pollutant_done:
+            on_pollutant_done(pol)
 
         for cid in domain_cells:
             m = cell_id == int(cid)

@@ -49,8 +49,8 @@ def load_cams_area_cells(
 
     with xr.open_dataset(cams_nc, engine="netcdf4") as ds:
         country_idx = cams_country_index_from_iso3(ds, iso3)
-        lon_src = np.asarray(ds["longitude_source"].values, dtype=np.float64).ravel()
-        lat_src = np.asarray(ds["latitude_source"].values, dtype=np.float64).ravel()
+        lon_src = np.asarray(ds["longitude_source"].values, dtype=np.float32).ravel()
+        lat_src = np.asarray(ds["latitude_source"].values, dtype=np.float32).ravel()
         src_type = np.asarray(ds["source_type_index"].values, dtype=np.int64).ravel()
         emis_cat = np.asarray(ds["emission_category_index"].values, dtype=np.int64).ravel()
         country_index = np.asarray(ds["country_index"].values, dtype=np.int64).ravel()
@@ -71,7 +71,7 @@ def load_cams_area_cells(
                 nan=0.0, posinf=0.0, neginf=0.0,
             )
             for lab in labels
-        ])
+        ]).astype(np.float32)
 
     mask = (
         np.isfinite(lon_src)
@@ -127,8 +127,8 @@ def load_cams_points(
 
     with xr.open_dataset(cams_nc, engine="netcdf4") as ds:
         country_idx = cams_country_index_from_iso3(ds, iso3)
-        lon = np.asarray(ds["longitude_source"].values, dtype=np.float64).ravel()
-        lat = np.asarray(ds["latitude_source"].values, dtype=np.float64).ravel()
+        lon = np.asarray(ds["longitude_source"].values, dtype=np.float32).ravel()
+        lat = np.asarray(ds["latitude_source"].values, dtype=np.float32).ravel()
         src_type = np.asarray(ds["source_type_index"].values, dtype=np.int64).ravel()
         emis_cat = np.asarray(ds["emission_category_index"].values, dtype=np.int64).ravel()
         country_index = np.asarray(ds["country_index"].values, dtype=np.int64).ravel()
@@ -179,8 +179,8 @@ def point_cell_ids(
     ids = []
     for row in cams_points.values():
         cid = cell_id_from_lonlat(
-            np.array([row["longitude"]], dtype=np.float64),
-            np.array([row["latitude"]], dtype=np.float64),
+            np.array([row["longitude"]], dtype=np.float32),
+            np.array([row["latitude"]], dtype=np.float32),
             lon_bounds,
             lat_bounds,
             nlon,

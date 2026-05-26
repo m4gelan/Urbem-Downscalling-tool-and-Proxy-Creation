@@ -133,7 +133,7 @@ def rasterize_points_max(
     raster_crs: Any,
 ) -> np.ndarray:
     """Per-pixel maximum ``values`` at point locations (WGS84 lon/lat)."""
-    from rasterio.enums import MergeAlg
+    from rasterio.transform import rowcol
 
     h, w = int(height), int(width)
     out = np.zeros((h, w), dtype=np.float32)
@@ -141,21 +141,12 @@ def rasterize_points_max(
         return out
 
     vals = np.asarray(values, dtype=np.float32)
-    order = np.argsort(vals)
     tr = Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
-    xs, ys = tr.transform(lon[order], lat[order])
-    shapes = [
-        (mapping(Point(float(x), float(y))), float(vals[i]))
-        for x, y, i in zip(xs, ys, order)
-    ]
-    rio_features.rasterize(
-        shapes,
-        out=out,
-        transform=transform,
-        fill=0.0,
-        dtype=np.float32,
-        merge_alg=MergeAlg.replace,
-    )
+    xs, ys = tr.transform(lon, lat)
+    rows, cols = rowcol(transform, xs, ys)
+    ok = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
+    if ok.any():
+        np.maximum.at(out, (rows[ok], cols[ok]), vals[ok])
     return out
 
 
