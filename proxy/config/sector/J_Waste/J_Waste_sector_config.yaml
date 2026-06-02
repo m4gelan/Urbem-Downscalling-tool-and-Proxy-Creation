@@ -21,7 +21,7 @@ filepaths:
   UWWTD_Agglomerations:
     path: INPUT/Proxy/ProxySpecific/Waste/UWWTD_Agglomerations.gpkg
   Imperviousness:
-    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_BEL.tif
+    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_CHE.tif
 
   
 

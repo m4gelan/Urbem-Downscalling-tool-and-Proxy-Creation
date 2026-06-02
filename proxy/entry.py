@@ -22,7 +22,7 @@ SECTORS = [
     "C_Othercombustion",
     "D_Fugitive",
     "E_Solvents",
-    #"F_Roads",
+    "F_Roads",
     "G_Shipping",
     "H_Aviation",
     "I_Offroad",
@@ -31,21 +31,22 @@ SECTORS = [
 ]
 # To Enable Proxy creation for a specific sector, add the sector key to the list below
 # FOR SECTOR SPECIFIC RUN
-#SECTORS_ENABLED = ["E_Solvents", "G_Shipping", "H_Aviation", "I_Offroad", "J_Waste", "K_Agriculture"]
-SECTORS_ENABLED = ["E_Solvents"]
+
+SECTORS_ENABLED = ["C_Othercombustion","D_Fugitive","E_Solvents","F_Roads","G_Shipping","H_Aviation","I_Offroad","J_Waste","K_Agriculture"]
+
 # Enable all sectors except "F_Roads"
-#SECTORS_ENABLED = [s for s in SECTORS if s != "F_Roads"]
+SECTORS_ENABLED = SECTORS
 
 # Select True or false to enable or disable area weights / Point Matching (Not all sectors support point matching)
 AREA_WEIGHTS = True
 POINT_MATCHING = True
 
 # SELECT COUNTRY FOR PROXY CREATION
-COUNTRY = "France"
-CITY = "Lyon"
+COUNTRY = "Switzerland"
+CITY = "Lausanne"
 
 # SELECT LOG LEVEL FOR PROXY CREATION | DEBUG FOR MAPS, INFO FOR PROGRESS REPORT
-LOG_LEVEL = "DEBUG"  # DEBUG | INFO 
+LOG_LEVEL = "INFO"  # DEBUG | INFO 
 MAP_TYPE = 'FIXED_IMAGE' # FIXED_IMAGE / INTERACTIVE
 
 EPSG_CRS = "EPSG:3035"
@@ -54,15 +55,13 @@ PAD_M = 10.0 # 10 m padding around the points
 
 filepaths_path = "proxy/config/filepaths.yaml"
 
-if LOG_LEVEL == "DEBUG":
+BOUNDING_BOX = None
+if CITY:
     bouding_box_yaml = yaml.safe_load(open("proxy/visualizers/bouding_boxes.yaml", "r"))
     bbox = bouding_box_yaml["bounding_boxes"].get(CITY)
     if not bbox:
         raise ValueError(f"City '{CITY}' not found in bounding_boxes.yaml")
     BOUNDING_BOX = tuple(bbox)
-    filepaths_path = "proxy/config/filepaths.yaml"
-else:
-    BOUNDING_BOX = None
 
 def _format_duration(seconds: float) -> str:
     s = max(0.0, float(seconds))
@@ -146,7 +145,7 @@ def main() -> int:
                 crs=EPSG_CRS,
                 resolution_m=RESOLUTION_M,
                 pad_m=PAD_M,
-                area_weights_viz_bbox_wgs84=viz_bbox,
+                area_weights_viz_bbox_wgs84=BOUNDING_BOX if sk == "F_Roads" else viz_bbox,
             )
         except Exception:
             import traceback

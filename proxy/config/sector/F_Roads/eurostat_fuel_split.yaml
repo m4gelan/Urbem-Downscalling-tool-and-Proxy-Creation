@@ -1,0 +1,57 @@
+# Eurostat road stock (road_eqs_*) — vehicle counts by motor energy.
+# geo: country_profile["other"] (e.g. Greece -> EL).
+
+year: 2019
+
+# When a country reports stock totals only (e.g. EL in road_eqs_carmot), use shares
+# summed over all Eurostat countries that do report PET/DIE/LPG/CNG breakdown.
+fallback: eu_aggregate
+
+api:
+  timeout_s: 30
+  offline: false
+  retries: 2
+  retry_sleep_s: 4.0
+  cache_dirs:
+    - proxy/cache/eurostat
+    - PROXY/cache/eurostat
+  write_cache_dir: proxy/cache/eurostat
+
+mot_nrg_to_fuel:
+  PET: gasoline
+  PET_X_HYB: gasoline
+  ELC_PET_HYB: gasoline
+  DIE: diesel
+  DIE_X_HYB: diesel
+  ELC_DIE_HYB: diesel
+  LPG: lpg
+  CNG: cng
+  LNG: cng
+  GAS: cng
+
+vehicle_classes:
+  pc:
+    dataset: road_eqs_carmot
+    filters:
+      engine: TOTAL
+  ldv:
+    dataset: road_eqs_lormot
+    filters:
+      vehicle: VG_LE3P5
+  hdv:
+    dataset: road_eqs_lormot
+    filters:
+      vehicle: LOR_GT3P5
+  l-cat:
+    default_split:
+      gasoline: 1.0
+      diesel: 0.0
+      lpg: 0.0
+      cng: 0.0
+    mopeds:
+      dataset: road_eqs_mopeds
+      fossil_mot_nrg: FOSS
+    motorcycles:
+      dataset: road_eqs_motorc
+      filters:
+        engine: TOTAL

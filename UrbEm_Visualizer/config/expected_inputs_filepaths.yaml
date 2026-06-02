@@ -21,6 +21,8 @@ sectors:
     mode: both
   E_Solvents:
     mode: both
+  F_Roads:
+    mode: area_only
   H_Aviation:
     mode: point_only
   I_Offroad:

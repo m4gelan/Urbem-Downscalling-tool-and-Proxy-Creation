@@ -16,6 +16,8 @@ from rasterio.transform import array_bounds, from_bounds as affine_from_bounds
 from rasterio.warp import reproject, transform_bounds
 from rasterio.windows import Window, from_bounds as window_from_bounds, transform as window_transform
 
+from proxy.core.alias import cams_pollutant_var
+
 # =============================================================================
 # Configuration — edit layer colours / titles per sector (used for maps + JPG names)
 # =============================================================================
@@ -50,7 +52,7 @@ class LayerStyle:
 
 # Per-sector layer styles (alphabetical). Keys must match raster dict keys passed to _emit_sector_viz.
 # Dynamic layers: use *_default entries; optional overrides e.g. w_poll_nh3, osm_refineries_petroleum.
-# Sectors without area-weight debug maps: F_Roads, H_Aviation (point matching only).
+# Sectors without area-weight debug maps: H_Aviation (point matching only).
 SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
     "A_PublicPower": {
         "corine": LayerStyle("CORINE mask", kind="corine_gray", show=True, opacity=0.88),
@@ -110,11 +112,24 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
         "wp_nmvoc": LayerStyle("W fused NMVOC", cmap="plasma", scale_per_cams=True, show=True),
         "wp_nox": LayerStyle("W fused NOx", cmap="plasma", scale_per_cams=True, show=False),
     },
+    "F_Roads": {
+        "osm": LayerStyle("OTM roads (buffered)", kind="osm_blue", show=True, opacity=0.75),
+        "aadt_primary": LayerStyle("AADT z primary", cmap="YlOrRd", show=True, opacity=0.82),
+        "aadt_secondary": LayerStyle("AADT z secondary", cmap="YlOrRd", show=False, opacity=0.82),
+        "aadt_tertiary": LayerStyle("AADT z tertiary", cmap="YlOrRd", show=False, opacity=0.82),
+        "wf1_pm10": LayerStyle("W F1 exhaust gasoline PM10", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86),
+        "wf1_nox": LayerStyle("W F1 exhaust gasoline NOx", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+        "wf2_pm10": LayerStyle("W F2 exhaust diesel PM10", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+        "wf2_nox": LayerStyle("W F2 exhaust diesel NOx", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86),
+        "wf3_pm10": LayerStyle("W F3 exhaust LPG/gas PM10", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+        "wf3_nox": LayerStyle("W F3 exhaust LPG/gas NOx", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+        "wf4_pm10": LayerStyle("W F4 non-exhaust PM10", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+        "wf4_nox": LayerStyle("W F4 non-exhaust NOx", cmap="plasma", scale_per_cams=True, show=False, opacity=0.86),
+    },
     "G_Shipping": {
         "corine": LayerStyle("CORINE mask", kind="corine_gray", show=True),
         "osm": LayerStyle("OSM shipping", kind="osm_blue", show=True),
-        "emod": LayerStyle("EMODNET z-score", cmap="viridis", show=False),
-        "W": LayerStyle("Weight W", cmap="inferno", scale_per_cams=True, show=True, opacity=0.85),
+        "emod": LayerStyle("EMODNET z-score", cmap="viridis", show=True),
     },
     "I_Offroad": {
         "c121": LayerStyle("CORINE L3 121", kind="mask_rgb", rgb=(139, 90, 43), show=True),
@@ -205,6 +220,19 @@ _FOOTER_PX = 34
 _COLORBAR_PX = 44
 _CAMS_OUTLINE_RGB = (100, 100, 100)
 # Per CAMS cell: hide values below this fraction of the cell max (transparent on map, not colormap floor).
+_F_ROADS_TYPE_RGB: dict[str, tuple[int, int, int]] = {
+    "primary": (233, 76, 61),
+    "secondary": (244, 164, 96),
+    "tertiary": (100, 180, 100),
+}
+
+_F_ROADS_AADT_CMAP: dict[str, str] = {
+    "primary": "YlOrRd",
+    "secondary": "Oranges",
+    "tertiary": "Greens",
+}
+
+_F_ROADS_DRAW_ORDER = ("tertiary", "secondary", "primary")
 _CAMS_DISPLAY_FLOOR_FRAC = 0.05
 
 
@@ -763,6 +791,8 @@ def _draw_cams_outlines_on_rgb(
     bbox_use: tuple[float, float, float, float],
     img_wh: tuple[int, int],
 ) -> np.ndarray:
+    if not cams_cells:
+        return img
     from PIL import Image, ImageDraw
 
     west, south, east, north = bbox_use
@@ -839,6 +869,210 @@ def _save_fixed_png(
         draw.text((mw + 4, _TITLE_PX + 2), f"{cbar_vmax:.4g}", fill=(60, 60, 60), font=font_cbar)
         draw.text((mw + 4, _TITLE_PX + mh - 14), f"{cbar_vmin:.4g}", fill=(60, 60, 60), font=font_cbar)
     pil.save(out_file, format="PNG", optimize=True)
+
+
+def _warp_crop_stack(
+    arrays: dict[str, np.ndarray],
+    *,
+    bbox_wgs84: tuple[float, float, float, float],
+    transform: rasterio.Affine,
+    raster_crs: Any,
+    nearest_keys: set[str] | None = None,
+) -> tuple[dict[str, np.ndarray], tuple[float, float, float, float], tuple[int, int]]:
+    cropped, sub_tr, bbox_use = _crop_to_wgs84_bbox(arrays, transform, raster_crs, bbox_wgs84)
+    hh, ww = next(iter(cropped.values())).shape
+    sc = min(1.0, _MAX_DISPLAY_PX / max(hh, ww))
+    dst_h = max(2, int(round(hh * sc)))
+    dst_w = max(2, int(round(ww * sc)))
+    west, south, east, north = bbox_use
+    nearest_keys = nearest_keys or set()
+    out: dict[str, np.ndarray] = {}
+    for key, src in cropped.items():
+        nearest = key in nearest_keys
+        res = Resampling.nearest if nearest else Resampling.bilinear
+        fill: Any = 0.0 if nearest else np.nan
+        out[key] = _warp_to_wgs84_grid(
+            src.astype(np.float32), sub_tr, raster_crs,
+            west, south, east, north, dst_h, dst_w, res,
+            dst_dtype=np.dtype(np.float32), fill_value=fill,
+        )
+    return out, bbox_use, (dst_w, dst_h)
+
+
+def _f_roads_type_label(masks: dict[str, np.ndarray], order: tuple[str, ...]) -> np.ndarray:
+    label = np.zeros(next(iter(masks.values())).shape, dtype=np.int8)
+    for rank, rname in enumerate(order, start=1):
+        m = masks.get(rname)
+        if m is not None:
+            label[m > 0] = rank
+    return label
+
+
+def _f_roads_type_rgba(label: np.ndarray, order: tuple[str, ...]) -> np.ndarray:
+    rgba = np.zeros((*label.shape, 4), dtype=np.uint8)
+    for rank, rname in enumerate(order, start=1):
+        m = label == rank
+        if not np.any(m):
+            continue
+        r, g, b = _F_ROADS_TYPE_RGB[rname]
+        sub = _mask_rgba_outlined(m, r, g, b, alpha=210, dilate=True)
+        rgba[m] = sub[m]
+    return rgba
+
+
+def _f_roads_aadt_rgba(
+    label: np.ndarray,
+    aadt: dict[str, np.ndarray],
+    order: tuple[str, ...],
+) -> tuple[np.ndarray, dict[str, tuple[float, float]]]:
+    rgba = np.zeros((*label.shape, 4), dtype=np.uint8)
+    stats: dict[str, tuple[float, float]] = {}
+    for rank, rname in enumerate(order, start=1):
+        m = label == rank
+        arr = aadt.get(rname)
+        if arr is None or not np.any(m):
+            continue
+        valid = m & np.isfinite(arr) & (arr > 0)
+        if not np.any(valid):
+            continue
+        lo = float(np.min(arr[valid]))
+        hi = float(np.max(arr[valid]))
+        stats[rname] = (lo, hi)
+        layer, _, _ = _float_rgba(arr, _F_ROADS_AADT_CMAP[rname], valid, vmin=lo, vmax=hi)
+        rgba[valid] = layer[valid]
+    return rgba, stats
+
+
+def _save_f_roads_legend_png(
+    out_file: Path,
+    map_rgb: np.ndarray,
+    *,
+    title: str,
+    footer: str,
+    swatches: list[tuple[str, tuple[int, int, int]]] | None = None,
+    colorbars: list[tuple[str, str, float, float]] | None = None,
+) -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    mh, mw = map_rgb.shape[:2]
+    legend_w = 0
+    if colorbars:
+        legend_w = len(colorbars) * (_COLORBAR_PX + 52)
+    elif swatches:
+        legend_w = 150
+    canvas_w = mw + legend_w
+    canvas_h = mh + _TITLE_PX + _FOOTER_PX
+    canvas = np.full((canvas_h, canvas_w, 3), 255, dtype=np.uint8)
+    canvas[_TITLE_PX : _TITLE_PX + mh, :mw] = map_rgb
+    pil = Image.fromarray(canvas)
+    draw = ImageDraw.Draw(pil)
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 18)
+        font_footer = ImageFont.truetype("arial.ttf", 11)
+        font_lbl = ImageFont.truetype("arial.ttf", 10)
+    except OSError:
+        font_title = ImageFont.load_default()
+        font_footer = font_title
+        font_lbl = font_title
+    draw.text((12, 10), title, fill=(26, 26, 26), font=font_title)
+    draw.text((12, _TITLE_PX + mh + 6), footer, fill=(85, 85, 85), font=font_footer)
+    if swatches:
+        x0 = mw + 12
+        y = _TITLE_PX + 16
+        for name, rgb in swatches:
+            draw.rectangle((x0, y, x0 + 18, y + 12), fill=rgb, outline=(40, 40, 40))
+            draw.text((x0 + 24, y - 1), name, fill=(40, 40, 40), font=font_lbl)
+            y += 22
+    if colorbars:
+        for i, (name, cmap_name, vmin, vmax) in enumerate(colorbars):
+            x0 = mw + 8 + i * (_COLORBAR_PX + 52)
+            bar = _colorbar_rgb(cmap_name, vmin, vmax, mh)
+            pil.paste(Image.fromarray(bar), (x0, _TITLE_PX))
+            draw.text((x0, _TITLE_PX + 2), f"{vmax:.3g}", fill=(60, 60, 60), font=font_lbl)
+            draw.text((x0, _TITLE_PX + mh - 12), f"{vmin:.3g}", fill=(60, 60, 60), font=font_lbl)
+            draw.text((x0 + _COLORBAR_PX + 4, _TITLE_PX + mh // 2 - 20), name, fill=(40, 40, 40), font=font_lbl)
+    pil.save(out_file, format="PNG", optimize=True)
+
+
+def _write_f_roads_composite_figures(
+    out_path: Path,
+    *,
+    bbox_wgs84: tuple[float, float, float, float],
+    transform: rasterio.Affine,
+    raster_crs: Any,
+    cams_cells: dict[int, dict[str, Any]],
+    road_types: list[str],
+    roads_by_type: dict[str, np.ndarray],
+    aadt_raw: dict[str, np.ndarray],
+) -> Path:
+    from PIL import Image
+
+    from proxy.core import log
+
+    order = tuple(r for r in _F_ROADS_DRAW_ORDER if r in road_types)
+    if not order:
+        raise ValueError("F_Roads viz: no road types in config")
+
+    mask_keys = {f"m_{r}": roads_by_type[r] for r in order if r in roads_by_type}
+    aadt_keys = {f"a_{r}": aadt_raw[r] for r in order if r in aadt_raw}
+    warped_m, bbox_use, dst_wh = _warp_crop_stack(
+        mask_keys, bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
+        nearest_keys=set(mask_keys),
+    )
+    warped_a, _, _ = _warp_crop_stack(
+        aadt_keys, bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
+    )
+    masks = {r: warped_m[f"m_{r}"] for r in order}
+    aadt = {r: warped_a[f"a_{r}"] for r in order}
+
+    ew, eh = _export_wh(dst_wh)
+    footer = _bbox_footer(bbox_use, (ew, eh))
+    out_dir = out_path.with_suffix("")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        basemap = _basemap_rgb_for_bbox(bbox_use, (ew, eh))
+    except Exception as exc:
+        log.warning(f"F_Roads basemap fetch failed ({exc}); overlays only")
+        basemap = None
+
+    def finalize(rgba: np.ndarray) -> np.ndarray:
+        if rgba.shape[0] != eh or rgba.shape[1] != ew:
+            rgba = np.asarray(
+                Image.fromarray(rgba).resize((ew, eh), resample=Image.Resampling.NEAREST)
+            )
+        if basemap is not None and basemap.shape[:2] == (eh, ew):
+            img = _blend_rgba_on_rgb(basemap, rgba)
+        else:
+            img = rgba[:, :, :3].copy()
+        return _draw_cams_outlines_on_rgb(img, cams_cells, bbox_use, (ew, eh))
+
+    label = _f_roads_type_label(masks, order)
+    type_file = out_dir / "f_roads__road_types.png"
+    _save_f_roads_legend_png(
+        type_file,
+        finalize(_f_roads_type_rgba(label, order)),
+        title="F Roads · road types (primary / secondary / tertiary)",
+        footer=footer,
+        swatches=[(r.capitalize(), _F_ROADS_TYPE_RGB[r]) for r in order],
+    )
+    log.info(f"F_Roads road-types figure: {type_file}")
+
+    aadt_rgba, aadt_stats = _f_roads_aadt_rgba(label, aadt, order)
+    aadt_file = out_dir / "f_roads__aadt.png"
+    _save_f_roads_legend_png(
+        aadt_file,
+        finalize(aadt_rgba),
+        title="F Roads · AADT by road type",
+        footer=footer,
+        colorbars=[
+            (r.capitalize(), _F_ROADS_AADT_CMAP[r], aadt_stats[r][0], aadt_stats[r][1])
+            for r in order
+            if r in aadt_stats
+        ],
+    )
+    log.info(f"F_Roads AADT figure: {aadt_file}")
+    return out_dir
 
 
 def _write_fixed_images(
@@ -1252,21 +1486,48 @@ def write_shipping_area_weights_map(
     corine_map: np.ndarray,
     osm_raster: np.ndarray,
     emodnet_z: np.ndarray,
-    W: np.ndarray,
-    cell_id: np.ndarray,
     transform: rasterio.Affine,
     raster_crs: Any,
-    cams_cells: dict[int, dict[str, Any]],
-    pollutant_label: str,
+    cell_id: np.ndarray,
 ) -> Path:
-    overrides = {
-        "W": replace(SECTOR_LAYER_STYLES["G_Shipping"]["W"], title=f"Weight W — {pollutant_label}"),
+    h0, w0 = cell_id.shape
+    west, south, east, north = bbox_wgs84
+    left, bottom, right, top = transform_bounds(
+        "EPSG:4326", raster_crs, west, south, east, north, densify_pts=11
+    )
+    win = window_from_bounds(left, bottom, right, top, transform).intersection(
+        Window(0, 0, w0, h0)
+    )
+    if win.width <= 0 or win.height <= 0:
+        rw, rs, re, rn = transform_bounds(
+            raster_crs, "EPSG:4326", *array_bounds(h0, w0, transform), densify_pts=21
+        )
+        raise ValueError(
+            "DEBUG bbox does not intersect the shipping raster window. "
+            f"bbox=({west:g},{south:g},{east:g},{north:g}) "
+            f"raster_extent_WGS84≈({rw:.4f},{rs:.4f},{re:.4f},{rn:.4f}). "
+            "For Italy use Genoa or La_Spezia (Naples is outside the CAMS grid)."
+        )
+    win = win.round_offsets(op="floor").round_lengths(op="ceil")
+    row_off, col_off = int(win.row_off), int(win.col_off)
+    hh, ww = int(win.height), int(win.width)
+    sub_tr = window_transform(win, transform)
+    bbox_use = transform_bounds(
+        raster_crs, "EPSG:4326", *array_bounds(hh, ww, sub_tr), densify_pts=21
+    )
+
+    def crop(a: np.ndarray) -> np.ndarray:
+        return _crop_array_window(a, row_off, col_off, hh, ww)
+
+    arrays = {
+        "corine": crop(corine_map).astype(np.float32),
+        "osm": crop(osm_raster).astype(np.float32),
+        "emod": crop(emodnet_z).astype(np.float32),
     }
     return _emit_sector_viz(
-        out_html, "G_Shipping",
-        {"corine": corine_map, "osm": osm_raster, "emod": emodnet_z, "W": W},
-        bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
-        cams_cells=cams_cells, cell_id=cell_id, style_overrides=overrides,
+        out_html, "G_Shipping", arrays,
+        bbox_wgs84=bbox_use, transform=sub_tr, raster_crs=raster_crs,
+        cams_cells={}, cell_id=crop(cell_id),
     )
 
 
@@ -1371,4 +1632,27 @@ def write_k_agriculture_area_weights_debug_map(
         out_html, "K_Agriculture", arrays,
         bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
         cams_cells=cams_cells, cell_id=cell_id, legend_html=legend_alpha_html,
+    )
+
+
+def write_f_roads_area_weights_debug_map(
+    out_html: Path,
+    *,
+    bbox_wgs84: tuple[float, float, float, float],
+    transform: rasterio.Affine,
+    raster_crs: Any,
+    cams_cells: dict[int, dict[str, Any]],
+    road_types: list[str],
+    roads_by_type: dict[str, np.ndarray],
+    aadt_raw: dict[str, np.ndarray],
+) -> Path:
+    return _write_f_roads_composite_figures(
+        out_html,
+        bbox_wgs84=bbox_wgs84,
+        transform=transform,
+        raster_crs=raster_crs,
+        cams_cells=cams_cells,
+        road_types=road_types,
+        roads_by_type=roads_by_type,
+        aadt_raw=aadt_raw,
     )

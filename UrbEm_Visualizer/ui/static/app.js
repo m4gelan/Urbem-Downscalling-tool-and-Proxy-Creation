@@ -7,6 +7,7 @@ let writerCountry = "";
 let lastCheck = null;
 let availablePollutants = [];
 let runsDir = "";
+let outputsDir = "";
 let bboxMap = null;
 let camsLayer = null;
 let drawLayer = null;
@@ -23,7 +24,7 @@ function showScreen(id) {
     window.UrbEmViz.onMapShown();
   }
   const titles = {
-    "screen-menu-a": ["UrbEm downscaling tool", "Run downscaling or open existing results"],
+    "screen-menu-a": ["UrbEm downscaling tool", "Create, load, or open a downscaling run"],
     "screen-menu-b": ["Configuration", "Review inputs, domain, and output"],
     "screen-writer-b1": ["Configuration writer", "Validate INPUT or set paths manually"],
     "screen-writer-b1b": ["Define inputs filepaths", "CAMS and sector GeoTIFF paths"],
@@ -39,10 +40,24 @@ function showScreen(id) {
   }
 }
 
+function setMenuStatus(msg) {
+  const el = document.getElementById("menu-a-status");
+  if (!el) return;
+  if (!msg) {
+    el.classList.add("hidden");
+    el.textContent = "";
+    return;
+  }
+  el.className = "status menu-a-status ok";
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
 async function openVisualization(outputDir) {
   try {
     await UrbEmViz.open(outputDir);
   } catch (e) {
+    setMenuStatus("");
     alert(String(e.message || e));
   }
 }
@@ -51,6 +66,7 @@ async function loadOutputFolder() {
   const errBox = document.getElementById("load-output-errors");
   errBox.classList.add("hidden");
   errBox.innerHTML = "";
+  setMenuStatus("");
   const r = await fetch(API + "/api/dialog/pick-folder", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,6 +74,7 @@ async function loadOutputFolder() {
   });
   const pick = await r.json();
   if (pick.cancelled || !pick.path) return;
+  setMenuStatus("Validating output folder…");
   const v = await fetch(API + "/api/viz/validate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -65,12 +82,15 @@ async function loadOutputFolder() {
   });
   const check = await v.json();
   if (!check.ok) {
+    setMenuStatus("");
     errBox.classList.remove("hidden");
     errBox.innerHTML = "<strong>Cannot open folder:</strong><ul>" +
       (check.errors || []).map((e) => "<li>" + e + "</li>").join("") + "</ul>";
     return;
   }
+  setMenuStatus("Preparing the visualization map…");
   await openVisualization(pick.path);
+  setMenuStatus("");
 }
 
 function statusClass(s) {
@@ -689,6 +709,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sr = await fetch(API + "/api/session");
   const sd = await sr.json();
   runsDir = sd.runs_dir || "";
+  outputsDir = sd.outputs_dir || "";
+  const runsHint = document.getElementById("menu-runs-dir-hint");
+  const outputsHint = document.getElementById("menu-outputs-dir-hint");
+  if (runsHint && runsDir) runsHint.textContent = runsDir;
+  if (outputsHint && outputsDir) outputsHint.textContent = outputsDir;
 
   fetch(API + "/api/countries")
     .then((r) => r.json())
@@ -1034,18 +1059,37 @@ document.addEventListener("DOMContentLoaded", async () => {
       alert.textContent = "";
     }
     const lead = document.getElementById("processing-lead");
+    const doneMsg = document.getElementById("processing-done-msg");
     if (state.status === "running") {
       lead.textContent = "Downscaling in progress…";
+      if (doneMsg) {
+        doneMsg.classList.add("hidden");
+        doneMsg.textContent = "";
+      }
     } else if (state.status === "done") {
-      lead.textContent = "Downscaling finished. Output: " + (state.output_dir || "");
+      lead.textContent = "Downscaling finished successfully.";
+      if (doneMsg) {
+        doneMsg.textContent = state.output_dir
+          ? "Output saved to " + state.output_dir + ". Opening the results map…"
+          : "All sectors processed. Opening the results map…";
+        doneMsg.classList.remove("hidden");
+      }
       document.getElementById("btn-processing-close").classList.remove("hidden");
       document.getElementById("btn-processing-cancel").classList.add("hidden");
     } else if (state.status === "error") {
       lead.textContent = "Downscaling stopped due to an error.";
+      if (doneMsg) {
+        doneMsg.classList.add("hidden");
+        doneMsg.textContent = "";
+      }
       document.getElementById("btn-processing-close").classList.remove("hidden");
       document.getElementById("btn-processing-cancel").classList.add("hidden");
     } else if (state.status === "cancelled") {
       lead.textContent = "Downscaling cancelled.";
+      if (doneMsg) {
+        doneMsg.classList.add("hidden");
+        doneMsg.textContent = "";
+      }
       document.getElementById("btn-processing-close").classList.remove("hidden");
       document.getElementById("btn-processing-cancel").classList.add("hidden");
     }
@@ -1068,6 +1112,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btn-processing-close").classList.add("hidden");
     document.getElementById("btn-processing-cancel").classList.remove("hidden");
     document.getElementById("processing-alert").classList.add("hidden");
+    const doneMsg = document.getElementById("processing-done-msg");
+    if (doneMsg) {
+      doneMsg.classList.add("hidden");
+      doneMsg.textContent = "";
+    }
     showScreen("screen-processing");
     const r = await fetch(API + "/api/downscale/start", {
       method: "POST",
@@ -1095,10 +1144,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("btn-processing-close").addEventListener("click", () => {
     if (downscalePollTimer) clearInterval(downscalePollTimer);
     showMenuASaved(configPath);
-  });
-
-  document.getElementById("btn-run-downscale-path").addEventListener("click", () => {
-    document.getElementById("menu-a-path-config").classList.remove("hidden");
   });
 
   document.getElementById("btn-load-output-folder").addEventListener("click", loadOutputFolder);

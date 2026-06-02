@@ -20,7 +20,13 @@ _LABELS = {
     "I_Offroad": "Off-road",
     "J_Waste": "Waste",
     "K_Agriculture": "Agriculture",
+    "F_Roads": "Roads",
 }
+
+
+def roads_category_names() -> list[str]:
+    cfg = load_sector_yaml("F_Roads")
+    return list((cfg.get("cams_f_categories") or {}).keys())
 
 
 def sector_label(sector_id: str) -> str:

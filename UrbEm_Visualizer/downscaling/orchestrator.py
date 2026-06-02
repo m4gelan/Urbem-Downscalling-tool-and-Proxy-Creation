@@ -7,6 +7,7 @@ from typing import Any, Callable
 import numpy as np
 
 from UrbEm_Visualizer.downscaling.area import downscale_area, prepare_sector_cams
+from UrbEm_Visualizer.downscaling.roads import downscale_roads_sector
 from UrbEm_Visualizer.dataset_loaders.tif_grid import cell_id_plane
 from UrbEm_Visualizer.downscaling.merge import merge_grids
 from UrbEm_Visualizer.downscaling.point import run_point_sector
@@ -32,7 +33,7 @@ def output_dir_for_run(config_path: Path, config: dict) -> Path:
 def _sector_step_plan(sec: dict, mode: str) -> list[tuple[str, float]]:
     aw = sec.get("area_weights") or {}
     ps = sec.get("point_source") or {}
-    has_area = bool(aw.get("path")) and mode in ("both", "area_only")
+    has_area = mode in ("both", "area_only") and (bool(aw.get("path")) or bool(aw.get("categories")))
     has_point = bool(ps.get("path")) and mode in ("both", "point_only")
     steps: list[tuple[str, float]] = [("Loading CAMS", 0.12)]
     if has_area and has_point:
@@ -142,25 +143,43 @@ def run_downscaling(
                 cell_id = np.full((grid.height, grid.width), -1, dtype=np.int32)
 
             aw = sec.get("area_weights") or {}
-            if aw.get("path") and mode in ("both", "area_only"):
-                aw_path = resolve_path(aw["path"], root)
+            if mode in ("both", "area_only") and (aw.get("path") or aw.get("categories")):
                 _set_progress(step, 0.0)
-                n_pol = len(pollutants) or 1
+                if sid == "F_Roads" and aw.get("categories"):
+                    cat_paths = {
+                        cat: resolve_path(p, root) for cat, p in aw["categories"].items()
+                    }
 
-                def _pol_done(pol: str) -> None:
-                    pi = pollutants.index(pol) if pol in pollutants else n_pol - 1
-                    _set_progress(step, (pi + 1) / n_pol, f"Area — {pol}")
+                    def _roads_prog(label: str, sub: float) -> None:
+                        _set_progress(step, sub, label)
 
-                area_da, wlog, fails, sector_clip = downscale_area(
-                    grid=grid,
-                    area_path=aw_path,
-                    sector_id=sid,
-                    domain=domain,
-                    pollutants=pollutants,
-                    cams_cells=cams_cells or {},
-                    cams_grid=cams_grid_meta,
-                    on_pollutant_done=_pol_done,
-                )
+                    area_da, wlog, fails, sector_clip = downscale_roads_sector(
+                        grid=grid,
+                        category_paths=cat_paths,
+                        country=config["country"],
+                        domain=domain,
+                        pollutants=pollutants,
+                        cams_nc=cams_nc,
+                        on_progress=_roads_prog,
+                    )
+                else:
+                    aw_path = resolve_path(aw["path"], root)
+                    n_pol = len(pollutants) or 1
+
+                    def _pol_done(pol: str) -> None:
+                        pi = pollutants.index(pol) if pol in pollutants else n_pol - 1
+                        _set_progress(step, (pi + 1) / n_pol, f"Area — {pol}")
+
+                    area_da, wlog, fails, sector_clip = downscale_area(
+                        grid=grid,
+                        area_path=aw_path,
+                        sector_id=sid,
+                        domain=domain,
+                        pollutants=pollutants,
+                        cams_cells=cams_cells or {},
+                        cams_grid=cams_grid_meta,
+                        on_pollutant_done=_pol_done,
+                    )
                 weight_check_log[sid] = wlog
                 if fails:
                     f0 = fails[0]

@@ -20,10 +20,11 @@ INPUT/Proxy/*
 !INPUT/Proxy/Dataset_sources.md
 INPUT/OLD
 INPUT/Proxy_weights/
-
 INPUT/Preprocess/OSM/_source
 Output/
 OLD CODES/
+Comparison/
+Urbem_V1/
 report/
 Comparaison/
 # Common data / geospatial formats

@@ -24,6 +24,7 @@ from UrbEm_Visualizer.writer.create_configuration import (
     apply_manual_paths,
     config_from_check,
     load_yaml,
+    merge_check_paths,
     new_writer_config,
     save_run_config,
 )
@@ -144,6 +145,8 @@ def api_dialog_open_yaml():
         return jsonify({"cancelled": True})
     try:
         cfg = load_yaml(Path(path))
+        check = check_input(cfg.get("country", ""), absent_sources=list(cfg.get("absent_sources") or []))
+        cfg = merge_check_paths(cfg, check)
         _SESSION["config"] = cfg
         _SESSION["config_path"] = path
         _SESSION["absent_sources"] = list(cfg.get("absent_sources") or [])
@@ -663,12 +666,14 @@ def api_viz_threshold():
 
 @app.route("/api/session", methods=["GET"])
 def api_session():
+    root = project_root()
     out = {
         "config": _SESSION.get("config"),
         "config_path": _SESSION.get("config_path"),
         "absent_sources": _session_absent(),
         "country": _SESSION.get("country"),
         "runs_dir": str(runs_dir().resolve()),
+        "outputs_dir": str((root / "Output" / "UrbEm").resolve()),
         "pollutants_available": AVAILABLE_POLLUTANTS,
     }
     if _SESSION.get("config"):

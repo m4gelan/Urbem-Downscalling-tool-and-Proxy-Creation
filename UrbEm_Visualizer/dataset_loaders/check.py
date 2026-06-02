@@ -9,8 +9,9 @@ from UrbEm_Visualizer.paths import config_dir, project_root
 
 _EXPECTED_NAME = "expected_inputs_filepaths.yaml"
 _TIF_RE = re.compile(
-    r"^(.+)_([A-Za-z]+)_(?:point_source|area_weights)_(\d{4})\.tif$"
+    r"^(.+)_([A-Za-z_]+)_(?:point_source|area_weights)_(\d{4})\.tif$"
 )
+_F_ROADS_TIF_RE = re.compile(r"^F_Roads_([A-Za-z_]+)_(F\d+)_(\d{4})\.tif$")
 
 
 def load_expected() -> dict:
@@ -42,6 +43,56 @@ def _absent_set(absent_sources: list[dict] | None) -> set[tuple[str, str]]:
     return out
 
 
+def _roads_category_names() -> list[str]:
+    try:
+        from UrbEm_Visualizer.downscaling.sector_meta import roads_category_names
+        return roads_category_names()
+    except Exception:
+        return ["F1", "F2", "F3", "F4"]
+
+
+def _country_tag(country: str) -> str:
+    return str(country).strip().replace(" ", "_")
+
+
+def _country_tags(country: str) -> list[str]:
+    tags: list[str] = []
+
+    def add(val: str) -> None:
+        t = str(val).strip().replace(" ", "_")
+        if t and t not in tags:
+            tags.append(t)
+
+    add(country)
+    try:
+        from proxy.core.alias import resolve_country_profile
+
+        prof = resolve_country_profile(country)
+        add(prof["full_name"])
+        add(prof["ISO3"])
+        add(prof["Abbreviation"])
+        add(prof.get("other", ""))
+    except Exception:
+        pass
+    return tags
+
+
+def _find_roads_proxy(folder: Path, cat: str, year: int, country: str) -> Path | None:
+    tag_set = {t.casefold() for t in _country_tags(country)}
+    for tag in _country_tags(country):
+        p = folder / f"F_Roads_{tag}_{cat}_{year}.tif"
+        if p.is_file():
+            return p
+    hits = sorted(folder.glob(f"F_Roads_*_{cat}_{year}.tif"))
+    for p in hits:
+        m = _F_ROADS_TIF_RE.match(p.name)
+        if m and m.group(1).casefold() in tag_set:
+            return p
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
 def _all_sector_defs(spec: dict) -> list[tuple[str, dict, bool]]:
     """(sector_id, sector_cfg, is_optional)."""
     out = [(sid, sec, False) for sid, sec in spec["sectors"].items()]
@@ -56,14 +107,19 @@ def list_countries(root: Path | None = None) -> list[str]:
     pw = _resolve(root, spec["proxy_weights_root"])
     year = int(spec["year"])
     found: set[str] = set()
+    tag_re = re.compile(r"^(.+)_([A-Za-z_]+)_(?:point_source|area_weights)_(\d{4})\.tif$")
     for sector_id, _, _ in _all_sector_defs(spec):
         folder = pw / sector_id
         if not folder.is_dir():
             continue
         for p in folder.glob("*.tif"):
-            m = _TIF_RE.match(p.name)
+            m = tag_re.match(p.name)
             if m and m.group(1) == sector_id and int(m.group(3)) == year:
-                found.add(m.group(2))
+                found.add(m.group(2).replace("_", " "))
+                continue
+            rm = _F_ROADS_TIF_RE.match(p.name)
+            if rm and int(rm.group(3)) == year:
+                found.add(rm.group(1).replace("_", " "))
     return sorted(found, key=str.lower)
 
 
@@ -81,12 +137,7 @@ def _check_sector_files(
     accepted_absent: list[dict],
 ) -> None:
     mode = sec["mode"]
-    names: dict[str, str] = {}
-    if mode in ("both", "area_only"):
-        names["area_weights"] = f"{sector_id}_{country}_area_weights_{year}.tif"
-    if mode in ("both", "point_only"):
-        names["point_source"] = f"{sector_id}_{country}_point_source_{year}.tif"
-
+    tag = _country_tag(country)
     prompt = sec.get("missing_prompt")
     if is_optional and not prompt:
         prompt = (
@@ -94,6 +145,51 @@ def _check_sector_files(
             "do you accept? Otherwise, we advise checking if a proxy file can be created "
             "in the proxy pipeline."
         )
+
+    if sector_id == "F_Roads" and mode in ("both", "area_only"):
+        cats = _roads_category_names()
+        cat_paths: dict[str, str] = {}
+        missing_cats: list[str] = []
+        for cat in cats:
+            fp = _find_roads_proxy(folder, cat, year, country)
+            fname = f"F_Roads_{tag}_{cat}_{year}.tif"
+            if fp is not None:
+                cat_paths[cat] = str(fp)
+            else:
+                missing_cats.append(fname)
+        key = (sector_id, "area_weights")
+        if len(cat_paths) == len(cats):
+            ok_items.append({
+                "kind": "area_weights",
+                "sector": sector_id,
+                "roads_categories": cat_paths,
+                "filename": ", ".join(sorted(cat_paths)),
+            })
+        elif key in waived:
+            accepted_absent.append({
+                "sector": sector_id,
+                "role": "area_weights",
+                "filename": ", ".join(missing_cats),
+                "optional": is_optional,
+            })
+        else:
+            for fname in missing_cats:
+                missing.append({
+                    "kind": "area_weights",
+                    "sector": sector_id,
+                    "path": str(folder / fname),
+                    "filename": fname,
+                    "waivable": True,
+                    "optional": is_optional,
+                    "prompt": prompt.strip() if prompt else "",
+                })
+        return
+
+    names: dict[str, str] = {}
+    if mode in ("both", "area_only"):
+        names["area_weights"] = f"{sector_id}_{tag}_area_weights_{year}.tif"
+    if mode in ("both", "point_only"):
+        names["point_source"] = f"{sector_id}_{tag}_point_source_{year}.tif"
 
     for role, fname in names.items():
         fp = folder / fname

@@ -171,9 +171,9 @@ def build(
     )
     log.info(f"crop NMVOC done: norm max={float(crop_nmvoc.normalized.max()):.6g}")
 
-    viirs_dir = (fp.get("GFED4") or {}).get("folder")
+    viirs_dir = (fp.get("VIIRS") or {}).get("folder")
     if not viirs_dir:
-        raise ValueError("filepaths.GFED4.folder required for VIIRS active fire archive")
+        raise ValueError("filepaths.VIIRS.folder required for VIIRS active fire archive")
     biomass = build_biomass_burning(
         repo_root,
         cfg,

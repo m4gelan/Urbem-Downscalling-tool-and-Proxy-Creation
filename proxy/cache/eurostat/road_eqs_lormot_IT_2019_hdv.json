@@ -1,0 +1,219 @@
+{
+  "version": "2.0",
+  "class": "dataset",
+  "label": "Lorries, by type of motor energy",
+  "source": "ESTAT",
+  "updated": "2026-05-04T23:00:00+0200",
+  "value": {
+    "6": 1364,
+    "3": 560605,
+    "9": 560604,
+    "5": 172,
+    "4": 261,
+    "2": 380,
+    "15": 551,
+    "1": 3041,
+    "7": 3040,
+    "0": 565010
+  },
+  "id": [
+    "freq",
+    "unit",
+    "vehicle",
+    "mot_nrg",
+    "geo",
+    "time"
+  ],
+  "size": [
+    1,
+    1,
+    1,
+    16,
+    1,
+    1
+  ],
+  "dimension": {
+    "freq": {
+      "label": "Time frequency",
+      "category": {
+        "index": {
+          "A": 0
+        },
+        "label": {
+          "A": "Annual"
+        }
+      }
+    },
+    "unit": {
+      "label": "Unit of measure",
+      "category": {
+        "index": {
+          "NR": 0
+        },
+        "label": {
+          "NR": "Number"
+        }
+      }
+    },
+    "vehicle": {
+      "label": "Vehicles",
+      "category": {
+        "index": {
+          "LOR_GT3P5": 0
+        },
+        "label": {
+          "LOR_GT3P5": "Lorries > 3.5 tonnes"
+        }
+      }
+    },
+    "mot_nrg": {
+      "label": "Motor energy",
+      "category": {
+        "index": {
+          "TOTAL": 0,
+          "PET": 1,
+          "LPG": 2,
+          "DIE": 3,
+          "GAS": 4,
+          "ELC": 5,
+          "ALT": 6,
+          "PET_X_HYB": 7,
+          "ELC_PET_HYB": 8,
+          "DIE_X_HYB": 9,
+          "ELC_DIE_HYB": 10,
+          "BIOETH": 11,
+          "BIODIE": 12,
+          "CNG": 13,
+          "LNG": 14,
+          "OTH": 15
+        },
+        "label": {
+          "TOTAL": "Total",
+          "PET": "Petrol",
+          "LPG": "Liquefied petroleum gases (LPG)",
+          "DIE": "Diesel",
+          "GAS": "Natural gas",
+          "ELC": "Electricity",
+          "ALT": "Alternative energy",
+          "PET_X_HYB": "Petrol (excluding hybrids) \u00a0",
+          "ELC_PET_HYB": "Hybrid electric-petrol",
+          "DIE_X_HYB": "Diesel (excluding hybrids) \u00a0",
+          "ELC_DIE_HYB": "Hybrid diesel-electric",
+          "BIOETH": "Bioethanol",
+          "BIODIE": "Biodiesel",
+          "CNG": "Compressed natural gas (CNG) \u00a0",
+          "LNG": "Liquefied natural gas (LNG) \u00a0",
+          "OTH": "Other"
+        }
+      }
+    },
+    "geo": {
+      "label": "Geopolitical entity (reporting)",
+      "category": {
+        "index": {
+          "IT": 0
+        },
+        "label": {
+          "IT": "Italy"
+        }
+      }
+    },
+    "time": {
+      "label": "Time",
+      "category": {
+        "index": {
+          "2019": 0
+        },
+        "label": {
+          "2019": "2019"
+        }
+      }
+    }
+  },
+  "extension": {
+    "lang": "EN",
+    "id": "ROAD_EQS_LORMOT",
+    "agencyId": "ESTAT",
+    "version": "1.0",
+    "datastructure": {
+      "id": "ROAD_EQS_LORMOT",
+      "agencyId": "ESTAT",
+      "version": "59.0"
+    },
+    "annotation": [
+      {
+        "type": "CREATED",
+        "date": "2016-12-13T11:09:44+0100"
+      },
+      {
+        "type": "DISSEMINATION_DOI_XML",
+        "title": "<adms:identifier xmlns:adms=\"http://www.w3.org/ns/adms#\" xmlns:skos=\"http://www.w3.org/2004/02/skos/core.html\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><adms:Identifier rdf:about=\"https://doi.org/10.2908/ROAD_EQS_LORMOT\"><skos:notation rdf:datatype=\"http://purl.org/spar/datacite/doi\">10.2908/ROAD_EQS_LORMOT</skos:notation><dct:creator rdf:resource=\"http://publications.europa.eu/resource/authority/corporate-body/ESTAT\"/><dct:issued rdf:datatype=\"http://www.w3.org/2001/XMLSchema#date\">2023-01-19</dct:issued></adms:Identifier></adms:identifier>"
+      },
+      {
+        "type": "DISSEMINATION_OBJECT_TYPE",
+        "title": "DATASET"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_DATA",
+        "date": "2026-05-04T23:00:00+0200"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_GLOBAL",
+        "date": "2026-05-04T23:00:00+0200"
+      },
+      {
+        "type": "DISSEMINATION_TIMESTAMP_PLANNED",
+        "date": "2026-05-04T23:00:00+0200"
+      },
+      {
+        "type": "ESMS_HTML",
+        "title": "Explanatory texts (metadata)",
+        "href": "https://ec.europa.eu/eurostat/cache/metadata/en/rail_if_esms.htm"
+      },
+      {
+        "type": "ESMS_SDMX",
+        "title": "Explanatory texts (metadata)",
+        "href": "https://ec.europa.eu/eurostat/api/dissemination/files?file=metadata/rail_if_esms.sdmx.zip"
+      },
+      {
+        "type": "OBS_COUNT",
+        "title": "9532"
+      },
+      {
+        "type": "OBS_PERIOD_OVERALL_LATEST",
+        "title": "2024"
+      },
+      {
+        "type": "OBS_PERIOD_OVERALL_OLDEST",
+        "title": "2013"
+      },
+      {
+        "type": "SOURCE_INSTITUTIONS",
+        "text": "Eurostat"
+      },
+      {
+        "type": "UPDATE_DATA",
+        "date": "2026-05-04T23:00:00+0200"
+      },
+      {
+        "type": "UPDATE_STRUCTURE",
+        "date": "2025-07-29T23:00:00+0200"
+      }
+    ],
+    "positions-with-no-data": {
+      "freq": [],
+      "unit": [],
+      "vehicle": [],
+      "mot_nrg": [
+        8,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "geo": [],
+      "time": []
+    }
+  }
+}

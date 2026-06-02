@@ -60,3 +60,7 @@ sectors:
     tree_label: Agriculture
     accent: "#8bc34a"
     icon: leaf
+  F_Roads:
+    tree_label: Roads
+    accent: "#78909c"
+    icon: truck

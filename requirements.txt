@@ -11,6 +11,7 @@ shapely>=2.0
 scipy>=1.7
 openpyxl>=3.0
 matplotlib>=3.5
+contextily>=1.4
 Pillow>=9.0
 folium>=0.14
 

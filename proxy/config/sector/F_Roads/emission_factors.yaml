@@ -1,0 +1,274 @@
+note: >
+  EMEP/EEA guidebook 2023 update 2025, chapter 1.A.3.b.i-iv (road transport), Tier 1.
+  Values in `ef` are g/kg fuel (Tables 3-5 to 3-7 mean columns). 
+  SOx is not tabulated in 3-5 to 3-7: derived as SO2 from fuel sulphur (Table 3-14,
+  Fuel 2009 and later) via E_SO2 = 2 * k_S * FC with k_S [g S / g fuel] = ppm * 1e-6,
+  hence ef.sox [g SO2 / kg fuel] = 2 * sulphur_ppm * 1e-3 (gasoline 5 ppm → 0.01,
+  diesel 3 ppm → 0.006). LPG has no row in Table 3-14; gasoline sulphur applied.
+  Tyres, breaks and road surface (Non-exhaust) are derived from chapter 1.A.3.vi-vii
+  Gasoline evaporation is derived from chapter 1.A.3.v
+
+
+
+tables:
+
+- vehicle_class: pc
+  fuel: gasoline
+  ef:
+    co: 48.36
+    nmvoc: 7.75
+    nox: 3.98
+    pm2_5: 0.02
+    pm10: 0.02
+    nh3: 0.84
+    sox: 0.01
+
+- vehicle_class: pc
+  fuel: diesel
+  ef:
+    co: 2.41
+    nmvoc: 0.51
+    nox: 11.77
+    pm2_5: 0.78
+    pm10: 0.78
+    nh3: 0.02
+    sox: 0.006
+
+- vehicle_class: pc
+  fuel: lpg
+  ef:
+    co: 58.22
+    nmvoc: 9.43
+    nox: 5.48
+    pm2_5: 0.03
+    pm10: 0.03
+    nh3: 1.02
+    sox: 0.01
+
+- vehicle_class: ldv
+  fuel: gasoline
+  ef:
+    co: 118.70
+    nmvoc: 7.42
+    nox: 5.93
+    pm2_5: 0.02
+    pm10: 0.02
+    nh3: 0.77
+    sox: 0.01
+
+- vehicle_class: ldv
+  fuel: diesel
+  ef:
+    co: 6.81
+    nmvoc: 1.23
+    nox: 13.48
+    pm2_5: 1.22
+    pm10: 1.22
+    nh3: 0.01
+    sox: 0.006
+
+- vehicle_class: ldv
+  fuel: lpg
+  ef:
+    co: missing
+    nmvoc: missing
+    nox: missing
+    pm2_5: missing
+    pm10: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: hdv
+  fuel: diesel
+  ef:
+    co: 6.10
+    nmvoc: 0.90
+    nox: 25.95
+    pm2_5: 0.55
+    pm10: 0.55
+    nh3: 0.02
+    sox: 0.006
+
+- vehicle_class: hdv
+  fuel: cng
+  ef:
+    co: 3.98
+    nmvoc: 92.74
+    nox: 17.1
+    pm2_5: 0.02
+    pm10: 0.02
+    nh3: missing
+    sox: missing
+
+- vehicle_class: hdv
+  fuel: gasoline
+  ef:
+    co: missing
+    nmvoc: missing
+    nox: missing
+    pm2_5: missing
+    pm10: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: hdv
+  fuel: lpg
+  ef:
+    co: missing
+    nmvoc: missing
+    nox: missing
+    pm2_5: missing
+    pm10: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: l-cat
+  fuel: gasoline
+  ef:
+    co: 244.88
+    nmvoc: 92.74
+    nox: 7.23
+    pm2_5: 0.51
+    pm10: 0.51
+    nh3: 0.05
+    sox: 0.01
+
+- vehicle_class: l-cat
+  fuel: diesel
+  ef:
+    co: missing
+    nmvoc: missing
+    nox: missing
+    pm2_5: missing
+    pm10: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: l-cat
+  fuel: lpg
+  ef:
+    co: missing
+    nmvoc: missing
+    nox: missing
+    pm2_5: missing
+    pm10: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: l-cat
+  type: tyre_brakes
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0064
+    pm2_5: 0.0034
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: pc
+  type: tyre_brakes
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0184
+    pm2_5: 0.0093
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: ldv
+  type: tyre_brakes
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0271
+    pm2_5: 0.0139
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: hdv
+  type: tyre_brakes
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0590
+    pm2_5: 0.0316
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+# --- Road surface wear (
+
+- vehicle_class: l-cat
+  type: road_surface_wear
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0030
+    pm2_5: 0.0016
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: pc
+  type: road_surface_wear
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0075
+    pm2_5: 0.0041
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: ldv
+  type: road_surface_wear
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0105
+    pm2_5: 0.0059
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+- vehicle_class: hdv
+  type: road_surface_wear
+  unit: g.km.vehicle
+  ef:
+    pm10: 0.0380
+    pm2_5: 0.0205
+    co: missing
+    nmvoc: missing
+    nox: missing
+    nh3: missing
+    sox: missing
+
+
+# --- Gasoline evaporation ---
+
+- vehicle_class: pc
+  fuel: gasoline
+  type: gasoline_evaporation
+  ef:
+    nmvoc : 7.8
+
+- vehicle_class: ldv
+  fuel: gasoline
+  type: gasoline_evaporation
+  ef:
+    nmvoc : 12.7
+- vehicle_class: l-cat
+  fuel: gasoline
+  type: gasoline_evaporation
+  ef:
+    nmvoc : 4.8    

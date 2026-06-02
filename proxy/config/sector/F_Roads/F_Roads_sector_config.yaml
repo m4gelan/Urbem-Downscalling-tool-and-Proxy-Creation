@@ -1,0 +1,78 @@
+filepaths:
+  CAMS:
+    path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  CORINE:
+    path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  OTM:
+    path: INPUT/Proxy/ProxySpecific/Roads/spatial_distribution_transport_cams_reg_v8.1_files/em_vkm_vector_dataset.gpkg
+  EUROSTAT:
+    path: proxy/config/sector/F_Roads/eurostat_fuel_split.yaml
+  EMEP:
+    path: proxy/config/sector/F_Roads/emission_factors.yaml
+
+eurostat:
+  enabled: true
+
+pollutants:
+- CO
+- NOx
+- NH3
+- NMVOC
+- PM10
+- PM2.5
+- SOx
+
+model:
+  road_types: [primary, secondary, tertiary]
+  vehicle_classes: [pc, ldv, hdv, l-cat]
+  fuels: [gasoline, diesel, lpg, cng]
+
+cams_area_sources:
+  year: 2019
+  emission_category_indices: [6, 7, 8, 9]
+  source_type_indices: [1]
+
+cams_f_categories:
+  F1:
+    emission_category_index: 6
+    fuels: [gasoline]
+  F2:
+    emission_category_index: 7
+    fuels: [diesel]
+  F3:
+    emission_category_index: 8
+    fuels: [lpg, cng]
+  F4:
+    emission_category_index: 9
+
+corine:
+  l3_codes: [122]
+  band: 1
+
+otm:
+  metric_crs: EPSG:3035
+  domain_clip_buffer_m: 0
+  layer: em_osm_europe_21072023_urh_motorway_novo_rossia_crimea_fix_country_scaled
+  iso3_column: ISO3_CODE
+  aadt_column: trafficvol_final
+  length_column: road_length
+  highway_column: highway
+  vkm_sum_column: vkm_abs_sum_corine_based_urh
+  vkm_columns:
+    pc: vkm_abs_passenger_cars_corine_based_urh
+    ldv: vkm_abs_light_commerical_vehicles_corine_based_urh
+    hdv: vkm_abs_heavy_duty_trucks_corine_based_urh
+    l-cat: vkm_abs_l_category_corine_based_urh
+  road_types:
+    primary:
+      highways: [primary, trunk, motorway]
+      buffer_m: 50
+    secondary:
+      highways: [secondary]
+      buffer_m: 20
+    tertiary:
+      highways: [tertiary]
+      buffer_m: 10
+  rasterize:
+    all_touched: true
+    dtype: float32

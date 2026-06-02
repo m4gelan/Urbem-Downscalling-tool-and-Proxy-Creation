@@ -29,6 +29,7 @@ _COUNTRY_ROWS: tuple[dict[str, str], ...] = (
     {"full_name": "Romania", "ISO3": "ROU", "Abbreviation": "RO", "other": "RO"},
     {"full_name": "Slovakia", "ISO3": "SVK", "Abbreviation": "SK", "other": "SK"},
     {"full_name": "Slovenia", "ISO3": "SVN", "Abbreviation": "SI", "other": "SI"},
+    {"full_name": "Switzerland", "ISO3": "CHE", "Abbreviation": "CH", "other": "CH"},
     {"full_name": "Spain", "ISO3": "ESP", "Abbreviation": "ES", "other": "ES"},
     {"full_name": "Sweden", "ISO3": "SWE", "Abbreviation": "SE", "other": "SE"},
 )

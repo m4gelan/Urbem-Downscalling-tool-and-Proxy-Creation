@@ -60,64 +60,87 @@ const UrbEmStats = (function () {
     }
   }
 
-  function renderComposition() {
+  function compositionDatasets(usePercent) {
     const pols = data.pollutants || [];
-    const ctx = document.getElementById("chart-composition");
-    const wrap = ctx.parentElement;
-    wrap.style.minHeight = 48 + pols.length * 36 + "px";
-    if (charts.composition) charts.composition.destroy();
-
     const sectorIds = sectorOrder();
-    const datasets = sectorIds.map((sid) => {
+    return sectorIds.map((sid) => {
       const firstPol = (data.composition || {})[pols[0]] || [];
       const row0 = firstPol.find((s) => s.sector_id === sid);
       return {
         label: row0?.label || sid,
         data: pols.map((p) => {
           const seg = ((data.composition || {})[p] || []).find((s) => s.sector_id === sid);
-          return seg ? seg.value : 0;
+          if (!seg) return 0;
+          return usePercent ? seg.percent : seg.value;
         }),
         backgroundColor: row0?.color || "#4f7cff",
         sector_id: sid,
       };
     });
+  }
 
+  function compositionChartOptions(pols, datasets, pctMode) {
+    return {
+      indexAxis: "y",
+      scales: {
+        x: {
+          stacked: true,
+          max: pctMode ? 100 : undefined,
+          ticks: {
+            color: "#8b91a8",
+            callback: (v) => (pctMode ? v + "%" : v >= 1e4 ? v.toExponential(1) : v),
+          },
+        },
+        y: { stacked: true, ticks: { color: "#e8eaf0" } },
+      },
+      plugins: {
+        legend: { display: !pctMode, labels: { color: "#8b91a8", boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const p = pols[c.dataIndex];
+              const seg = ((data.composition || {})[p] || []).find(
+                (s) => s.sector_id === datasets[c.datasetIndex].sector_id
+              );
+              if (!seg) return c.dataset.label;
+              return `${seg.label}: ${seg.percent}% (${seg.value_label})`;
+            },
+          },
+        },
+      },
+      onClick: (_, els) => {
+        if (!els.length || !window.UrbEmViz) return;
+        const sid = datasets[els[0].datasetIndex]?.sector_id;
+        if (sid) UrbEmViz.toggleSector(sid);
+      },
+    };
+  }
+
+  function renderComposition() {
+    const pols = data.pollutants || [];
+    const ctx = document.getElementById("chart-composition");
+    const wrap = ctx.parentElement;
+    wrap.style.minHeight = 48 + pols.length * 72 + 40 + "px";
+    if (charts.composition) charts.composition.destroy();
+
+    const datasets = compositionDatasets(false);
     charts.composition = new Chart(ctx, {
       type: "bar",
       data: { labels: pols, datasets },
-      options: {
-        indexAxis: "y",
-        scales: {
-          x: {
-            stacked: true,
-            ticks: {
-              color: "#8b91a8",
-              callback: (v) => (v >= 1e4 ? v.toExponential(1) : v),
-            },
-          },
-          y: { stacked: true, ticks: { color: "#e8eaf0" } },
-        },
-        plugins: {
-          legend: { labels: { color: "#8b91a8", boxWidth: 12 } },
-          tooltip: {
-            callbacks: {
-              label: (c) => {
-                const p = pols[c.dataIndex];
-                const seg = ((data.composition || {})[p] || []).find(
-                  (s) => s.sector_id === datasets[c.datasetIndex].sector_id
-                );
-                if (!seg) return c.dataset.label;
-                return `${seg.label}: ${seg.value_label} (${seg.percent}% of ${p})`;
-              },
-            },
-          },
-        },
-        onClick: (_, els) => {
-          if (!els.length || !window.UrbEmViz) return;
-          const sid = datasets[els[0].datasetIndex]?.sector_id;
-          if (sid) UrbEmViz.toggleSector(sid);
-        },
-      },
+      options: compositionChartOptions(pols, datasets, false),
+    });
+    renderCompositionPct(pols);
+  }
+
+  function renderCompositionPct(pols) {
+    const ctx = document.getElementById("chart-composition-pct");
+    if (!ctx) return;
+    if (charts.compositionPct) charts.compositionPct.destroy();
+    const pctDatasets = compositionDatasets(true);
+    charts.compositionPct = new Chart(ctx, {
+      type: "bar",
+      data: { labels: pols, datasets: pctDatasets },
+      options: compositionChartOptions(pols, pctDatasets, true),
     });
   }
 

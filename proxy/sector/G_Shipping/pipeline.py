@@ -178,7 +178,6 @@ def build(
         log.info(f"PIPELINE FINISHED: Area-weight stack written: {out_tif}")
 
         if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-            pol0 = str(pols[0]).strip() if pols else "W"
             map_html = output_dir / f"G_Shipping_{country_tag}_area_weights_map_{year}.html"
             try:
                 write_shipping_area_weights_map(
@@ -187,12 +186,9 @@ def build(
                     corine_map=corine_map,
                     osm_raster=osm_raster,
                     emodnet_z=emodnet_z,
-                    W=W,
-                    cell_id=cell_id,
                     transform=cor_tr,
                     raster_crs=cor_crs,
-                    cams_cells=cams_cells,
-                    pollutant_label=pol0,
+                    cell_id=cell_id,
                 )
                 log.info(f"G_Shipping area-weights debug map: {map_html}")
             except Exception as exc:

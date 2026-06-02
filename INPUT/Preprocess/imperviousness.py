@@ -17,8 +17,8 @@ TARGET_CRS = CRS.from_epsg(3035)
 
 # After downloading the imperviousness raster from COPERNICS you get a zip bundle.
 # Change INPUT_DIR to that zip (or a folder with Results/*.zip) and OUTPUT_RASTER.
-INPUT_DIR = "INPUT/79157.zip"
-OUTPUT_RASTER = "INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_NET.tif"
+INPUT_DIR = "INPUT/81184.zip"
+OUTPUT_RASTER = "INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_CHE.tif"
 
 
 def project_root() -> Path:

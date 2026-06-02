@@ -55,6 +55,11 @@ def find_reference_tif(config: dict, sector_order: list[str]) -> Path | None:
     for sid in sector_order:
         sec = sectors.get(sid) or {}
         aw = sec.get("area_weights") or {}
+        cats = aw.get("categories")
+        if cats:
+            for p in cats.values():
+                if p:
+                    return resolve_path(p, base)
         if aw.get("path"):
             return resolve_path(aw["path"], base)
     for sid in sector_order:

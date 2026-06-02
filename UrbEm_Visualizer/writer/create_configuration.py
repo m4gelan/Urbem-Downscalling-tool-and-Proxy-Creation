@@ -54,6 +54,38 @@ def save_run_config(config: dict, name: str) -> Path:
     return path.resolve()
 
 
+def _apply_ok_items(cfg: dict, ok_items: list[dict], root: Path) -> None:
+    for item in ok_items:
+        if item["kind"] == "cams":
+            cfg["paths"]["cams"] = _rel(root, item["path"])
+            continue
+        sector = item["sector"]
+        if sector is None:
+            continue
+        role = item["kind"]
+        if item.get("roads_categories"):
+            cfg["sectors"].setdefault(sector, {})["area_weights"] = {
+                "categories": {
+                    cat: _rel(root, p) for cat, p in item["roads_categories"].items()
+                },
+            }
+            continue
+        cfg["sectors"].setdefault(sector, {})[role] = {"path": _rel(root, item["path"])}
+
+
+def merge_check_paths(config: dict, check: dict | None = None, root: Path | None = None) -> dict:
+    root = root or project_root()
+    cfg = dict(config)
+    cfg["sectors"] = dict(cfg.get("sectors") or {})
+    if check is None:
+        country = cfg.get("country")
+        if not country:
+            return cfg
+        check = check_input(country, absent_sources=cfg.get("absent_sources"), root=root)
+    _apply_ok_items(cfg, check.get("ok_items") or [], root)
+    return cfg
+
+
 def config_from_check(
     country: str,
     root: Path | None = None,
@@ -67,16 +99,7 @@ def config_from_check(
     cfg = new_writer_config(country)
     cfg["absent_sources"] = list(absent_sources or [])
     optional_ids = _optional_sector_ids()
-
-    for item in result["ok_items"]:
-        if item["kind"] == "cams":
-            cfg["paths"]["cams"] = _rel(root, item["path"])
-            continue
-        sector = item["sector"]
-        if sector is None:
-            continue
-        role = item["kind"]
-        cfg["sectors"].setdefault(sector, {})[role] = {"path": _rel(root, item["path"])}
+    _apply_ok_items(cfg, result["ok_items"], root)
 
     for item in result.get("accepted_absent") or []:
         sector = item["sector"]

@@ -25,16 +25,6 @@ These datasets are reused across several sectors.
 
 **Access conditions:** no account required.
 
-### OpenStreetMap (agriculture infrastructure)
-
-**Dataset:** Project-specific GeoPackage `INPUT/Proxy/OSM/agricultural_layers.gpkg`
-
-**Description:** Polygons derived from OpenStreetMap for **farmyards, animal housing, and related built agricultural infrastructure** used as the OSM leg \(H_j\) of the K\_Agriculture combined proxy (Family~1: housing vs pasture split). Expected layer name and geometry rules are fixed in `PROXY/config/agriculture/osm_agriculture_layers.yaml`. Geometries should be in `EPSG:3035` (or reprojected at load time) and must not overlap the CORINE pasture mask used for the pasture leg.
-
-**Why:** OSM captures compact farm infrastructure that CORINE agricultural classes dilute; combining OSM with CORINE pastures improves NH\(_3\) and PM spatial realism.
-
-**Access:** built locally from OSM planet or regional PBF extracts (e.g. Geofabrik) using project preprocess rules; OSM data © OpenStreetMap contributors, ODbL.
-
 ### CORINE Land Cover
 
 **Dataset:** CORINE Land Cover 2018 (vector and raster, 100 m)
@@ -125,18 +115,6 @@ These datasets are reused across several sectors.
 **Access:** https://www.earthdata.nasa.gov/data/instruments/viirs/viirs-i-band-375-m-active-fire-data (instrument page; links to FIRMS / LANCE and related download paths).
 
 **Access conditions:** NASA **Earthdata** login required for sanctioned bulk/ordered access; FIRMS distributes the GIS products used here.
-
-#### LUCAS Soil
-
-**Dataset:** LUCAS topsoil data
-
-**Description:** Soil survey dataset associated with the LUCAS sampling framework, including measurements such as pH, organic carbon, nitrogen, phosphorus, potassium, carbonate content, and related soil properties. In this project, the soil component is relevant for agriculture proxies when soil characteristics are used to differentiate spatial patterns of agricultural activity.
-
-**Project note:** the workflow originally relied on `LUCAS-SOIL-2018`, because the newer campaign was not yet practically available at the time.
-
-**Reference page for the newer release:** https://esdac.jrc.ec.europa.eu/content/lucas-2022-topsoil-data
-
-**Access conditions:** registration or licence request may be required depending on the release.
 
 #### C21: geospatial data from agricultural census
 
