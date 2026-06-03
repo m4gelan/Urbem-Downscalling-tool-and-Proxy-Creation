@@ -11,7 +11,11 @@ from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 from proxy.writers.debug_dump import KAgAreaWeightsDebug, write_k_agriculture_area_weights_debug
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
-from proxy.visualizers.area_weights_map import write_k_agriculture_area_weights_debug_map
+from proxy.visualizers.area_weights_map import (
+    alpha_legend_html,
+    write_k_agriculture_area_weights_debug_map,
+    w_pollutant_for_viz,
+)
 
 from proxy.sector.K_Agriculture.signals.farm_buildings import build_farm_buildings
 from proxy.sector.K_Agriculture.signals.grazed_pastures import build_grazed_pastures
@@ -263,31 +267,13 @@ def build(
         log.info(f"area weights debug written: {output_dir / 'area_weights_debug.txt'}")
 
         if area_weights_viz_bbox_wgs84 is not None:
-
-            def _poll_ix(small: str) -> int | None:
-                for jj, lab in enumerate(alpha_result.pollutant_labels):
-                    if cams_pollutant_var(lab) == small:
-                        return jj
-                return None
-
-            w_poll: dict[str, np.ndarray] = {}
-            for key in ("nh3", "nmvoc"):
-                ix = _poll_ix(key)
-                if ix is not None:
-                    w_poll[key] = W_poll_stack[ix]
-
-            legend_bits: list[str] = []
-            for disp, small in (("NH3", "nh3"), ("NMVOC", "nmvoc")):
-                ix = _poll_ix(small)
-                if ix is None:
-                    continue
-                row = alpha_result.alpha[ix, :]
-                legend_bits.append(
-                    "<b>"
-                    + disp
-                    + "</b> α: "
-                    + " ".join(f"{group_names[i]}={float(row[i]):.4f}" for i in range(len(group_names)))
-                )
+            w_poll = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels)
+            legend_html = alpha_legend_html(
+                alpha_result.pollutant_labels,
+                alpha_result.alpha,
+                group_names,
+                cfg,
+            )
             map_html = output_dir / f"K_Agriculture_{country_tag}_area_weights_debug_{year}.html"
             try:
                 write_k_agriculture_area_weights_debug_map(
@@ -299,7 +285,7 @@ def build(
                     cell_id=cell_id,
                     W_by_group=W_by_group,
                     W_pollutant=w_poll,
-                    legend_alpha_html="<br>".join(legend_bits),
+                    legend_alpha_html=legend_html,
                 )
                 log.info(f"K_Agriculture area-weights debug map: {map_html}")
             except Exception as exc:

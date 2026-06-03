@@ -12,7 +12,9 @@ import pandas as pd
 import rasterio
 from rasterio import features as rio_features
 from rasterio.crs import CRS as RioCRS
+from pyproj import Transformer
 from rasterio.transform import array_bounds
+from shapely import get_coordinates, make_valid, set_coordinates
 from shapely.geometry import box
 from shapely.ops import unary_union
 
@@ -21,6 +23,48 @@ from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 
 # load_osm runs three geometry passes on the same file; cache avoids reading the GPKG three times.
 _LAYER_CACHE: dict[tuple[str, tuple[str, ...]], gpd.GeoDataFrame] = {}
+
+
+def _repair_geom(geom: Any) -> Any:
+    if geom is None or geom.is_empty:
+        return geom
+    if geom.is_valid:
+        return geom
+    return make_valid(geom)
+
+
+def _intersect_box(geom: Any, bbox: Any) -> Any:
+    if geom is None or geom.is_empty:
+        return geom
+    g = _repair_geom(geom)
+    try:
+        return g.intersection(bbox)
+    except Exception:
+        return make_valid(g).intersection(bbox)
+
+
+def _geom_to_crs_f32(geom: Any, trans: Transformer) -> Any:
+    if geom is None or geom.is_empty:
+        return geom
+    coords = get_coordinates(geom, include_z=False)
+    if coords.size == 0:
+        return geom
+    xy = coords.astype(np.float32, copy=False)
+    x2, y2 = trans.transform(xy[:, 0], xy[:, 1])
+    out = np.column_stack(
+        (np.asarray(x2, dtype=np.float32), np.asarray(y2, dtype=np.float32))
+    )
+    return _repair_geom(set_coordinates(geom, out))
+
+
+def _to_crs_f32(gdf: gpd.GeoDataFrame, target_crs: Any) -> gpd.GeoDataFrame:
+    if gdf.empty:
+        return gpd.GeoDataFrame(geometry=[], crs=target_crs)
+    if gdf.crs is not None and RioCRS.from_user_input(gdf.crs) == RioCRS.from_user_input(target_crs):
+        return gdf
+    trans = Transformer.from_crs(gdf.crs, target_crs, always_xy=True)
+    geoms = [_geom_to_crs_f32(geom, trans) for geom in gdf.geometry]
+    return gpd.GeoDataFrame(gdf.drop(columns="geometry"), geometry=geoms, crs=target_crs)
 
 
 def _read_osm_layers(osm_gpkg: Path, layer_order: list[str]) -> gpd.GeoDataFrame:
@@ -63,7 +107,7 @@ def _cams_domain_metric(
         b = c["cell_bounds_wgs84"]
         polys.append(box(b["west"], b["south"], b["east"], b["north"]))
     dom = unary_union(polys)
-    g = gpd.GeoDataFrame(geometry=[dom], crs="EPSG:4326").to_crs(metric_crs)
+    g = _to_crs_f32(gpd.GeoDataFrame(geometry=[dom], crs="EPSG:4326"), metric_crs)
     geom = g.geometry.iloc[0]
     if domain_clip_buffer_m and domain_clip_buffer_m > 0:
         geom = geom.buffer(float(domain_clip_buffer_m))
@@ -87,7 +131,7 @@ def _clip_geoms_to_domain_metric(
     g = g.loc[m].copy()
     if g.empty:
         return gpd.GeoDataFrame(geometry=[], crs=metric_crs)
-    g = g.to_crs(metric_crs)
+    g = _to_crs_f32(g, metric_crs)
     g = gpd.clip(g, mask_gdf)
     if g.empty:
         return gpd.GeoDataFrame(geometry=[], crs=metric_crs)
@@ -248,14 +292,13 @@ def rasterize_osm(
     if gdf is None or gdf.empty:
         return acc.astype(dtype, copy=False)
 
-    dst_crs = RioCRS.from_user_input(raster_crs)
-    if gdf.crs is not None and RioCRS.from_user_input(gdf.crs) == dst_crs:
-        g = gdf
-    else:
-        g = gdf.to_crs(raster_crs)
+    g = _to_crs_f32(gdf, raster_crs)
 
     left, bottom, right, top = array_bounds(height, width, transform)
-    g = gpd.clip(g, gpd.GeoDataFrame(geometry=[box(left, bottom, right, top)], crs=raster_crs))
+    bbox = box(left, bottom, right, top)
+    g = g.copy()
+    g["geometry"] = [_intersect_box(geom, bbox) for geom in g.geometry]
+    g = g.loc[g.geometry.notna() & ~g.geometry.is_empty]
 
     res = min(abs(float(transform.a)), abs(float(transform.e)))
     tol = res * 0.5 if res > 0 else 0.0

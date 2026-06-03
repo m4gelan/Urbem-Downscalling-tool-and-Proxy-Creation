@@ -437,6 +437,34 @@ const UrbEmStats = (function () {
     renderGini();
   }
 
+  async function runExport(key) {
+    const exp = window.UrbEmExport;
+    if (!exp) {
+      throw new Error("Export module not loaded — hard-refresh the page (Ctrl+F5)");
+    }
+    if (key === "summary") {
+      await exp.exportElement(
+        document.getElementById("card-summary-table"),
+        "domain_totals.png"
+      );
+    } else if (key === "composition") {
+      await exp.exportChart(charts.composition, "emission_composition.png");
+    } else if (key === "composition-pct") {
+      await exp.exportChart(charts.compositionPct, "emission_composition_pct.png");
+    } else if (key === "radar") {
+      await exp.exportChart(charts.radar, "sector_fingerprint.png");
+    } else if (key === "histogram") {
+      await exp.exportChart(charts.histogram, `histogram_${pollutant}.png`);
+    } else if (key === "lorenz") {
+      await exp.exportChart(charts.lorenz, `cumulative_contribution_${pollutant}.png`);
+    } else if (key === "gini") {
+      await exp.exportElement(
+        document.getElementById("card-gini"),
+        `gini_concentration_${pollutant}.png`
+      );
+    }
+  }
+
   async function open() {
     const r = await fetch(API + "/api/viz/analytics");
     const json = await r.json();
@@ -462,6 +490,24 @@ const UrbEmStats = (function () {
     renderOverview();
     renderSpatial();
   }
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const btn = e.target.closest("#screen-analytics [data-export]");
+      if (!btn || btn.disabled) return;
+      const screen = document.getElementById("screen-analytics");
+      if (!screen || screen.classList.contains("hidden")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const key = btn.dataset.export;
+      runExport(key).catch((err) => {
+        console.error("PNG export:", err);
+        alert(err.message || String(err));
+      });
+    },
+    true
+  );
 
   return { open };
 })();

@@ -25,7 +25,10 @@ from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
 from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
-from proxy.visualizers.area_weights_map import write_b_industry_area_weights_debug_map
+from proxy.visualizers.area_weights_map import (
+    write_b_industry_area_weights_debug_map,
+    w_pollutant_for_viz,
+)
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
@@ -383,24 +386,10 @@ def build(
             log.info(f"B_Industry alpha-fused area weights GeoTIFF: {out_w_tif}")
 
             if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-
-                def _pollutant_row_index(want_small: str) -> int | None:
-                    for jj, lab in enumerate(alpha_result.pollutant_labels):
-                        if cams_pollutant_var(lab) == want_small:
-                            return jj
-                    return None
-
-                w_poll: dict[str, np.ndarray] = {}
-                for key in ("pm10", "co"):
-                    ix = _pollutant_row_index(key)
-                    if ix is not None:
-                        w_poll[key] = W_poll_stack[ix]
-
                 if cor121_map is None or cor131_map is None:
                     log.warning("B_Industry area-weights debug map: CORINE 121/131 rasters missing; skip.")
-                elif not w_poll:
-                    log.info("B_Industry area-weights debug map: need PM10 and/or CO in alpha pollutant list; skip.")
                 else:
+                    w_poll = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels)
                     map_html = output_dir / f"B_Industry_{country_tag}_area_weights_debug_{year}.html"
                     try:
                         write_b_industry_area_weights_debug_map(

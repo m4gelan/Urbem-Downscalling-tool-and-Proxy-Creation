@@ -89,24 +89,23 @@ def apply_row_augment(
     if not isinstance(aug, dict):
         return
     columns = aug.get("columns")
-    if not isinstance(columns, dict):
-        return
-    offroad_sets = _offroad_sets_frozen(sector)
-    actx = dict(ctx)
-    if offroad_sets:
-        actx["offroad_sets"] = offroad_sets
+    if isinstance(columns, dict):
+        offroad_sets = _offroad_sets_frozen(sector)
+        actx = dict(ctx)
+        if offroad_sets:
+            actx["offroad_sets"] = offroad_sets
 
-    for col, spec in columns.items():
-        if not isinstance(spec, dict):
-            continue
-        if "first_match" in spec:
-            default = str(spec.get("default", "other"))
-            dt = spec.get("default_template")
-            row[col] = _first_match_value(
-                tags, spec["first_match"], actx, row, default=default, default_template=dt
-            )
-        elif "multi_match" in spec:
-            row[col] = _multi_match_values(tags, spec["multi_match"], actx)
+        for col, spec in columns.items():
+            if not isinstance(spec, dict):
+                continue
+            if "first_match" in spec:
+                default = str(spec.get("default", "other"))
+                dt = spec.get("default_template")
+                row[col] = _first_match_value(
+                    tags, spec["first_match"], actx, row, default=default, default_template=dt
+                )
+            elif "multi_match" in spec:
+                row[col] = _multi_match_values(tags, spec["multi_match"], actx)
 
     copy_tags = aug.get("copy_tags")
     if isinstance(copy_tags, list):

@@ -170,9 +170,7 @@ osm:
               - highway: primary_link
               - highway: secondary
               - highway: secondary_link
-              - highway: tertiary
-              - highway: tertiary_link
-              - highway: residential
+              # tertiary + residential omitted for faster national runs (dense OSM line count)
 
 weights:
   household:
@@ -236,3 +234,8 @@ beta:
     service: 0.3
     industrial: 0.5
     infrastructure: 0.0
+
+area_weights_debug:
+  viz_pollutants:
+    - NMVOC
+    - PM10

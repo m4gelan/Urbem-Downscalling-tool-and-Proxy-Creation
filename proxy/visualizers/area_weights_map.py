@@ -30,6 +30,7 @@ from proxy.core.alias import cams_pollutant_var
 #   float       — continuous raster + colour scale
 #   corine_gray — binary mask (gray)
 #   mask_rgb    — binary mask with fixed RGB (set rgb=(r,g,b), alpha=0-255)
+#   mask_codes  — uint raster: pixel value = CLC code, color per code (see _MASK_CODES_RGB)
 #   osm_blue    — OSM-style blue points/lines
 #
 # scale_per_cams: W layers normalised to max within each CAMS cell; low tail masked (see _CAMS_DISPLAY_FLOOR_FRAC)
@@ -48,6 +49,7 @@ class LayerStyle:
     vmax: float | None = None
     rgb: tuple[int, int, int] = (65, 65, 65)
     alpha: int = 220
+    zeros_transparent: bool = False
 
 
 # Per-sector layer styles (alphabetical). Keys must match raster dict keys passed to _emit_sector_viz.
@@ -102,15 +104,13 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
         "wp_nox": LayerStyle("W fused NOx", cmap="plasma", scale_per_cams=True, show=False),
     },
     "E_Solvents": {
-        "household": LayerStyle("CORINE household", kind="mask_rgb", rgb=(180, 60, 60), show=True),
-        "service": LayerStyle("CORINE service", kind="mask_rgb", rgb=(30, 144, 200), show=False),
-        "industrial": LayerStyle("CORINE industrial", kind="mask_rgb", rgb=(139, 90, 43), show=False),
-        "transport": LayerStyle("CORINE transport", kind="mask_rgb", rgb=(255, 165, 0), show=False),
-        "osm_slot_default": LayerStyle("OSM slot", kind="mask_rgb", rgb=(30, 110, 255), show=False, nearest=True),
-        "W_default": LayerStyle("W subsector", cmap="inferno", scale_per_cams=True, show=False, opacity=0.84),
+        "household": LayerStyle("S household (CORINE res + pop z)", cmap="YlOrRd", vmin=0.0, vmax=1.0, show=True),
+        "service": LayerStyle("S service (CORINE urban + service + OSM)", cmap="YlOrRd", vmin=0.0, vmax=1.0, show=True),
+        "industrial": LayerStyle("S industrial (CORINE + OSM)", cmap="YlOrRd", vmin=0.0, vmax=1.0, show=True),
+        "infrastructure": LayerStyle("S infrastructure (CORINE transport + OSM roads)", cmap="YlOrRd", vmin=0.0, vmax=1.0, show=True),
         "wp_default": LayerStyle("W fused pollutant", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86),
         "wp_nmvoc": LayerStyle("W fused NMVOC", cmap="plasma", scale_per_cams=True, show=True),
-        "wp_nox": LayerStyle("W fused NOx", cmap="plasma", scale_per_cams=True, show=False),
+        "wp_pm10": LayerStyle("W fused PM10", cmap="plasma", scale_per_cams=True, show=True),
     },
     "F_Roads": {
         "osm": LayerStyle("OTM roads (buffered)", kind="osm_blue", show=True, opacity=0.75),
@@ -144,11 +144,16 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
     },
     "J_Waste": {
         "osm": LayerStyle("OSM waste layers", kind="osm_blue", show=True),
-        "c132": LayerStyle("CORINE CLC 132 dump sites", kind="mask_rgb", rgb=(65, 65, 65), show=False),
-        "c121": LayerStyle("CORINE CLC 121 industrial", kind="mask_rgb", rgb=(139, 90, 43), show=False),
-        "impz": LayerStyle("Imperviousness z-score", cmap="cividis", show=False),
-        "upl": LayerStyle("UWWTD treatment plants", cmap="Oranges", vmin=0.0, vmax=1.0, show=False),
-        "uag": LayerStyle("UWWTD agglomerations", cmap="Purples", vmin=0.0, vmax=1.0, show=False),
+        "cor_sw": LayerStyle("CORINE CLC 121 + 132", kind="mask_codes", show=True),
+        "impz": LayerStyle("Imperviousness z-score", cmap="YlGnBu", show=False),
+        "upl": LayerStyle(
+            "UWWTD treatment plants", cmap="Oranges", vmin=0.0, vmax=1.0,
+            show=False, opacity=0.62, zeros_transparent=True,
+        ),
+        "uag": LayerStyle(
+            "UWWTD agglomerations", cmap="PuRd", vmin=0.0, vmax=1.0,
+            show=False, opacity=0.62, zeros_transparent=True,
+        ),
         "rur": LayerStyle("GHSL rural mask", cmap="Greens", vmin=0.0, vmax=1.0, show=False),
         "popz": LayerStyle("Population z-score", cmap="viridis", show=False),
         "Ws": LayerStyle("W solid waste", cmap="inferno", scale_per_cams=True, show=False),
@@ -183,6 +188,13 @@ _CORINE_L3_RGB: dict[str, tuple[int, int, int, int]] = {
     "u111": (205, 92, 92, 220),
     "u112": (210, 105, 30, 220),
     "u121": (30, 144, 200, 218),
+}
+
+_MASK_CODES_RGB: dict[tuple[str, str], dict[int, tuple[int, int, int, int]]] = {
+    ("J_Waste", "cor_sw"): {
+        121: (200, 110, 45, 220),
+        132: (55, 115, 85, 235),
+    },
 }
 
 _CORINE_SOLVENTS_RGB: dict[str, tuple[int, int, int, int]] = {
@@ -475,6 +487,16 @@ def _corine_gray_rgba(mask: np.ndarray) -> np.ndarray:
     return _mask_rgba(mask, 65, 65, 65, 235)
 
 
+def _mask_codes_rgba(codes: np.ndarray, code_rgb: dict[int, tuple[int, int, int, int]]) -> np.ndarray:
+    rgba = np.zeros((*codes.shape, 4), dtype=np.uint8)
+    for code, (r, g, b, a) in code_rgb.items():
+        m = np.asarray(codes) == int(code)
+        if not np.any(m):
+            continue
+        rgba[m, 0], rgba[m, 1], rgba[m, 2], rgba[m, 3] = r, g, b, a
+    return rgba
+
+
 def _osm_blue_rgba(osm: np.ndarray) -> np.ndarray:
     return _mask_rgba(np.asarray(osm) > 0, 30, 110, 255, 220)
 
@@ -630,10 +652,12 @@ def _prepare_layers(
             raw = _W_scaled_per_cell(raw.astype(np.float32), cid, cams_cells)
             raw = _mask_low_within_cams_cells(raw, cid, cams_cells)
 
-        nearest = st.nearest or st.kind in ("corine_gray", "mask_rgb", "osm_blue")
+        nearest = st.nearest or st.kind in ("corine_gray", "mask_rgb", "mask_codes", "osm_blue")
         if st.kind == "float":
             w = warp(raw.astype(np.float32), nearest, np.dtype(np.float32), np.nan)
             valid = valid_cam & np.isfinite(w)
+            if st.zeros_transparent:
+                valid = valid & (w > 0)
             rgba, vmin, vmax = _float_rgba(w, st.cmap, valid, vmin=st.vmin, vmax=st.vmax)
         elif st.kind == "corine_gray":
             w = warp(raw, True, np.dtype(np.uint8), 0)
@@ -655,6 +679,13 @@ def _prepare_layers(
                 w > 0 if w.dtype != np.uint8 else w.astype(bool),
                 rgb[0], rgb[1], rgb[2], fill_alpha,
             )
+            vmin, vmax = 0.0, 1.0
+        elif st.kind == "mask_codes":
+            w = warp(raw, True, np.dtype(np.uint16), 0)
+            code_rgb = _MASK_CODES_RGB.get((sector, key))
+            if not code_rgb:
+                raise ValueError(f"mask_codes layer {sector!r}/{key!r}: no entry in _MASK_CODES_RGB")
+            rgba = _mask_codes_rgba(w, code_rgb)
             vmin, vmax = 0.0, 1.0
         else:
             continue
@@ -738,6 +769,43 @@ def _export_wh(dst_wh: tuple[int, int]) -> tuple[int, int]:
         return w, h
     s = _MIN_EXPORT_LONG_PX / long
     return max(2, int(round(w * s))), max(2, int(round(h * s)))
+
+
+def _align_rgba(rgba: np.ndarray, eh: int, ew: int, *, nearest: bool = True) -> np.ndarray:
+    if rgba.shape[0] == eh and rgba.shape[1] == ew:
+        return rgba
+    from PIL import Image
+
+    res = Image.Resampling.NEAREST if nearest else Image.Resampling.LANCZOS
+    return np.asarray(Image.fromarray(rgba, mode="RGBA").resize((ew, eh), resample=res))
+
+
+def _align_rgb(rgb: np.ndarray, eh: int, ew: int) -> np.ndarray:
+    if rgb.shape[0] == eh and rgb.shape[1] == ew:
+        return rgb
+    from PIL import Image
+
+    return np.asarray(Image.fromarray(rgb, mode="RGB").resize((ew, eh), resample=Image.Resampling.LANCZOS))
+
+
+def _export_basemap_rgb(
+    bbox_wgs84: tuple[float, float, float, float],
+    dst_wh: tuple[int, int],
+) -> np.ndarray:
+    """OSM street map, then Esri satellite; flat gray if both fail."""
+    from proxy.core import log
+
+    dst_w, dst_h = dst_wh
+    for label, url in (("OpenStreetMap", _OSM_TILES), ("Esri satellite", _SATELLITE_TILES)):
+        try:
+            bm = _basemap_rgb_for_bbox(bbox_wgs84, dst_wh, tiles_url=url)
+            if float(np.mean(bm)) > 8.0:
+                return bm
+            log.warning(f"FIXED_IMAGE basemap {label} returned near-black tiles")
+        except Exception as exc:
+            log.warning(f"FIXED_IMAGE basemap {label} failed: {exc}")
+    log.warning("FIXED_IMAGE: tile fetch failed; using neutral fallback background")
+    return np.full((dst_h, dst_w, 3), 210, dtype=np.uint8)
 
 
 def _basemap_rgb_for_bbox(
@@ -1030,21 +1098,10 @@ def _write_f_roads_composite_figures(
     out_dir = out_path.with_suffix("")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        basemap = _basemap_rgb_for_bbox(bbox_use, (ew, eh))
-    except Exception as exc:
-        log.warning(f"F_Roads basemap fetch failed ({exc}); overlays only")
-        basemap = None
+    bm = _align_rgb(_export_basemap_rgb(bbox_use, (ew, eh)), eh, ew)
 
     def finalize(rgba: np.ndarray) -> np.ndarray:
-        if rgba.shape[0] != eh or rgba.shape[1] != ew:
-            rgba = np.asarray(
-                Image.fromarray(rgba).resize((ew, eh), resample=Image.Resampling.NEAREST)
-            )
-        if basemap is not None and basemap.shape[:2] == (eh, ew):
-            img = _blend_rgba_on_rgb(basemap, rgba)
-        else:
-            img = rgba[:, :, :3].copy()
+        img = _blend_rgba_on_rgb(bm, _align_rgba(rgba, eh, ew, nearest=True))
         return _draw_cams_outlines_on_rgb(img, cams_cells, bbox_use, (ew, eh))
 
     label = _f_roads_type_label(masks, order)
@@ -1094,30 +1151,18 @@ def _write_fixed_images(
     ew, eh = _export_wh(dst_wh)
     footer = _bbox_footer(bbox_use, (ew, eh))
 
-    try:
-        basemap = _basemap_rgb_for_bbox(bbox_use, (ew, eh))
-    except Exception as exc:
-        log.warning(f"FIXED_IMAGE basemap fetch failed ({exc}); saving overlays only")
-        basemap = None
+    basemap = _export_basemap_rgb(bbox_use, (ew, eh))
+    bm = _align_rgb(basemap, eh, ew)
 
     for layer in layers:
-        rgba = layer.rgba
-        if rgba.shape[0] != eh or rgba.shape[1] != ew:
+        nearest = layer.kind in ("mask_rgb", "mask_codes", "corine_gray", "osm_blue")
+        if layer.rgba.shape[0] != eh or layer.rgba.shape[1] != ew:
             log.warning(
-                f"FIXED_IMAGE layer {layer.key!r} size {rgba.shape[1]}x{rgba.shape[0]} "
+                f"FIXED_IMAGE layer {layer.key!r} size {layer.rgba.shape[1]}x{layer.rgba.shape[0]} "
                 f"!= export {ew}x{eh}; resizing"
             )
-            res = (
-                Image.Resampling.NEAREST
-                if layer.kind in ("mask_rgb", "corine_gray", "osm_blue")
-                else Image.Resampling.LANCZOS
-            )
-            rgba = np.asarray(Image.fromarray(rgba).resize((ew, eh), resample=res))
-
-        if basemap is not None and basemap.shape[:2] == (eh, ew):
-            img = _blend_rgba_on_rgb(basemap, rgba)
-        else:
-            img = rgba[:, :, :3].copy()
+        rgba = _align_rgba(layer.rgba, eh, ew, nearest=nearest)
+        img = _blend_rgba_on_rgb(bm, rgba)
 
         img = _draw_cams_outlines_on_rgb(img, cams_cells, bbox_use, (ew, eh))
         cbar = None
@@ -1261,6 +1306,75 @@ def _emit_sector_viz(
 
 
 # =============================================================================
+# Debug map — pollutants to export (sector YAML)
+# =============================================================================
+
+
+def viz_pollutant_labels(cfg: dict) -> list[str]:
+    """Labels from ``area_weights_debug.viz_pollutants`` (must be listed under ``pollutants``)."""
+    dbg = cfg.get("area_weights_debug")
+    if not isinstance(dbg, dict):
+        raise ValueError("sector config: area_weights_debug block required for debug maps")
+    raw = dbg.get("viz_pollutants")
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("area_weights_debug.viz_pollutants: non-empty list required")
+    labels = [str(p).strip() for p in raw if str(p).strip()]
+    if not labels:
+        raise ValueError("area_weights_debug.viz_pollutants: non-empty list required")
+    allowed = {str(p).strip() for p in (cfg.get("pollutants") or []) if str(p).strip()}
+    if not allowed:
+        raise ValueError("sector config: pollutants list required")
+    for p in labels:
+        if p not in allowed:
+            raise ValueError(f"area_weights_debug.viz_pollutants: {p!r} not in sector pollutants")
+    return labels
+
+
+def alpha_row_index(pollutant_labels: list, label: str) -> int | None:
+    want = cams_pollutant_var(label)
+    for jj, lab in enumerate(pollutant_labels):
+        if cams_pollutant_var(lab) == want:
+            return jj
+    return None
+
+
+def w_pollutant_for_viz(
+    cfg: dict,
+    W_planes: np.ndarray,
+    pollutant_labels: list,
+) -> dict[str, np.ndarray]:
+    """Fused W planes for keys listed in area_weights_debug.viz_pollutants."""
+    out: dict[str, np.ndarray] = {}
+    for label in viz_pollutant_labels(cfg):
+        ix = alpha_row_index(pollutant_labels, label)
+        if ix is None:
+            raise ValueError(f"area_weights_debug.viz_pollutants: {label!r} not in alpha pollutant_labels")
+        key = cams_pollutant_var(label)
+        out[key] = np.asarray(W_planes[ix], dtype=np.float32)
+    return out
+
+
+def alpha_legend_html(
+    pollutant_labels: list,
+    alpha: np.ndarray,
+    group_names: list,
+    cfg: dict,
+) -> str:
+    bits: list[str] = []
+    for label in viz_pollutant_labels(cfg):
+        ix = alpha_row_index(pollutant_labels, label)
+        if ix is None:
+            continue
+        row = alpha[ix, :]
+        disp = str(label).strip()
+        bits.append(
+            f"<b>{disp}</b> &alpha;: "
+            + " ".join(f"{group_names[i]}={float(row[i]):.4f}" for i in range(len(group_names)))
+        )
+    return "<br>".join(bits)
+
+
+# =============================================================================
 # Per-sector writers (alphabetical)
 # =============================================================================
 
@@ -1334,17 +1448,12 @@ def parse_c_othercombustion_debug_viz(
 ) -> tuple[list[str], list[str]]:
     dbg = sector_cfg.get("area_weights_debug") or {}
     classes = [str(c).strip() for c in (dbg.get("viz_classes") or []) if str(c).strip()]
-    pollutants = [str(p).strip() for p in (dbg.get("viz_pollutants") or []) if str(p).strip()]
+    pollutants = viz_pollutant_labels(sector_cfg)
     for cls in classes:
         if cls not in model_classes:
             raise ValueError(f"area_weights_debug.viz_classes: unknown class {cls!r}")
-    for p in pollutants:
-        if p not in pollutant_outputs:
-            raise ValueError(f"area_weights_debug.viz_pollutants: {p!r} not in sector pollutants")
     if len(classes) != 2:
         raise ValueError("area_weights_debug.viz_classes: set exactly 2 MODEL_CLASSES names")
-    if len(pollutants) != 2:
-        raise ValueError("area_weights_debug.viz_pollutants: set exactly 2 pollutant names")
     return classes, pollutants
 
 
@@ -1443,12 +1552,7 @@ def write_e_solvents_area_weights_debug_map(
     raster_crs: Any,
     cams_cells: dict[int, dict[str, Any]],
     cell_id: np.ndarray,
-    corine_household: np.ndarray,
-    corine_service: np.ndarray,
-    corine_industrial: np.ndarray,
-    corine_transport: np.ndarray,
-    osm_by_subgroup: dict[str, dict[str, np.ndarray]],
-    W_by_subsector: dict[str, np.ndarray],
+    S_archetype: dict[str, np.ndarray],
     W_pollutant: dict[str, np.ndarray],
     legend_alpha_html: str,
 ) -> Path:
@@ -1458,17 +1562,10 @@ def write_e_solvents_area_weights_debug_map(
     def crop(a: np.ndarray) -> np.ndarray:
         return _crop_array_window(a, row_off, col_off, hh, ww)
 
-    arrays: dict[str, np.ndarray] = {
-        "household": crop(corine_household).astype(np.uint8),
-        "service": crop(corine_service).astype(np.uint8),
-        "industrial": crop(corine_industrial).astype(np.uint8),
-        "transport": crop(corine_transport).astype(np.uint8),
-    }
-    for sg in sorted(osm_by_subgroup.keys()):
-        for sid in sorted((osm_by_subgroup[sg] or {}).keys()):
-            arrays[f"osm__{sg}__{sid}"] = crop(osm_by_subgroup[sg][sid]).astype(np.float32)
-    for g, a in W_by_subsector.items():
-        arrays[f"W_{g}"] = crop(a).astype(np.float32)
+    arrays: dict[str, np.ndarray] = {}
+    for act in ("household", "service", "industrial", "infrastructure"):
+        if act in S_archetype:
+            arrays[act] = crop(S_archetype[act]).astype(np.float32)
     for pk, a in W_pollutant.items():
         arrays[f"wp_{pk}"] = crop(a).astype(np.float32)
     # Re-use emit with pre-cropped window: fake full grid via sub_tr on cropped arrays
@@ -1589,10 +1686,12 @@ def write_j_waste_area_weights_debug_map(
     W_residual: np.ndarray,
     W_pollutant: dict[str, np.ndarray],
 ) -> Path:
+    cor_sw = np.zeros(corine_l3_132.shape, dtype=np.uint16)
+    cor_sw[np.asarray(corine_l3_132) > 0] = 132
+    cor_sw[np.asarray(corine_l3_121) > 0] = 121
     arrays: dict[str, np.ndarray] = {
         "osm": osm_raster,
-        "c132": corine_l3_132,
-        "c121": corine_l3_121,
+        "cor_sw": cor_sw,
         "impz": imperviousness_z,
         "upl": uwwtd_plants_raster,
         "uag": uwwtd_agg_raster,

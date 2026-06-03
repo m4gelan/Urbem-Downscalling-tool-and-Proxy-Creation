@@ -27,7 +27,11 @@ from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
 from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
-from proxy.visualizers.area_weights_map import write_e_solvents_area_weights_debug_map
+from proxy.visualizers.area_weights_map import (
+    alpha_legend_html,
+    write_e_solvents_area_weights_debug_map,
+    w_pollutant_for_viz,
+)
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import (
     area_weights_tif_path,
@@ -326,6 +330,11 @@ def build(
             raise ValueError(f"beta missing rows for alpha groups: {missing_beta}")
 
         activity_keys = list(weights_cfg.keys())
+        make_viz = log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None
+        S_for_viz = (
+            {k: np.asarray(v, dtype=np.float32) for k, v in S_by_activity.items()} if make_viz else None
+        )
+
         S_by_subsector = combine_S_solvents_subsectors(
             S_by_activity,
             beta_cfg,
@@ -360,48 +369,29 @@ def build(
         band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
         out_w_tif = area_weights_tif_path(output_dir, "E_Solvents", country_tag, year)
         dst = open_area_weight_stack(out_w_tif, ch, cw, n_poll, cor_tr, cor_crs)
-
-        w_poll: dict[str, np.ndarray] = {}
-        make_viz = log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None
+        W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
         for j in range(n_poll):
             W_c = fuse_alpha_weighted_W_planes(
                 W_per_group, a_alpha[j], cell_id, cams_cells_mask,
             )
+            W_poll_stack[j] = W_c
             write_area_weight_plane(dst, j + 1, band_names[j], W_c)
-            if make_viz:
-                pk = band_names[j].lower()
-                if pk in ("nmvoc", "nox"):
-                    w_poll[pk] = W_c
 
         dst.close()
+        w_poll = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels) if make_viz else {}
         del W_per_group
         if not make_viz:
             del W_by_subsector
         gc.collect()
         log.info(f"E_Solvents alpha-fused area weights GeoTIFF: {out_w_tif}")
 
-        if make_viz:
-
-            def _pollutant_row_index(want_small: str) -> int | None:
-                for jj, lab in enumerate(alpha_result.pollutant_labels):
-                    if cams_pollutant_var(lab) == want_small:
-                        return jj
-                return None
-
-            legend_bits: list[str] = []
-            for disp, small in (("NMVOC", "nmvoc"), ("NOx", "nox")):
-                ix = _pollutant_row_index(small)
-                if ix is None:
-                    continue
-                row = alpha_result.alpha[ix, :]
-                legend_bits.append(
-                    "<b>"
-                    + disp
-                    + "</b> &alpha;: "
-                    + " ".join(f"{group_names[i]}={float(row[i]):.4f}" for i in range(n_g))
-                )
-            legend_alpha_html = "<br>".join(legend_bits) if legend_bits else ""
-
+        if make_viz and S_for_viz is not None:
+            legend_alpha_html = alpha_legend_html(
+                alpha_result.pollutant_labels,
+                alpha_result.alpha,
+                group_names,
+                cfg,
+            )
             map_html = output_dir / f"E_Solvents_{country_tag}_area_weights_debug_{year}.html"
             try:
                 write_e_solvents_area_weights_debug_map(
@@ -411,12 +401,7 @@ def build(
                     raster_crs=cor_crs,
                     cams_cells=cams_cells_mask,
                     cell_id=cell_id,
-                    corine_household=corine_map_household,
-                    corine_service=corine_map_service,
-                    corine_industrial=corine_map_industrial,
-                    corine_transport=corine_map_transport,
-                    osm_by_subgroup=osm_rasters_by_subgroup,
-                    W_by_subsector=W_by_subsector,
+                    S_archetype=S_for_viz,
                     W_pollutant=w_poll,
                     legend_alpha_html=legend_alpha_html,
                 )
@@ -424,5 +409,5 @@ def build(
             except Exception as exc:
                 log.error(f"E_Solvents area-weights debug map failed: {exc}")
             finally:
-                del W_by_subsector
+                del S_for_viz, W_by_subsector
                 gc.collect()

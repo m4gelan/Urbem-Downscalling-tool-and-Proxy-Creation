@@ -31,7 +31,10 @@ from proxy.dataset_loaders.load_uwwtd_treatment_plants import (
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.core.point_matching.fallback import merge_uwwtd_waste_fallback
 from proxy.dataset_loaders.load_waste_rasters import load_ghsl_smod, load_imperviousness
-from proxy.visualizers.area_weights_map import write_j_waste_area_weights_debug_map
+from proxy.visualizers.area_weights_map import (
+    write_j_waste_area_weights_debug_map,
+    w_pollutant_for_viz,
+)
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
@@ -474,20 +477,7 @@ def build(
             log.info(f"J_Waste alpha-fused area weights GeoTIFF: {out_w_tif}")
 
             if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-
-                def _pollutant_row_index(want_small: str) -> int | None:
-                    for jj, lab in enumerate(alpha_result.pollutant_labels):
-                        if cams_pollutant_var(lab) == want_small:
-                            return jj
-                    return None
-
-                w_poll_map: dict[str, np.ndarray] = {}
-                ix_nmvoc = _pollutant_row_index("nmvoc")
-                if ix_nmvoc is not None:
-                    w_poll_map["nmvoc"] = W_poll_stack[ix_nmvoc]
-                ix_sox = _pollutant_row_index("sox")
-                if ix_sox is not None:
-                    w_poll_map["sox"] = W_poll_stack[ix_sox]
+                w_poll_map = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels)
                 map_html = output_dir / f"J_Waste_{country_tag}_area_weights_debug_{year}.html"
                 try:
                     write_j_waste_area_weights_debug_map(

@@ -399,3 +399,8 @@ weights:
     w_osm: 0.7
     w_clc: 0.3
     w_pop: 0.05
+
+area_weights_debug:
+  viz_pollutants:
+    - PM10
+    - CO

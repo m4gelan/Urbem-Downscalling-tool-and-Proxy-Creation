@@ -9,6 +9,11 @@ filepaths:
     path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
     config: proxy/config/alpha_methods.yaml
 
+area_weights_debug:
+  viz_pollutants:
+    - NMVOC
+    - NOx
+
 pollutants:
 - CO
 - NOx

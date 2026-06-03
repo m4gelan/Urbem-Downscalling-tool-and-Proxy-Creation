@@ -17,7 +17,8 @@ from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_population import load_population
 from proxy.core.point_matching.fallback import match_cams_lcp_one_to_one
 from proxy.core.point_matching.matching import match_cams_jrc
-from proxy.visualizers.area_weights_map import write_area_weights_map
+from proxy.core.alias import cams_pollutant_var
+from proxy.visualizers.area_weights_map import viz_pollutant_labels, write_area_weights_map
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.core.area_weights import combined_S_publicpower, normalize_W_per_cams_cell
@@ -245,21 +246,22 @@ def build(
         log.info(f"PIPELINE FINISHED: Area-weight stack written: {out_tif}")
 
         if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-            pol0 = str(pols[0]).strip() if pols else "W"
-            map_html = output_dir / f"A_PublicPower_{country_tag}_area_weights_map_{year}.html"
-            try:
-                write_area_weights_map(
-                    map_html,
-                    bbox_wgs84=area_weights_viz_bbox_wgs84,
-                    corine_map=corine_map,
-                    population_z=population_z,
-                    W=W,
-                    cell_id=cell_id,
-                    transform=cor_tr,
-                    raster_crs=cor_crs,
-                    cams_cells=cams_cells_mask,
-                    pollutant_label=pol0,
-                )
-                log.info(f"Area-weights debug map: {map_html}")
-            except Exception as exc:
-                log.error(f"Area-weights debug map failed: {exc}")
+            for pol in viz_pollutant_labels(cfg):
+                tag = cams_pollutant_var(pol)
+                map_html = output_dir / f"A_PublicPower_{country_tag}_area_weights_debug_{year}_{tag}.html"
+                try:
+                    write_area_weights_map(
+                        map_html,
+                        bbox_wgs84=area_weights_viz_bbox_wgs84,
+                        corine_map=corine_map,
+                        population_z=population_z,
+                        W=W,
+                        cell_id=cell_id,
+                        transform=cor_tr,
+                        raster_crs=cor_crs,
+                        cams_cells=cams_cells_mask,
+                        pollutant_label=pol,
+                    )
+                    log.info(f"Area-weights debug map: {map_html}")
+                except Exception as exc:
+                    log.error(f"Area-weights debug map failed ({pol}): {exc}")

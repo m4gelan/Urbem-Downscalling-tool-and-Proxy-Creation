@@ -47,3 +47,8 @@ corine:
 area_weights:
   w1: 0.4
   w2: 0.6
+
+area_weights_debug:
+  viz_pollutants:
+    - PM10
+    - NOx

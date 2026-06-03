@@ -18,7 +18,11 @@ from proxy.dataset_loaders import require_filepaths_exist
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
-from proxy.visualizers.area_weights_map import write_i_offroad_area_weights_debug_map
+from proxy.visualizers.area_weights_map import (
+    alpha_legend_html,
+    write_i_offroad_area_weights_debug_map,
+    w_pollutant_for_viz,
+)
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 
 
@@ -243,33 +247,13 @@ def build(
             log.info(f"I_Offroad alpha-fused area weights GeoTIFF: {out_w_tif}")
 
             if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-
-                def _pollutant_row_index(want_small: str) -> int | None:
-                    for jj, lab in enumerate(alpha_result.pollutant_labels):
-                        if cams_pollutant_var(lab) == want_small:
-                            return jj
-                    return None
-
-                w_poll: dict[str, np.ndarray] = {}
-                for key in ("nmvoc", "nox"):
-                    ix = _pollutant_row_index(key)
-                    if ix is not None:
-                        w_poll[key] = W_poll_stack[ix]
-
-                legend_bits: list[str] = []
-                for disp, small in (("NMVOC", "nmvoc"), ("NOx", "nox")):
-                    ix = _pollutant_row_index(small)
-                    if ix is None:
-                        continue
-                    row = alpha_result.alpha[ix, :]
-                    legend_bits.append(
-                        "<b>"
-                        + disp
-                        + "</b> &alpha;: "
-                        + " ".join(f"{group_names[i]}={float(row[i]):.4f}" for i in range(n_g))
-                    )
-                legend_alpha_html = "<br>".join(legend_bits) if legend_bits else ""
-
+                w_poll = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels)
+                legend_alpha_html = alpha_legend_html(
+                    alpha_result.pollutant_labels,
+                    alpha_result.alpha,
+                    group_names,
+                    cfg,
+                )
                 map_html = output_dir / f"I_Offroad_{country_tag}_area_weights_debug_{year}.html"
                 try:
                     write_i_offroad_area_weights_debug_map(

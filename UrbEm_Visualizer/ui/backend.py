@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 import sys
 from pathlib import Path
@@ -435,6 +436,34 @@ def api_dialog_pick_folder():
     return jsonify({"path": path})
 
 
+@app.route("/api/dialog/save-png", methods=["POST"])
+def api_dialog_save_png():
+    data = request.get_json() or {}
+    path = dialogs.pick_png_save(data.get("default_name"))
+    if not path:
+        return jsonify({"cancelled": True})
+    p = Path(path)
+    if p.suffix.lower() != ".png":
+        path = str(p.with_suffix(".png"))
+    return jsonify({"cancelled": False, "path": path})
+
+
+@app.route("/api/export/png", methods=["POST"])
+def api_export_png():
+    data = request.get_json() or {}
+    path = data.get("path")
+    raw_b64 = data.get("data")
+    if not path or not raw_b64:
+        return jsonify({"error": "path and data required"}), 400
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    try:
+        Path(path).write_bytes(base64.b64decode(raw_b64))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True, "path": path})
+
+
 @app.route("/api/viz/validate", methods=["POST"])
 def api_viz_validate():
     data = request.get_json() or {}
@@ -646,6 +675,54 @@ def api_viz_viewport():
             float(bbox["north"]),
         )
     )
+
+
+@app.route("/api/viz/export-map", methods=["POST"])
+def api_viz_export_map():
+    from flask import Response
+
+    from UrbEm_Visualizer.visualization.map_export import render_map_view_png
+    from UrbEm_Visualizer.visualization.session import get_context
+
+    ctx = get_context()
+    if ctx is None:
+        return jsonify({"error": "no visualization session"}), 400
+    data = request.get_json() or {}
+    bounds = data.get("bounds") or {}
+    for k in ("west", "south", "east", "north"):
+        if k not in bounds:
+            return jsonify({"error": "bounds.west/south/east/north required"}), 400
+    pollutant = data.get("pollutant")
+    if not pollutant:
+        return jsonify({"error": "pollutant required"}), 400
+    width = data.get("width")
+    height = data.get("height")
+    if width is None or height is None:
+        return jsonify({"error": "width and height required"}), 400
+    thr = data.get("threshold")
+    if thr is None:
+        thr = ctx.get_threshold(pollutant)
+    area_sectors = data.get("area_sectors") or ["TOTAL"]
+    point_sectors = data.get("point_sectors") or []
+    basemap_url = data.get("basemap_url")
+    try:
+        png = render_map_view_png(
+            ctx,
+            float(bounds["west"]),
+            float(bounds["south"]),
+            float(bounds["east"]),
+            float(bounds["north"]),
+            int(width),
+            int(height),
+            pollutant,
+            float(thr),
+            list(area_sectors),
+            list(point_sectors),
+            basemap_url=basemap_url,
+        )
+        return Response(png, mimetype="image/png")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/viz/threshold", methods=["POST"])

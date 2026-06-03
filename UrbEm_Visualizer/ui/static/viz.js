@@ -48,6 +48,32 @@ const UrbEmViz = (function () {
     return activeSectorIds().filter((id) => id !== "TOTAL").join(",");
   }
 
+  function areaSectorsForExport() {
+    const ids = [];
+    if (layerState.TOTAL?.enabled && layerState.TOTAL?.areaOn) ids.push("TOTAL");
+    Object.keys(layerState).forEach((sid) => {
+      if (sid !== "TOTAL" && layerState[sid]?.enabled && layerState[sid]?.areaOn) ids.push(sid);
+    });
+    return ids.length ? ids : ["TOTAL"];
+  }
+
+  function mapExportParams() {
+    const bmKey = document.getElementById("viz-basemap")?.value || "dark";
+    const m = meta?.map_config?.basemaps?.[bmKey];
+    const b = meta?.domain_wgs84;
+    const size = map ? map.getSize() : { x: 1500, y: 1000 };
+    return {
+      pollutant,
+      threshold: thresholdValue(),
+      area_sectors: areaSectorsForExport(),
+      point_sectors: activePointSectorsParam().split(",").filter(Boolean),
+      basemap_url: m?.url || null,
+      bounds: b ? { west: b.west, south: b.south, east: b.east, north: b.north } : null,
+      width: Math.round(size.x),
+      height: Math.round(size.y),
+    };
+  }
+
   function sectorMeta(id) {
     return (meta.sectors || []).find((s) => s.id === id) || { id, label: id, accent: "#4f7cff", icon: "dot" };
   }
@@ -200,6 +226,7 @@ const UrbEmViz = (function () {
       minZoom: 5,
       opacity: 1,
       zIndex: areaLayerZIndex(sectorId),
+      crossOrigin: true,
     }).addTo(map);
     if (layerState[sectorId].enabled && layerState[sectorId].areaOn) {
       setLegend(scaleForSector(sectorId));
@@ -535,7 +562,11 @@ const UrbEmViz = (function () {
     const m = meta.map_config?.basemaps?.[key];
     if (!m) return;
     if (basemapLayer) map.removeLayer(basemapLayer);
-    basemapLayer = L.tileLayer(m.url, { attribution: m.attribution || "", maxZoom: 19 }).addTo(map);
+    basemapLayer = L.tileLayer(m.url, {
+      attribution: m.attribution || "",
+      maxZoom: 19,
+      crossOrigin: true,
+    }).addTo(map);
     basemapLayer.bringToBack();
   }
 
@@ -582,7 +613,7 @@ const UrbEmViz = (function () {
       map = null;
     }
     const b = meta.domain_wgs84;
-    map = L.map("viz-map", { zoomControl: false, attributionControl: true }).fitBounds([
+    map = L.map("viz-map", { zoomControl: false, attributionControl: true, preferCanvas: true }).fitBounds([
       [b.south, b.west],
       [b.north, b.east],
     ]);
@@ -620,6 +651,16 @@ const UrbEmViz = (function () {
     document.getElementById("btn-facility-close").onclick = closeFacility;
     document.getElementById("btn-viz-stats").onclick = showAnalytics;
     document.getElementById("btn-viz-back").onclick = () => close();
+    document.getElementById("btn-viz-export-map").onclick = async () => {
+      const sectors = areaSectorsForExport().join("_");
+      const name = `urbem_map_${pollutant}_${sectors}.png`.replace(/[^\w.-]+/g, "_");
+      try {
+        await window.UrbEmExport.exportMap(map, mapExportParams(), name);
+      } catch (e) {
+        console.error("Map PNG export:", e);
+        alert(e.message || String(e));
+      }
+    };
     map.on("moveend zoomend", refreshViewportCard);
 
     await refreshAllLayers();
@@ -636,7 +677,7 @@ const UrbEmViz = (function () {
     }
   }
 
-  return {
+  const api = {
     open,
     close,
     toggleSector,
@@ -646,4 +687,6 @@ const UrbEmViz = (function () {
     getPollutant: () => pollutant,
     getThreshold: (pol) => userThresholds[pol || pollutant] ?? (meta?.default_thresholds || {})[pol || pollutant] ?? 0,
   };
+  window.UrbEmViz = api;
+  return api;
 })();

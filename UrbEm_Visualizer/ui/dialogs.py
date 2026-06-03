@@ -46,6 +46,19 @@ def pick_folder(title: str) -> str | None:
     return path if path else None
 
 
+def pick_png_save(default_name: str | None = None) -> str | None:
+    def go():
+        return filedialog.asksaveasfilename(
+            title="Export image (PNG)",
+            defaultextension=".png",
+            initialfile=default_name or "export.png",
+            filetypes=[("PNG image", "*.png"), ("All files", "*.*")],
+        )
+
+    path = _run_dialog(go)
+    return path if path else None
+
+
 def pick_file(title: str, patterns: list[tuple[str, str]] | None = None) -> str | None:
     types = patterns or [("All files", "*.*")]
 

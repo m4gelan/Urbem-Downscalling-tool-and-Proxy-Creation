@@ -254,3 +254,8 @@ weights:
     w_clc_121: 0.1
     w_clc_123: 0.05
 
+area_weights_debug:
+  viz_pollutants:
+    - NMVOC
+    - NH3
+

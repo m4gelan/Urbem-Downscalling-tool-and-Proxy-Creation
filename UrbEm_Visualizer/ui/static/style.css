@@ -1194,6 +1194,123 @@ body.analytics-mode .header {
   min-width: 0;
 }
 
+.viz-map-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+.viz-map-stack .viz-map {
+  flex: 1;
+}
+
+.viz-map-export-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 800;
+}
+
+.viz-export-hide {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.export-png-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 56px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.export-png-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #c5d4ff;
+}
+
+.chart-export-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 6px;
+}
+
+.export-png-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-active);
+  color: var(--accent);
+}
+
+.export-png-btn:focus-visible {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 2px;
+}
+
+.export-icon-svg {
+  display: block;
+}
+
+.analytics-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 20;
+}
+
+.analytics-card-head h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.analytics-card-head .export-png-btn,
+.chart-export-row .export-png-btn {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 21;
+  pointer-events: auto;
+}
+
+.export-png-btn .export-icon-svg,
+.export-png-btn .export-png-label {
+  pointer-events: none;
+}
+
+.analytics-export-hint {
+  margin: 0 0 0 auto;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  max-width: 420px;
+  text-align: right;
+}
+
+.analytics-export-hint strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.analytics-card--table {
+  margin-bottom: 16px;
+}
+
 .viz-map {
   flex: 1;
   min-height: 200px;
