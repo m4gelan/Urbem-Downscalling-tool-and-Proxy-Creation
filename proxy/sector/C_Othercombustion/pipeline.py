@@ -35,8 +35,10 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
+    export_w_groups: bool = False,
+    w_groups_export_root: Path | None = None,
 ) -> None:
-    _ = point_matching
+    _ = (point_matching, export_w_groups, w_groups_export_root)
 
     repo_root = Path(__file__).resolve().parents[3]
 

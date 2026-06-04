@@ -39,6 +39,7 @@ from proxy.writers.area_weight_stack import (
     write_area_weight_plane,
 )
 from proxy.writers.point_link import write_cams_facility_link_tif
+from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
@@ -52,6 +53,8 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
+    export_w_groups: bool = False,
+    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR E Solvents: optional CAMS↔E-PRTR links; area weights = activity S, beta subsectors, alpha-fused GeoTIFF."""
 
@@ -357,6 +360,21 @@ def build(
         del S_by_subsector
         gc.collect()
 
+        country_tag = country_profile["full_name"].replace(" ", "_")
+        maybe_export_w_groups(
+            export_w_groups,
+            w_groups_export_root,
+            sector_key="E_Solvents",
+            country_tag=country_tag,
+            year=year,
+            W_by_group=W_by_subsector,
+            cell_id=cell_id,
+            transform=cor_tr,
+            crs=cor_crs,
+            alpha_result=alpha_result,
+            cams_cells=cams_cells_mask,
+        )
+
         W_per_group = [W_by_subsector[g] for g in group_names]
 
         a_alpha = alpha_result.alpha.astype(np.float32)
@@ -365,7 +383,6 @@ def build(
         if a_alpha.shape[1] != n_g:
             raise ValueError(f"alpha columns {a_alpha.shape[1]} != subsector groups {n_g}")
 
-        country_tag = country_profile["full_name"].replace(" ", "_")
         band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
         out_w_tif = area_weights_tif_path(output_dir, "E_Solvents", country_tag, year)
         dst = open_area_weight_stack(out_w_tif, ch, cw, n_poll, cor_tr, cor_crs)

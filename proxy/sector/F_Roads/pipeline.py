@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 
 import yaml
@@ -29,7 +30,10 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
+    export_w_groups: bool = False,
+    w_groups_export_root: Path | None = None,
 ) -> None:
+    _ = (export_w_groups, w_groups_export_root)
     _ = point_matching
 
     repo_root = Path(__file__).resolve().parents[3]
@@ -121,7 +125,9 @@ def build(
     log_pi_fleet(pi, road_types, classes)
     s = build_s_tensor(pi, fuel_split, road_types, classes, fuels)
     x = build_x_from_s(s, aadt_rasters, road_types, classes, fuels)
-    x_tot = build_x_tot_by_class(pi, aadt_rasters, road_types, classes)
+    del s
+    gc.collect()
+    x_tot = None
     m_exh, m_non = load_emission_factor_matrices(
         repo_root / str(emep_filepath).replace("\\", "/"),
         pol_list,
@@ -133,9 +139,9 @@ def build(
     country_tag = country_profile["full_name"].replace(" ", "_")
     band_names = [cams_pollutant_var(p) for p in pol_list]
     output_dir.mkdir(parents=True, exist_ok=True)
-    w_by_category: dict[str, np.ndarray] = {}
 
     for cat_name, cat_cfg in f_cats.items():
+        cat = str(cat_name)
         ec = [int(cat_cfg["emission_category_index"])]
         cat_cells, _ = load_cams_cells_mask(
             repo_root / str(cams_filepath).replace("\\", "/"),
@@ -149,23 +155,33 @@ def build(
             pad_m=pad_m,
         )
         cat_fuels = [str(f) for f in cat_cfg["fuels"]] if "fuels" in cat_cfg else None
+        if cat == "F4":
+            if x_tot is None:
+                x_tot = build_x_tot_by_class(pi, aadt_rasters, road_types, classes)
+            del x, aadt_rasters
+            gc.collect()
         w_stack = build_category_weight_stack(
-            x=x,
-            x_tot=x_tot,
+            x=x if cat != "F4" else None,
+            x_tot=x_tot or {},
             m_exh=m_exh,
             m_non=m_non,
             classes=classes,
             fuels=fuels,
             pollutants=pol_list,
-            category=str(cat_name),
+            category=cat,
             category_fuels=cat_fuels,
             cell_id=cell_id,
             cams_cells=cat_cells,
         )
-        w_by_category[str(cat_name)] = w_stack
         out_tif = output_dir / f"F_Roads_{country_tag}_{cat_name}_{year}.tif"
         write_area_weight_stack_multiband(out_tif, w_stack, band_names, cor_tr, cor_crs)
         log.info(f"F_Roads area weights written: {out_tif}")
+        del w_stack, cat_cells
+        gc.collect()
+        if cat == "F4" and x_tot is not None:
+            del x_tot
+            x_tot = None
+            gc.collect()
 
     if area_weights_viz_bbox_wgs84 is not None:
         map_stem = output_dir / f"F_Roads_{country_tag}_area_weights_debug_{year}"

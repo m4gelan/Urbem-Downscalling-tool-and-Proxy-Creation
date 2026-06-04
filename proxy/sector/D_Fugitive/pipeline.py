@@ -35,6 +35,7 @@ from proxy.visualizers.area_weights_map import (
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
+from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
@@ -48,6 +49,8 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
+    export_w_groups: bool = False,
+    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR D fugitive: optional CAMS↔E-PRTR point links; area weights = OSM+CORINE+pop per group, alpha-fused GeoTIFF."""
 
@@ -394,13 +397,27 @@ def build(
             if a_alpha.shape[1] != n_g:
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
+            country_tag = country_profile["full_name"].replace(" ", "_")
+            maybe_export_w_groups(
+                export_w_groups,
+                w_groups_export_root,
+                sector_key="D_Fugitive",
+                country_tag=country_tag,
+                year=year,
+                W_by_group=W_by_subgroup,
+                cell_id=cell_id,
+                transform=cor_tr,
+                crs=cor_crs,
+                alpha_result=alpha_result,
+                cams_cells=cams_cells_mask,
+            )
+
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
             for j in range(n_poll):
                 W_poll_stack[j] = fuse_alpha_weighted_W_planes(
                     W_per_group, a_alpha[j], cell_id, cams_cells_mask,
                 )
 
-            country_tag = country_profile["full_name"].replace(" ", "_")
             band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
             out_w_tif = area_weights_tif_path(output_dir, "D_Fugitive", country_tag, year)
             write_area_weight_stack_multiband(

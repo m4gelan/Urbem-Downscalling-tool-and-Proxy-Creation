@@ -31,7 +31,7 @@ def _x_band(ci: int, fi: int, n_fuels: int) -> int:
 
 def build_category_weight_stack(
     *,
-    x: np.ndarray,
+    x: np.ndarray | None,
     x_tot: dict[str, np.ndarray],
     m_exh: np.ndarray,
     m_non: np.ndarray,
@@ -44,13 +44,20 @@ def build_category_weight_stack(
     cams_cells: dict[int, dict[str, Any]],
 ) -> np.ndarray:
     """Return (n_poll, H, W) normalized weights for one CAMS F subcategory."""
-    h, w, _ = x.shape
+    if category == "F4":
+        ref = next(iter(x_tot.values()))
+        h, w = ref.shape
+    else:
+        if x is None:
+            raise ValueError("F_Roads exhaust categories require X stack")
+        h, w, _ = x.shape
     n_p = len(pollutants)
     fuel_ix = {f: i for i, f in enumerate(fuels)}
     stack = np.zeros((n_p, h, w), dtype=np.float32)
+    u = np.zeros((h, w), dtype=np.float32)
 
     for pj, pol in enumerate(pollutants):
-        u = np.zeros((h, w), dtype=np.float32)
+        u.fill(0.0)
         if category == "F4":
             for ci, c in enumerate(classes):
                 m = float(m_non[ci, pj])

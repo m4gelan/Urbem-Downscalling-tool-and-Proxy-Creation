@@ -1,0 +1,22 @@
+reference_pollutant: NOx
+similarity_threshold: 0.7
+active_eps: 1.0e-9
+perturb_pct:
+  - 0.2
+  - 0.4
+dirichlet_draws: 300
+dirichlet_concentration: 25.0
+
+representative_sectors:
+  low:
+    sector_key: A_PublicPower
+    primary_pollutant: auto_entropy
+    contrast_pollutant: null
+  high:
+    sector_key: B_Industry
+    primary_pollutant: auto_entropy
+    contrast_pollutant: auto_dominant
+  mid:
+    sector_key: J_Waste
+    primary_pollutant: auto_entropy
+    contrast_pollutant: auto_dominant

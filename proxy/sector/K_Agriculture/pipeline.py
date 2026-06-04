@@ -11,6 +11,7 @@ from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 from proxy.writers.debug_dump import KAgAreaWeightsDebug, write_k_agriculture_area_weights_debug
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
+from proxy.writers.w_groups_export import maybe_export_w_groups
 from proxy.visualizers.area_weights_map import (
     alpha_legend_html,
     write_k_agriculture_area_weights_debug_map,
@@ -45,6 +46,8 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
+    export_w_groups: bool = False,
+    w_groups_export_root: Path | None = None,
 ) -> (
     tuple[
         LivestockHousingPastureResult,
@@ -234,6 +237,21 @@ def build(
         ]
         log.info(f"  {plab}: " + " ".join(parts) + f" (method {int(alpha_result.methods[j])})")
 
+    country_tag = country_profile["full_name"].replace(" ", "_")
+    maybe_export_w_groups(
+        export_w_groups,
+        w_groups_export_root,
+        sector_key="K_Agriculture",
+        country_tag=country_tag,
+        year=year,
+        W_by_group=W_by_group,
+        cell_id=cell_id,
+        transform=cor_tr,
+        crs=cor_crs,
+        alpha_result=alpha_result,
+        cams_cells=cams_cells,
+    )
+
     a_alpha = alpha_result.alpha.astype(np.float32)
     n_poll = a_alpha.shape[0]
     W_per_group = [W_by_group[gname] for gname in group_names]
@@ -243,7 +261,6 @@ def build(
             W_per_group, a_alpha[j], cell_id, cams_cells,
         )
 
-    country_tag = country_profile["full_name"].replace(" ", "_")
     band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
     out_w_tif = area_weights_tif_path(output_dir, "K_Agriculture", country_tag, year)
     write_area_weight_stack_multiband(out_w_tif, W_poll_stack, band_names, cor_tr, cor_crs)
