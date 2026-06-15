@@ -14,8 +14,9 @@ from UrbEm_Visualizer.downscaling.point import run_point_sector
 from UrbEm_Visualizer.writer.downscale_export import export_run
 from UrbEm_Visualizer.downscaling.sector_meta import sector_label, sector_mode, sector_order
 from UrbEm_Visualizer.downscaling.spatial import (
-    fine_grid_from_reference,
+    build_output_grid,
     find_reference_tif,
+    native_grid_metadata,
     resolve_path,
 )
 from UrbEm_Visualizer.paths import project_root
@@ -61,14 +62,19 @@ def run_downscaling(
 
     domain = config["domain"]
     pollutants = list(config["pollutants"])
-    layer_mode = config["output"]["layer_mode"]
-    fmt = config["output"]["format"]
+    output_cfg = config["output"]
+    if "grid_resolution_m" not in output_cfg:
+        raise KeyError("run config missing output.grid_resolution_m")
+    layer_mode = output_cfg["layer_mode"]
+    fmt = output_cfg["format"]
+    grid_resolution_m = int(output_cfg["grid_resolution_m"])
     order = sector_order(config)
     ref = find_reference_tif(config, order)
     if ref is None:
         raise ValueError("no area_weights or point_source path in configuration")
 
-    grid = fine_grid_from_reference(ref, domain)
+    native_meta = native_grid_metadata(ref)
+    grid = build_output_grid(domain, grid_resolution_m, native_meta)
     cams_nc = resolve_path(config["paths"]["cams"], root)
     out_dir = output_dir_for_run(config_path, config)
 
@@ -160,6 +166,8 @@ def run_downscaling(
                         domain=domain,
                         pollutants=pollutants,
                         cams_nc=cams_nc,
+                        output_resolution_m=grid_resolution_m,
+                        native_meta=native_meta,
                         on_progress=_roads_prog,
                     )
                 else:
@@ -178,6 +186,8 @@ def run_downscaling(
                         pollutants=pollutants,
                         cams_cells=cams_cells or {},
                         cams_grid=cams_grid_meta,
+                        output_resolution_m=grid_resolution_m,
+                        native_meta=native_meta,
                         on_pollutant_done=_pol_done,
                     )
                 weight_check_log[sid] = wlog
@@ -218,6 +228,8 @@ def run_downscaling(
                     layer_mode=layer_mode,
                     cell_id=cell_id,
                     area_weight_path=aw_path,
+                    output_resolution_m=grid_resolution_m,
+                    native_meta=native_meta,
                     on_progress=_point_prog,
                 )
                 res["point_emission"] = point_da

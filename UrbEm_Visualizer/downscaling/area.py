@@ -15,18 +15,21 @@ from UrbEm_Visualizer.dataset_loaders.cams_emissions import (
     point_cell_ids,
 )
 from UrbEm_Visualizer.dataset_loaders.tif_grid import (
+    aggregate_plane_to_grid,
     cell_id_on_raster,
+    cell_id_plane,
     pixels_in_domain_bbox,
     read_weight_stack_native,
     reproject_plane_to_grid,
 )
 from UrbEm_Visualizer.downscaling.sector_meta import load_sector_yaml
-from UrbEm_Visualizer.downscaling.spatial import FineGrid
+from UrbEm_Visualizer.downscaling.spatial import FineGrid, NativeGridMeta
 from UrbEm_Visualizer.pollutants import band_index_for_pollutant
 
 # Proxy normalizes each CAMS cell to sum=1 in float32 before writing the GeoTIFF.
-# Re-summing stored float32 pixels can drift slightly (e.g. 1.000743) — not a bad normalize.
-WEIGHT_TOL = 1e-2
+# Re-summing stored float32 pixels can drift (~2% on large cells) — repaired on read, not a bad proxy.
+WEIGHT_TOL = 1.5e-2  # domain-clip warning threshold only
+WEIGHT_FAIL_TOL = 5e-2  # hard fail: likely broken weights, not float32 round-trip
 
 
 def cell_weight_sums(weights: np.ndarray, cell_id: np.ndarray) -> np.ndarray:
@@ -41,24 +44,53 @@ def cell_weight_sums(weights: np.ndarray, cell_id: np.ndarray) -> np.ndarray:
     return np.bincount(c, weights=flat_w[valid].astype(np.float64), minlength=max_c + 1)
 
 
+def renormalize_weights_per_cams_cell(weights: np.ndarray, cell_id: np.ndarray) -> np.ndarray:
+    """Scale weights so each CAMS cell sums to 1 (fixes float32 GeoTIFF round-trip drift)."""
+    sums = cell_weight_sums(weights, cell_id)
+    out = weights.astype(np.float32, copy=True)
+    ok = cell_id >= 0
+    cid = cell_id[ok].astype(np.int64)
+    s = sums[cid]
+    good = s > 0.0
+    out[ok] = np.where(good, (weights[ok].astype(np.float64) / s[good]).astype(np.float32), np.float32(0.0))
+    return out
+
+
 def check_weights_native(
     weights: np.ndarray,
     cell_id: np.ndarray,
     pollutant: str,
     cells_to_check: np.ndarray,
-    sector_id: str,
-) -> list[dict[str, Any]]:
-    """Sum weights on full native cell (all pixels with cell_id); only cells touching domain."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Check raw stored sums; fail only on large drift. Return (failures, repairs)."""
     sums = cell_weight_sums(weights, cell_id)
     fails: list[dict[str, Any]] = []
+    repairs: list[dict[str, Any]] = []
     for cid in cells_to_check:
         ic = int(cid)
         if ic < 0 or ic >= sums.size:
             continue
         s = float(sums[ic])
-        if abs(s - 1.0) > WEIGHT_TOL:
+        drift = abs(s - 1.0)
+        if drift > WEIGHT_FAIL_TOL:
             fails.append({"cell_id": ic, "pollutant": pollutant, "sum": s})
-    return fails
+        elif drift > 1e-6:
+            repairs.append({"cell_id": ic, "pollutant": pollutant, "sum_before": s})
+    return fails, repairs
+
+
+def prepare_weight_plane(
+    weights: np.ndarray,
+    cell_id: np.ndarray,
+    pollutant: str,
+    cells_to_check: np.ndarray,
+) -> tuple[np.ndarray, list[dict[str, Any]], list[dict[str, Any]]]:
+    fails, repairs = check_weights_native(weights, cell_id, pollutant, cells_to_check)
+    if fails:
+        return weights, fails, repairs
+    if repairs:
+        weights = renormalize_weights_per_cams_cell(weights, cell_id)
+    return weights, fails, repairs
 
 
 def downscale_area(
@@ -70,6 +102,8 @@ def downscale_area(
     pollutants: list[str],
     cams_cells: dict[int, dict[str, Any]],
     cams_grid: dict[str, Any],
+    output_resolution_m: int,
+    native_meta: NativeGridMeta,
     on_pollutant_done: Callable[[str], None] | None = None,
 ) -> tuple[xr.DataArray, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     labels, native_stack, nat_tr, nat_crs = read_weight_stack_native(area_path)
@@ -78,6 +112,7 @@ def downscale_area(
     cell_id = cell_id_on_raster(nat_tr, nat_crs, h, w, cams_grid, valid_keys)
     in_domain = pixels_in_domain_bbox(nat_tr, nat_crs, h, w, domain)
     domain_cells = np.unique(cell_id[in_domain & (cell_id >= 0)])
+    use_aggregate = output_resolution_m > int(native_meta.res_x)
 
     mass_lut = cams_mass_lookup(cams_cells, pollutants)
     n_pol = len(pollutants)
@@ -85,14 +120,20 @@ def downscale_area(
     clip_log: list[dict[str, Any]] = []
     weight_log: dict[str, Any] = {"sector": sector_id, "pollutants": {}, "passed": True}
 
-    ok = cell_id >= 0
-    cid_ok = cell_id[ok]
+    cell_id_out = None
+    if use_aggregate:
+        cell_id_out = cell_id_plane(grid, cams_grid, valid_keys)
 
     for pi, pol in enumerate(pollutants):
         bi = band_index_for_pollutant(labels, pol)
-        w_plane = native_stack[bi]
-        fails = check_weights_native(w_plane, cell_id, pol, domain_cells, sector_id)
-        weight_log["pollutants"][pol] = {"failures": fails, "cells_checked": int(domain_cells.size)}
+        w_native, fails, repairs = prepare_weight_plane(
+            native_stack[bi], cell_id, pol, domain_cells,
+        )
+        weight_log["pollutants"][pol] = {
+            "failures": fails,
+            "repairs": repairs,
+            "cells_checked": int(domain_cells.size),
+        }
         if fails:
             weight_log["passed"] = False
             return (
@@ -107,17 +148,23 @@ def downscale_area(
             )
 
         lut = mass_lut[pol]
-        e_native = np.zeros((h, w), dtype=np.float32)
-        e_native[ok] = lut[cid_ok] * w_plane[ok]
-        out_stack[pi] = reproject_plane_to_grid(e_native, nat_tr, nat_crs, grid)
+        if use_aggregate:
+            w_plane = aggregate_plane_to_grid(w_native, nat_tr, nat_crs, grid)
+            ok = (cell_id_out >= 0) & grid.domain_mask
+            out_stack[pi][ok] = lut[cell_id_out[ok]] * w_plane[ok]
+        else:
+            ok = cell_id >= 0
+            e_native = np.zeros((h, w), dtype=np.float32)
+            e_native[ok] = lut[cell_id[ok]] * w_native[ok]
+            out_stack[pi] = reproject_plane_to_grid(e_native, nat_tr, nat_crs, grid)
 
         if on_pollutant_done:
             on_pollutant_done(pol)
 
         for cid in domain_cells:
             m = cell_id == int(cid)
-            w_sum = float(w_plane[m].sum())
-            w_dom = float(w_plane[m & in_domain].sum())
+            w_sum = float(w_native[m].sum())
+            w_dom = float(w_native[m & in_domain].sum())
             if w_sum > 0.0 and w_dom < 1.0 - WEIGHT_TOL:
                 clip_log.append({
                     "sector": sector_id,

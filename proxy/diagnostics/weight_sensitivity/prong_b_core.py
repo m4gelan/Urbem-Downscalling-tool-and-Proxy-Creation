@@ -42,6 +42,30 @@ def pick_pollutant_index(
     raise ValueError(f"unknown pollutant pick mode {mode!r}")
 
 
+def pick_reference_pollutant(
+    alpha_doc: dict[str, Any],
+    mode: str,
+    reference_pollutants: list[str],
+) -> str:
+    """Like pick_pollutant_index but auto_* modes only consider reference_pollutants."""
+    labels = alpha_doc.get("pollutant_labels") or reference_pollutants
+    mat = np.asarray(alpha_doc.get("alpha") or [], dtype=np.float64)
+    allowed = [i for i, l in enumerate(labels) if l in reference_pollutants]
+    if not allowed or mat.size == 0:
+        return reference_pollutants[0]
+    if mode in reference_pollutants:
+        return mode
+    if mode == "auto_entropy":
+        ix = max(allowed, key=lambda i: alpha_entropy(mat[i]))
+        return labels[ix]
+    if mode == "auto_dominant":
+        ix = max(allowed, key=lambda i: float(np.max(mat[i])))
+        return labels[ix]
+    if mode in labels and mode in reference_pollutants:
+        return mode
+    return labels[allowed[0]]
+
+
 def renormalize_alpha(alpha: np.ndarray) -> np.ndarray:
     a = np.asarray(alpha, dtype=np.float64).copy()
     s = a.sum()

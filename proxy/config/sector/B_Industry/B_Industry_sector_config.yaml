@@ -24,7 +24,7 @@ pollutants:
 cams_point_sources:
   year: 2019
   emission_category_indices: [2]
-  source_type_indices: [1]
+  source_type_indices: [2]
   max_match_distance_km: 10.0
 
 cams_area_sources:

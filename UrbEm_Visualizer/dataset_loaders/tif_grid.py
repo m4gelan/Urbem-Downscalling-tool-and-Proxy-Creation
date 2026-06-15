@@ -9,7 +9,8 @@ from rasterio.enums import Resampling
 from rasterio.warp import reproject
 
 from UrbEm_Visualizer.dataset_loaders.cams_emissions import cell_id_from_lonlat
-from UrbEm_Visualizer.downscaling.spatial import FineGrid
+from UrbEm_Visualizer.downscaling.spatial import FineGrid, NativeGridMeta
+from UrbEm_Visualizer.pollutants import band_index_for_pollutant
 
 
 def pixel_centre_axes(transform: rasterio.Affine, height: int, width: int) -> tuple[np.ndarray, np.ndarray]:
@@ -91,6 +92,48 @@ def read_weight_stack_native(path: Path) -> tuple[list[str], np.ndarray, rasteri
         stack[stack == float(nodata)] = 0.0
     np.nan_to_num(stack, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
     return names, stack, transform, crs
+
+
+def aggregate_plane_to_grid(
+    plane: np.ndarray,
+    nat_tr: rasterio.Affine,
+    nat_crs: str,
+    grid: FineGrid,
+) -> np.ndarray:
+    h, w = plane.shape
+    px, py = pixel_centre_axes(nat_tr, h, w)
+    yy, xx = np.meshgrid(py, px, indexing="ij")
+    if nat_crs != grid.crs:
+        tr = Transformer.from_crs(nat_crs, grid.crs, always_xy=True)
+        xx, yy = tr.transform(xx, yy)
+    cols = np.floor((xx - grid.transform.c) / grid.transform.a).astype(np.int64)
+    rows = np.floor((yy - grid.transform.f) / grid.transform.e).astype(np.int64)
+    agg = np.zeros((grid.height, grid.width), dtype=np.float64)
+    flat_w = plane.ravel().astype(np.float64)
+    flat_r = rows.ravel()
+    flat_c = cols.ravel()
+    valid = (flat_r >= 0) & (flat_r < grid.height) & (flat_c >= 0) & (flat_c < grid.width)
+    np.add.at(agg, (flat_r[valid], flat_c[valid]), flat_w[valid])
+    return agg.astype(np.float32)
+
+
+def weight_planes_on_grid(
+    area_path: Path,
+    grid: FineGrid,
+    output_resolution_m: int,
+    native_meta: NativeGridMeta,
+    pollutants: list[str],
+) -> dict[str, np.ndarray]:
+    labels, native_stack, nat_tr, nat_crs = read_weight_stack_native(area_path)
+    native_res = int(native_meta.res_x)
+    out: dict[str, np.ndarray] = {}
+    for pol in pollutants:
+        bi = band_index_for_pollutant(labels, pol)
+        if output_resolution_m > native_res:
+            out[pol] = aggregate_plane_to_grid(native_stack[bi], nat_tr, nat_crs, grid)
+        else:
+            out[pol] = reproject_plane_to_grid(native_stack[bi], nat_tr, nat_crs, grid)
+    return out
 
 
 def reproject_plane_to_grid(

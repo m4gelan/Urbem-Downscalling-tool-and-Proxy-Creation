@@ -42,6 +42,13 @@ sectors:
   K_Agriculture:
     area_weights:
       path: INPUT/Proxy_weights/K_Agriculture/K_Agriculture_Greece_area_weights_2019.tif
+  F_Roads:
+    area_weights:
+      categories:
+        F1: INPUT/Proxy_weights/F_Roads/F_Roads_Greece_F1_2019.tif
+        F2: INPUT/Proxy_weights/F_Roads/F_Roads_Greece_F2_2019.tif
+        F3: INPUT/Proxy_weights/F_Roads/F_Roads_Greece_F3_2019.tif
+        F4: INPUT/Proxy_weights/F_Roads/F_Roads_Greece_F4_2019.tif
 absent_sources:
 - sector: G_Shipping
   role: area_weights
@@ -55,10 +62,11 @@ pollutants:
 - PM2.5
 domain:
   crs: EPSG:3035
-  xmin: 5309686.880144976
-  ymin: 1979268.622275752
-  xmax: 5335490.361644405
-  ymax: 2013324.6353636384
+  xmin: 5304795.8
+  ymin: 1979094
+  xmax: 5339688.2
+  ymax: 2014285.1
 output:
   format: csv
   layer_mode: separate
+  grid_resolution_m: 100

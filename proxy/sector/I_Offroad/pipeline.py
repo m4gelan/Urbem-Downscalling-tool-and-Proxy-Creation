@@ -232,6 +232,42 @@ def build(
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
             country_tag = country_profile["full_name"].replace(" ", "_")
+            wr = weights_cfg.get("rail_transport") or {}
+            wp = weights_cfg.get("pipeline_transport") or {}
+            wm = weights_cfg.get("non_road_machinery") or {}
+            osg = osm_rasters_by_subgroup
+            mix_by_group = {
+                "rail_transport": {
+                    "mixer": "linear",
+                    "weight_keys": ["w_osm_diesel", "w_osm_electric", "w_osm_yard"],
+                    "weights": {k: float(wr[k]) for k in ("w_osm_diesel", "w_osm_electric", "w_osm_yard")},
+                    "terms": {
+                        "rail_diesel": np.asarray(osg["rail_transport"]["rail_diesel"], dtype=np.float32),
+                        "rail_electric": np.asarray(osg["rail_transport"]["rail_electric"], dtype=np.float32),
+                        "rail_yards": np.asarray(osg["rail_transport"]["rail_yards"], dtype=np.float32),
+                    },
+                },
+                "pipeline_transport": {
+                    "mixer": "linear",
+                    "weight_keys": ["w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon"],
+                    "weights": {k: float(wp[k]) for k in ("w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon")},
+                    "terms": {
+                        "oil_gas_facilities": np.asarray(osg["pipeline_transport"]["oil_gas_facilities"], dtype=np.float32),
+                        "pipeline_hydrocarbon": np.asarray(osg["pipeline_transport"]["pipeline_hydrocarbon"], dtype=np.float32),
+                    },
+                },
+                "non_road_machinery": {
+                    "mixer": "linear",
+                    "weight_keys": ["w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131"],
+                    "weights": {k: float(wm[k]) for k in ("w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131")},
+                    "terms": {
+                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
+                        "clc_123": np.asarray(corine_map_123, dtype=np.float32),
+                        "clc_124": np.asarray(corine_map_124, dtype=np.float32),
+                        "clc_131": np.asarray(corine_map_131, dtype=np.float32),
+                    },
+                },
+            }
             maybe_export_w_groups(
                 export_w_groups,
                 w_groups_export_root,
@@ -244,6 +280,7 @@ def build(
                 crs=cor_crs,
                 alpha_result=alpha_result,
                 cams_cells=cams_cells_mask,
+                mix_by_group=mix_by_group,
             )
 
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)

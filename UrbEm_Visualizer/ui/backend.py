@@ -346,18 +346,25 @@ def api_config_output():
     output = data.get("output")
     if not isinstance(output, dict):
         return jsonify({"error": "output object required"}), 400
-    for k in ("format", "layer_mode"):
+    for k in ("format", "layer_mode", "grid_resolution_m"):
         if k not in output:
             return jsonify({"error": f"output.{k} required"}), 400
     if output["format"] not in ("csv", "netcdf4"):
         return jsonify({"error": "output.format must be csv or netcdf4"}), 400
     if output["layer_mode"] not in ("separate", "merged"):
         return jsonify({"error": "output.layer_mode must be separate or merged"}), 400
+    try:
+        grid_res = int(output["grid_resolution_m"])
+    except (TypeError, ValueError):
+        return jsonify({"error": "output.grid_resolution_m must be an integer"}), 400
+    if grid_res not in (100, 1000):
+        return jsonify({"error": "output.grid_resolution_m must be 100 or 1000"}), 400
     if _SESSION.get("config") is None:
         return jsonify({"error": "no active configuration"}), 400
     _SESSION["config"]["output"] = {
         "format": output["format"],
         "layer_mode": output["layer_mode"],
+        "grid_resolution_m": grid_res,
     }
     return _config_response()
 
@@ -399,6 +406,8 @@ def api_downscale_start():
         for key in ("domain", "pollutants", "output", "sectors", "paths"):
             if key not in cfg:
                 return jsonify({"error": f"run config missing {key!r}"}), 400
+        if "grid_resolution_m" not in cfg["output"]:
+            return jsonify({"error": "run config missing output.grid_resolution_m"}), 400
         from UrbEm_Visualizer.downscaling.job import start_downscale_job
 
         job_id = start_downscale_job(path.resolve())

@@ -10,7 +10,7 @@ from UrbEm_Visualizer.dataset_loaders.cams_emissions import load_cams_area_cells
 from UrbEm_Visualizer.downscaling.area import downscale_area
 from UrbEm_Visualizer.downscaling.merge import merge_grids
 from UrbEm_Visualizer.downscaling.sector_meta import load_sector_yaml, roads_category_names
-from UrbEm_Visualizer.downscaling.spatial import FineGrid
+from UrbEm_Visualizer.downscaling.spatial import FineGrid, NativeGridMeta
 
 
 def roads_proxy_paths(
@@ -37,6 +37,8 @@ def downscale_roads_sector(
     domain: dict,
     pollutants: list[str],
     cams_nc: Path,
+    output_resolution_m: int,
+    native_meta: NativeGridMeta,
     on_progress: Callable[[str, float], None] | None = None,
 ) -> tuple[xr.DataArray, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     sec_yaml = load_sector_yaml("F_Roads")
@@ -81,6 +83,8 @@ def downscale_roads_sector(
             pollutants=pollutants,
             cams_cells=cams_cells,
             cams_grid=cams_grid,
+            output_resolution_m=output_resolution_m,
+            native_meta=native_meta,
         )
         weight_log["categories"][cat] = wlog
         if fails:

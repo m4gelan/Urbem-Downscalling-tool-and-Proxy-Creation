@@ -11,7 +11,7 @@ from pyproj import Transformer
 
 from UrbEm_Visualizer.dataset_loaders.cams_alias import country_iso3
 from UrbEm_Visualizer.dataset_loaders.cams_emissions import load_cams_points
-from UrbEm_Visualizer.dataset_loaders.tif_grid import deposit_point, load_multiband_to_grid, lonlat_to_rowcol
+from UrbEm_Visualizer.dataset_loaders.tif_grid import deposit_point, lonlat_to_rowcol, weight_planes_on_grid
 from UrbEm_Visualizer.downscaling.point_meta import (
     flatten_meta_to_row,
     load_match_sidecar,
@@ -19,9 +19,8 @@ from UrbEm_Visualizer.downscaling.point_meta import (
     sidecar_has_emissions,
 )
 from UrbEm_Visualizer.downscaling.sector_meta import load_sector_yaml, sector_mode
-from UrbEm_Visualizer.downscaling.spatial import FineGrid
-from UrbEm_Visualizer.pollutants import band_index_for_pollutant
-
+from UrbEm_Visualizer.downscaling.spatial import FineGrid, NativeGridMeta
+from UrbEm_Visualizer.pollutants import pollutant_key
 
 def domain_wgs84(domain: dict) -> tuple[float, float, float, float]:
     tr = Transformer.from_crs(str(domain["crs"]), "EPSG:4326", always_xy=True)
@@ -119,6 +118,17 @@ def _split_by_domain(
         not_appointed.append({**base, "match_status": "matched_not_appointed"})
 
 
+def _sidecar_pollutant_mass(pols: dict, pollutant: str) -> float:
+    want = pollutant_key(pollutant)
+    for key, val in pols.items():
+        try:
+            if pollutant_key(str(key)) == want:
+                return float(val or 0)
+        except ValueError:
+            continue
+    return 0.0
+
+
 def _records_from_sidecar(
     sidecar: dict[str, dict[str, Any]],
     domain: dict,
@@ -134,7 +144,7 @@ def _records_from_sidecar(
             "cams_point_id": int(pid_str),
             "cams_lon": float(rec["cams_lon"]),
             "cams_lat": float(rec["cams_lat"]),
-            **{f"emis_{pol}": float(pols.get(pol, 0) or 0) for pol in pollutants},
+            **{f"emis_{pol}": _sidecar_pollutant_mass(pols, pol) for pol in pollutants},
         }
         fac = None
         if rec.get("matched") == "yes":
@@ -288,6 +298,8 @@ def run_point_sector(
     layer_mode: str,
     cell_id: np.ndarray,
     area_weight_path: Path | None,
+    output_resolution_m: int,
+    native_meta: NativeGridMeta,
     on_progress: Callable[[str, float], None] | None = None,
 ) -> tuple[xr.DataArray, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     sidecar = load_match_sidecar(link_path)
@@ -322,11 +334,9 @@ def run_point_sector(
 
     weight_planes = None
     if area_weight_path and area_weight_path.is_file():
-        names, wstack = load_multiband_to_grid(area_weight_path, grid)
-        weight_planes = {}
-        for pol in pollutants:
-            bi = band_index_for_pollutant(names, pol)
-            weight_planes[pol] = wstack[bi]
+        weight_planes = weight_planes_on_grid(
+            area_weight_path, grid, output_resolution_m, native_meta, pollutants,
+        )
     if on_progress:
         on_progress("Allocating to grid", 0.7)
     ponly = sector_mode(sector_id) == "point_only"

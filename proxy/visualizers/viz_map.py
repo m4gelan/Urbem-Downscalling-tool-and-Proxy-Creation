@@ -14,6 +14,25 @@ def _jitter_latlon(uid: str, lat: float, lon: float, meters: float = 180.0) -> t
     return lat + deg * math.sin(rad), lon + deg * math.cos(rad)
 
 
+def _in_bbox_wgs84(lon: float, lat: float, bbox: tuple[float, float, float, float]) -> bool:
+    w, s, e, n = bbox
+    return w <= lon <= e and s <= lat <= n
+
+
+def _facility_info_for_line(m: dict[str, Any]) -> dict[str, Any] | None:
+    for key in (
+        "corine_facility_info",
+        "uwwtd_facility_info",
+        "eprtr_point_info",
+        "jrc_point_info",
+        "osm_facility_info",
+    ):
+        info = m.get(key)
+        if isinstance(info, dict) and info.get("lon") is not None and info.get("lat") is not None:
+            return info
+    return None
+
+
 def write_point_match_map(
     matches: dict[int, dict[str, Any]],
     jrc_points: dict[str, dict[str, Any]],
@@ -24,6 +43,7 @@ def write_point_match_map(
     osm_polygons_gdf: gpd.GeoDataFrame | None = None,
     corine_facility_points: dict[str, dict[str, Any]] | None = None,
     uwwtd_facility_points: dict[str, dict[str, Any]] | None = None,
+    bbox_wgs84: tuple[float, float, float, float] | None = None,
 ) -> Path:
     """
     Interactive map: CAMS (green/red), optional JRC (blue/purple), EPRTR (cyan/orange),
@@ -53,32 +73,37 @@ def write_point_match_map(
 
     for pid, m in matches.items():
         dist = float(m["scoring_value"]) if m.get("scoring_value") is not None else float("nan")
+        matched_yes = m.get("matched") == "yes"
         jid = m.get("jrc_point_id")
         if jid:
             jid = str(jid)
-            assigned_jrc.add(jid)
             jrc_to_cams.setdefault(jid, []).append((int(pid), str(m.get("matched", "")), dist))
+            if matched_yes:
+                assigned_jrc.add(jid)
         eid = m.get("eprtr_point_id")
         if eid:
             eid = str(eid)
-            assigned_eprtr.add(eid)
             eprtr_to_cams.setdefault(eid, []).append((int(pid), str(m.get("matched", "")), dist))
+            if matched_yes:
+                assigned_eprtr.add(eid)
         oid = m.get("osm_facility_id")
         if oid:
             oid = str(oid)
-            assigned_osm.add(oid)
             osm_to_cams.setdefault(oid, []).append((int(pid), str(m.get("matched", "")), dist))
+            if matched_yes:
+                assigned_osm.add(oid)
         cid = m.get("corine_facility_id")
         if cid:
             cid = str(cid)
             corine_to_cams.setdefault(cid, []).append((int(pid), str(m.get("matched", "")), dist))
-            if m.get("matched") == "yes" and m.get("match_source") == "corine":
+            if matched_yes and m.get("match_source") == "corine":
                 assigned_corine.add(cid)
         wid = m.get("uwwtd_facility_id")
         if wid:
             wid = str(wid)
-            assigned_uwwtd.add(wid)
             uwwtd_to_cams.setdefault(wid, []).append((int(pid), str(m.get("matched", "")), dist))
+            if matched_yes:
+                assigned_uwwtd.add(wid)
 
     lats: list[float] = []
     lons: list[float] = []
@@ -109,8 +134,16 @@ def write_point_match_map(
     if not lats:
         raise ValueError("No coordinates to plot")
 
-    center = (sum(lats) / len(lats), sum(lons) / len(lons))
-    fmap = folium.Map(location=center, zoom_start=7, tiles="OpenStreetMap", control_scale=True)
+    if bbox_wgs84 is not None:
+        w, s, e, n = bbox_wgs84
+        center = ((s + n) / 2.0, (w + e) / 2.0)
+        zoom = 10
+    else:
+        center = (sum(lats) / len(lats), sum(lons) / len(lons))
+        zoom = 7
+    fmap = folium.Map(location=center, zoom_start=zoom, tiles="OpenStreetMap", control_scale=True)
+    if bbox_wgs84 is not None:
+        fmap.fit_bounds([[s, w], [n, e]])
 
     if osm_polygons_gdf is not None and not osm_polygons_gdf.empty:
         g_osm = osm_polygons_gdf.to_crs("EPSG:4326")
@@ -125,7 +158,24 @@ def write_point_match_map(
             },
         ).add_to(fmap)
 
+    def _show_cams(m: dict[str, Any]) -> bool:
+        if bbox_wgs84 is None:
+            return True
+        c = m["cams"]
+        clon, clat = float(c["longitude"]), float(c["latitude"])
+        if _in_bbox_wgs84(clon, clat, bbox_wgs84):
+            return True
+        info = _facility_info_for_line(m)
+        if info is not None:
+            return _in_bbox_wgs84(float(info["lon"]), float(info["lat"]), bbox_wgs84)
+        return False
+
+    def _show_facility(lon: float, lat: float) -> bool:
+        return bbox_wgs84 is None or _in_bbox_wgs84(lon, lat, bbox_wgs84)
+
     for pid, m in matches.items():
+        if not _show_cams(m):
+            continue
         c = m["cams"]
         ok = m.get("matched") == "yes"
         color = "green" if ok else "red"
@@ -203,8 +253,20 @@ def write_point_match_map(
                 weight=2,
                 opacity=0.75,
             ).add_to(fmap)
+        elif not ok:
+            nearest = _facility_info_for_line(m)
+            if nearest is not None:
+                folium.PolyLine(
+                    locations=[[c["latitude"], c["longitude"]], [float(nearest["lat"]), float(nearest["lon"])]],
+                    color="#e65100",
+                    weight=2,
+                    opacity=0.65,
+                    dash_array="6, 8",
+                ).add_to(fmap)
 
     for jid, j in jrc_points.items():
+        if not _show_facility(float(j["lon"]), float(j["lat"])):
+            continue
         linked = jid in assigned_jrc
         lat, lon = _jitter_latlon(jid, float(j["lat"]), float(j["lon"]))
         links = jrc_to_cams.get(jid, [])
@@ -219,13 +281,15 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>JRC {j.get('name_g', j.get('facility_name', ''))}</b><br>id: {jid}<br>"
-                f"nearest CAMS: {'yes' if linked else 'no'}"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
                 + (f"<br><br>{link_lines}" if link_lines else ""),
                 max_width=320,
             ),
         ).add_to(fmap)
 
     for eid, e in eprtr_points.items():
+        if not _show_facility(float(e["lon"]), float(e["lat"])):
+            continue
         linked = eid in assigned_eprtr
         lat, lon = _jitter_latlon(eid, float(e["lat"]), float(e["lon"]))
         links = eprtr_to_cams.get(eid, [])
@@ -240,13 +304,15 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>EPRTR {e.get('facility_name', '')}</b><br>id: {eid}<br>"
-                f"nearest CAMS: {'yes' if linked else 'no'}"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
                 + (f"<br><br>{link_lines}" if link_lines else ""),
                 max_width=320,
             ),
         ).add_to(fmap)
 
     for oid, o in osm_facility_points.items():
+        if not _show_facility(float(o["lon"]), float(o["lat"])):
+            continue
         linked = oid in assigned_osm
         lat, lon = _jitter_latlon(oid, float(o["lat"]), float(o["lon"]))
         links = osm_to_cams.get(oid, [])
@@ -264,13 +330,15 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>OSM {title}</b><br>id: {oid}<br>"
-                f"nearest CAMS: {'yes' if linked else 'no'}"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
                 + (f"<br><br>{link_lines}" if link_lines else ""),
                 max_width=320,
             ),
         ).add_to(fmap)
 
     for uid, w in uwwtd_facility_points.items():
+        if not _show_facility(float(w["lon"]), float(w["lat"])):
+            continue
         linked = uid in assigned_uwwtd
         lat, lon = _jitter_latlon(uid, float(w["lat"]), float(w["lon"]))
         links = uwwtd_to_cams.get(uid, [])
@@ -285,13 +353,15 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>UWWTD {w.get('facility_name', '')}</b><br>id: {uid}<br>"
-                f"nearest CAMS: {'yes' if linked else 'no'}"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
                 + (f"<br><br>{link_lines}" if link_lines else ""),
                 max_width=320,
             ),
         ).add_to(fmap)
 
     for cid, cf in corine_facility_points.items():
+        if not _show_facility(float(cf["lon"]), float(cf["lat"])):
+            continue
         linked = cid in assigned_corine
         lat, lon = _jitter_latlon(cid, float(cf["lat"]), float(cf["lon"]))
         links = corine_to_cams.get(cid, [])
@@ -307,7 +377,7 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>CORINE L{l3}</b><br>id: {cid}<br>"
-                f"nearest CAMS: {'yes' if linked else 'no'}"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
                 + (f"<br><br>{link_lines}" if link_lines else ""),
                 max_width=320,
             ),
@@ -316,27 +386,28 @@ def write_point_match_map(
     legend_rows = [
         "<b>CAMS</b> <span style='color:green'>&#9679;</span> matched "
         "<span style='color:red'>&#9679;</span> not matched",
-        "<b>JRC</b> <span style='color:blue'>&#9679;</span> nearest CAMS "
-        "<span style='color:purple'>&#9679;</span> no assignment",
-        "<b>EPRTR</b> <span style='color:cyan'>&#9679;</span> nearest CAMS "
-        "<span style='color:darkorange'>&#9679;</span> no assignment",
+        "<span style='color:#e65100'>- -</span> dashed = unmatched CAMS → nearest facility",
+        "<b>JRC</b> <span style='color:blue'>&#9679;</span> matched "
+        "<span style='color:purple'>&#9679;</span> unmatched pool",
+        "<b>EPRTR</b> <span style='color:cyan'>&#9679;</span> matched "
+        "<span style='color:darkorange'>&#9679;</span> unmatched pool",
     ]
     if uwwtd_facility_points:
         legend_rows.append(
-            "<b>UWWTD</b> <span style='color:#00695c'>&#9679;</span> nearest CAMS "
-            "<span style='color:#b2dfdb'>&#9679;</span> no assignment"
+            "<b>UWWTD</b> <span style='color:#00695c'>&#9679;</span> matched "
+            "<span style='color:#b2dfdb'>&#9679;</span> unmatched pool"
         )
     if osm_facility_points:
         legend_rows.append(
-            "<b>OSM aerodrome</b> <span style='color:#283593'>&#9679;</span> nearest CAMS "
-            "<span style='color:#b39ddb'>&#9679;</span> pool only"
+            "<b>OSM aerodrome</b> <span style='color:#283593'>&#9679;</span> matched "
+            "<span style='color:#b39ddb'>&#9679;</span> unmatched pool"
         )
     if osm_polygons_gdf is not None and not osm_polygons_gdf.empty:
         legend_rows.append("<b>OSM polygons</b> light blue fill = all GPKG polygon rows in map extent")
     if corine_facility_points:
         legend_rows.append(
             "<b>CORINE airport</b> <span style='color:#5d4037'>&#9679;</span> matched "
-            "<span style='color:#d7ccc8'>&#9679;</span> pool only"
+            "<span style='color:#d7ccc8'>&#9679;</span> unmatched pool"
         )
     legend_html = (
         "<div style='position: fixed; bottom: 24px; left: 12px; z-index: 9999; "
@@ -362,6 +433,7 @@ def write_cams_jrc_match_map(
     osm_polygons_gdf: gpd.GeoDataFrame | None = None,
     corine_facility_points: dict[str, dict[str, Any]] | None = None,
     uwwtd_facility_points: dict[str, dict[str, Any]] | None = None,
+    bbox_wgs84: tuple[float, float, float, float] | None = None,
 ) -> Path:
     return write_point_match_map(
         matches,
@@ -372,4 +444,5 @@ def write_cams_jrc_match_map(
         osm_polygons_gdf=osm_polygons_gdf,
         corine_facility_points=corine_facility_points,
         uwwtd_facility_points=uwwtd_facility_points,
+        bbox_wgs84=bbox_wgs84,
     )

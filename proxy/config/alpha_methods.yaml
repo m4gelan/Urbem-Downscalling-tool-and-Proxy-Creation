@@ -250,14 +250,15 @@ sectors:
         - "5C1biii" # Clinical Waste Incineration
         - "5C1biv"  # Sewage Sludge Incineration
         - "5C1bv"   # Cremation
-        - "5C1bvi"  # (No mapping provided; keep for completeness)
+        - "5C1bvi"  # Other waste incineration
+        - "5E"  # Other Waste
       wastewater:
         - "5D1"   # Domestic waste-water handling
         - "5D2"   # Industrial waste-water handling
         - "5D3"   # (No mapping provided; keep for completeness)
       residual:
         - "5C2" # Open Burning of Waste
-        - "5E"  # Other Waste  
+          
   
 
     defaults:

@@ -7,6 +7,16 @@ import numpy as np
 from proxy.core import log
 
 
+def _cell_aggregate_setup(
+    cell_id: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    flat = cell_id.ravel()
+    valid = flat >= 0
+    global_fid = flat[valid].astype(np.int64)
+    unique, dense = np.unique(global_fid, return_inverse=True)
+    return valid, dense.astype(np.int64), unique, len(unique)
+
+
 def _flat_valid(cell_id: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
     flat = cell_id.ravel()
     valid = flat >= 0
@@ -18,38 +28,18 @@ def _flat_valid(cell_id: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
 def _group_mass_and_norm_sq(
     W_by_group: dict[str, np.ndarray],
     valid: np.ndarray,
-    fid: np.ndarray,
-    nb: int,
+    dense_fid: np.ndarray,
+    ndense: int,
 ) -> tuple[list[str], np.ndarray, np.ndarray]:
     names = list(W_by_group.keys())
     g = len(names)
-    mass = np.zeros((g, nb), dtype=np.float64)
-    norm_sq = np.zeros((g, nb), dtype=np.float64)
+    mass = np.zeros((g, ndense), dtype=np.float64)
+    norm_sq = np.zeros((g, ndense), dtype=np.float64)
     for i, plane in enumerate(W_by_group.values()):
         w = plane.ravel()[valid].astype(np.float64)
-        mass[i] = np.bincount(fid, weights=w, minlength=nb)
-        norm_sq[i] = np.bincount(fid, weights=w * w, minlength=nb)
+        mass[i] = np.bincount(dense_fid, weights=w, minlength=ndense)
+        norm_sq[i] = np.bincount(dense_fid, weights=w * w, minlength=ndense)
     return names, mass, norm_sq
-
-
-def _pairwise_dot_matrices(
-    W_by_group: dict[str, np.ndarray],
-    valid: np.ndarray,
-    fid: np.ndarray,
-    nb: int,
-) -> list[np.ndarray]:
-    planes = [p.ravel()[valid].astype(np.float64) for p in W_by_group.values()]
-    g = len(planes)
-    dots: list[np.ndarray] = []
-    for i in range(g):
-        row: list[np.ndarray] = []
-        for j in range(g):
-            if i == j:
-                row.append(norm_sq_row := np.bincount(fid, weights=planes[i] * planes[i], minlength=nb))
-            else:
-                row.append(np.bincount(fid, weights=planes[i] * planes[j], minlength=nb))
-        dots.append(row)
-    return dots
 
 
 def tv_per_cell_all(
@@ -57,12 +47,15 @@ def tv_per_cell_all(
     Wp: np.ndarray,
     cell_id: np.ndarray,
 ) -> np.ndarray:
-    """``TV(c) = 0.5 * sum |W'-W|`` per cell index; index = CAMS cell id."""
-    valid, fid, nb = _flat_valid(cell_id)
+    """``TV(c) = 0.5 * sum |W'-W|`` per cell; returned array indexed by global CAMS cell id."""
+    valid, dense, unique, ndense = _cell_aggregate_setup(cell_id)
     d = np.abs(
         Wp.ravel()[valid].astype(np.float64) - W.ravel()[valid].astype(np.float64)
     )
-    return 0.5 * np.bincount(fid, weights=d, minlength=nb)
+    tv_dense = 0.5 * np.bincount(dense, weights=d, minlength=ndense)
+    out = np.zeros(int(unique.max()) + 1, dtype=np.float64)
+    out[unique] = tv_dense
+    return out
 
 
 def compute_prong_a(
@@ -73,29 +66,31 @@ def compute_prong_a(
     active_eps: float,
     similarity_threshold: float,
 ) -> dict[str, Any]:
+    valid, dense, unique, ndense = _cell_aggregate_setup(cell_id)
+    g2d = {int(g): i for i, g in enumerate(unique)}
+
     cids = [c for c in nox_by_cell if nox_by_cell[c] > 0]
     if not cids:
-        valid, fid, nb = _flat_valid(cell_id)
-        _, mass, _ = _group_mass_and_norm_sq(W_by_group, valid, fid, nb)
+        _, mass, _ = _group_mass_and_norm_sq(W_by_group, valid, dense, ndense)
         cell_tot = mass.sum(axis=0)
-        cids = [i for i in range(nb) if cell_tot[i] > active_eps]
+        cids = [int(unique[i]) for i in range(ndense) if cell_tot[i] > active_eps]
         nox_by_cell = {c: 1.0 for c in cids}
         log.warning(
-            "no positive NOx in bundle; using equal unit mass over cells with group footprint"
+            "no positive CAMS mass in bundle; using equal unit mass over cells with group footprint"
         )
     if not cids:
         raise ValueError("no CAMS cells with positive mass or footprint")
 
-    valid, fid, nb = _flat_valid(cell_id)
-    names, mass, norm_sq = _group_mass_and_norm_sq(W_by_group, valid, fid, nb)
+    names, mass, norm_sq = _group_mass_and_norm_sq(W_by_group, valid, dense, ndense)
     g = len(names)
 
-    # Upper-triangle pairwise dot products (one pass per pair)
     pair_dots: dict[tuple[int, int], np.ndarray] = {}
     planes = [W_by_group[n].ravel()[valid].astype(np.float64) for n in names]
     for i in range(g):
         for j in range(i + 1, g):
-            pair_dots[(i, j)] = np.bincount(fid, weights=planes[i] * planes[j], minlength=nb)
+            pair_dots[(i, j)] = np.bincount(
+                dense, weights=planes[i] * planes[j], minlength=ndense
+            )
 
     total_nox = float(sum(nox_by_cell[c] for c in cids))
     a1_bins: dict[int, float] = {}
@@ -104,10 +99,11 @@ def compute_prong_a(
     sensitive_cell_ids: list[int] = []
 
     for cid in cids:
-        if cid >= nb:
+        di = g2d.get(int(cid))
+        if di is None:
             continue
         m_c = nox_by_cell[cid]
-        active_ix = [i for i in range(g) if mass[i, cid] > active_eps]
+        active_ix = [i for i in range(g) if mass[i, di] > active_eps]
         n_act = len(active_ix)
         a1_bins[n_act] = a1_bins.get(n_act, 0.0) + m_c
 
@@ -119,11 +115,11 @@ def compute_prong_a(
             for b in range(a + 1, len(active_ix)):
                 i, j = active_ix[a], active_ix[b]
                 key = (i, j) if i < j else (j, i)
-                ng = float(np.sqrt(norm_sq[i, cid]))
-                nh = float(np.sqrt(norm_sq[j, cid]))
+                ng = float(np.sqrt(norm_sq[i, di]))
+                nh = float(np.sqrt(norm_sq[j, di]))
                 if ng <= 0 or nh <= 0:
                     continue
-                sims.append(float(pair_dots[key][cid]) / (ng * nh))
+                sims.append(float(pair_dots[key][di]) / (ng * nh))
 
         if not sims:
             continue

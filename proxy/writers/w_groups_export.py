@@ -11,6 +11,7 @@ import yaml
 
 from proxy.alpha.Compute_alpha_matrix import AlphaMatrixResult
 from proxy.core import log
+from proxy.diagnostics.weight_sensitivity.pollutants_config import REFERENCE_POLLUTANTS
 
 
 def w_groups_bundle_dir(export_root: Path, sector_key: str, country_tag: str, year: int) -> Path:
@@ -36,8 +37,8 @@ def _cell_id_meta(h: int, w: int, transform: Any, crs: Any) -> dict[str, Any]:
     }
 
 
-def _nox_by_cell(cams_cells: dict[int, dict[str, Any]], reference_pollutant: str) -> dict[str, float]:
-    ref = reference_pollutant.strip()
+def _mass_by_cell(cams_cells: dict[int, dict[str, Any]], pollutant: str) -> dict[str, float]:
+    ref = pollutant.strip()
     out: dict[str, float] = {}
     for cid, row in cams_cells.items():
         pols = row.get("pollutants_within_cell") or {}
@@ -48,10 +49,16 @@ def _nox_by_cell(cams_cells: dict[int, dict[str, Any]], reference_pollutant: str
                     v = val
                     break
         if v is None or float(v) <= 0.0:
-            vals = [float(x) for x in pols.values() if float(x) > 0.0]
-            v = float(sum(vals)) if vals else 0.0
+            v = 0.0
         out[str(int(cid))] = float(v)
     return out
+
+
+def _mass_by_pollutant(
+    cams_cells: dict[int, dict[str, Any]],
+    pollutants: list[str],
+) -> dict[str, dict[str, float]]:
+    return {p: _mass_by_cell(cams_cells, p) for p in pollutants}
 
 
 def _write_float_raster(path: Path, plane: np.ndarray, transform: Any, crs: Any) -> None:
@@ -90,14 +97,15 @@ def _write_mix_terms(
             fname = f"mix__{_safe_group_filename(gname)}__{_safe_group_filename(str(tkey))}.tif"
             _write_float_raster(bundle_dir / fname, plane, transform, crs)
             term_entries.append({"key": str(tkey), "file": fname})
-        entries.append(
-            {
-                "name": str(gname),
-                "mixer": mixer,
-                "weights": weights,
-                "terms": term_entries,
-            }
-        )
+        ent: dict[str, Any] = {
+            "name": str(gname),
+            "mixer": mixer,
+            "weights": weights,
+            "terms": term_entries,
+        }
+        if "weight_keys" in spec:
+            ent["weight_keys"] = [str(k) for k in spec["weight_keys"]]
+        entries.append(ent)
     return entries
 
 
@@ -113,9 +121,10 @@ def write_w_groups_bundle(
     crs: Any,
     alpha_result: AlphaMatrixResult | None,
     cams_cells: dict[int, dict[str, Any]],
-    reference_pollutant: str = "NOx",
+    reference_pollutants: list[str] | None = None,
     mix_by_group: dict[str, dict[str, Any]] | None = None,
 ) -> Path:
+    pollutants = list(reference_pollutants or REFERENCE_POLLUTANTS)
     if not W_by_group:
         raise ValueError("W_by_group must be non-empty")
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -158,23 +167,25 @@ def write_w_groups_bundle(
             "alpha": np.asarray(alpha_result.alpha, dtype=np.float64).tolist(),
         }
 
+    mass_doc = _mass_by_pollutant(cams_cells, pollutants)
+    mass_path = bundle_dir / "cams_mass_by_pollutant.json"
+    mass_path.write_text(json.dumps(mass_doc, indent=2), encoding="utf-8")
+    legacy_pol = "NOx" if "NOx" in pollutants else pollutants[0]
     nox_path = bundle_dir / "cams_nox_by_cell.json"
-    nox_path.write_text(
-        json.dumps(_nox_by_cell(cams_cells, reference_pollutant), indent=2),
-        encoding="utf-8",
-    )
+    nox_path.write_text(json.dumps(mass_doc.get(legacy_pol, {}), indent=2), encoding="utf-8")
     (bundle_dir / "alpha_matrix.json").write_text(json.dumps(alpha_doc, indent=2), encoding="utf-8")
 
     manifest: dict[str, Any] = {
         "sector_key": sector_key,
         "country_tag": country_tag,
         "year": int(year),
-        "reference_pollutant": reference_pollutant,
+        "reference_pollutants": pollutants,
         "height": h,
         "width": w,
         "groups": group_entries,
         "cell_id_file": "cell_id.tif",
         "alpha_matrix_file": "alpha_matrix.json",
+        "cams_mass_file": "cams_mass_by_pollutant.json",
         "cams_nox_file": "cams_nox_by_cell.json",
     }
     if mix_by_group:
@@ -200,7 +211,7 @@ def maybe_export_w_groups(
     crs: Any,
     alpha_result: AlphaMatrixResult | None,
     cams_cells: dict[int, dict[str, Any]],
-    reference_pollutant: str = "NOx",
+    reference_pollutants: list[str] | None = None,
     mix_by_group: dict[str, dict[str, Any]] | None = None,
 ) -> Path | None:
     if not enabled:
@@ -219,6 +230,6 @@ def maybe_export_w_groups(
         crs=crs,
         alpha_result=alpha_result,
         cams_cells=cams_cells,
-        reference_pollutant=reference_pollutant,
+        reference_pollutants=reference_pollutants,
         mix_by_group=mix_by_group,
     )

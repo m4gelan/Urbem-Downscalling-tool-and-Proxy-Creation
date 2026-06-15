@@ -8,6 +8,7 @@ import yaml
 from proxy.core import log
 from proxy.core.alias import resolve_country_profile
 from proxy.diagnostics.weight_sensitivity.load_exports import MULTI_GROUP_SECTORS
+from proxy.diagnostics.weight_sensitivity.pollutants_config import reference_pollutants_from_cfg
 from proxy.diagnostics.weight_sensitivity.prong_a import run_all_prong_a
 from proxy.diagnostics.weight_sensitivity.prong_a_w import run_all_prong_a_w
 
@@ -38,6 +39,8 @@ def run_prong_a(
     else:
         keys = tuple(sector_keys)
     tag = _country_tag(country)
+    cfg = load_prong_a_settings(root)
+    pollutants = reference_pollutants_from_cfg(cfg)
     return run_all_prong_a(
         exp,
         tag,
@@ -45,6 +48,7 @@ def run_prong_a(
         keys,
         active_eps=active_eps,
         similarity_threshold=similarity_threshold,
+        reference_pollutants=pollutants,
     )
 
 
@@ -70,6 +74,8 @@ def run_prong_a_w(
     else:
         keys = tuple(sector_keys)
     tag = _country_tag(country)
+    cfg = load_prong_a_w_settings(root)
+    pollutants = reference_pollutants_from_cfg(cfg)
     return run_all_prong_a_w(
         exp,
         tag,
@@ -77,6 +83,7 @@ def run_prong_a_w(
         keys,
         active_eps=active_eps,
         similarity_threshold=similarity_threshold,
+        reference_pollutants=pollutants,
     )
 
 
@@ -113,7 +120,7 @@ def load_prong_a_settings(repo_root: Path) -> dict[str, Any]:
     path = repo_root / "proxy" / "config" / "weight_sensitivity_prong_a.yaml"
     if not path.is_file():
         return {
-            "reference_pollutant": "NOx",
+            "reference_pollutants": ["PM10", "NOx", "SOx", "NMVOC"],
             "similarity_threshold": 0.7,
             "active_eps": 1e-9,
             "year": 2019,

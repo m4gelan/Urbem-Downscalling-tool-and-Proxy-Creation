@@ -1,4 +1,9 @@
-reference_pollutant: NOx
+reference_pollutants:
+  - PM10
+  - NOx
+  - SOx
+  - NMVOC
+report_pollutant: NMVOC
 similarity_threshold: 0.7
 active_eps: 1.0e-9
 perturb_pct:
@@ -8,15 +13,23 @@ dirichlet_draws: 300
 dirichlet_concentration: 25.0
 
 representative_sectors:
-  low:
+  public_power:
     sector_key: A_PublicPower
     primary_pollutant: auto_entropy
     contrast_pollutant: null
-  high:
+  industry:
     sector_key: B_Industry
     primary_pollutant: auto_entropy
     contrast_pollutant: auto_dominant
-  mid:
+  waste:
     sector_key: J_Waste
+    primary_pollutant: auto_entropy
+    contrast_pollutant: auto_dominant
+  fugitive:
+    sector_key: D_Fugitive
+    primary_pollutant: auto_entropy
+    contrast_pollutant: auto_dominant
+  offroad:
+    sector_key: I_Offroad
     primary_pollutant: auto_entropy
     contrast_pollutant: auto_dominant

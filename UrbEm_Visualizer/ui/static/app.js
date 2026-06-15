@@ -181,6 +181,12 @@ function showMenuB(config, tableRows) {
   if (config.output) {
     document.querySelector('input[name="out-format"][value="' + config.output.format + '"]').checked = true;
     document.querySelector('input[name="layer-mode"][value="' + config.output.layer_mode + '"]').checked = true;
+    if (config.output.grid_resolution_m != null) {
+      const gridEl = document.querySelector(
+        'input[name="grid-resolution"][value="' + config.output.grid_resolution_m + '"]'
+      );
+      if (gridEl) gridEl.checked = true;
+    }
   }
 }
 
@@ -960,10 +966,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const format = document.querySelector('input[name="out-format"]:checked').value;
     const layerMode = document.querySelector('input[name="layer-mode"]:checked').value;
+    const gridResolutionM = parseInt(document.querySelector('input[name="grid-resolution"]:checked').value, 10);
     await fetch(API + "/api/config/output", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ output: { format, layer_mode: layerMode } }),
+      body: JSON.stringify({ output: { format, layer_mode: layerMode, grid_resolution_m: gridResolutionM } }),
     });
     const pollutants = collectSelectedPollutants("pollutants-checkboxes");
     if (pollutants.length) {

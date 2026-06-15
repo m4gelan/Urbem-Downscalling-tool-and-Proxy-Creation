@@ -63,3 +63,4 @@ domain:
 output:
   format: csv
   layer_mode: separate
+  grid_resolution_m: 100

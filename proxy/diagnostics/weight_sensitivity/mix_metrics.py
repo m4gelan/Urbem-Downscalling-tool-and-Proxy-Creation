@@ -5,7 +5,36 @@ from typing import Any
 import numpy as np
 
 from proxy.core import log
-from proxy.diagnostics.weight_sensitivity.cell_metrics import _flat_valid
+from proxy.diagnostics.weight_sensitivity.cell_metrics import _cell_aggregate_setup
+
+MixPrecompute = tuple[np.ndarray, dict[int, int], list[tuple[str, list[str], np.ndarray, np.ndarray, dict[tuple[int, int], np.ndarray]]]]
+
+
+def precompute_mix_group_specs(
+    mix_by_group: dict[str, dict[str, Any]],
+    cell_id: np.ndarray,
+) -> MixPrecompute:
+    valid, dense, unique, ndense = _cell_aggregate_setup(cell_id)
+    g2d = {int(g): i for i, g in enumerate(unique)}
+    group_specs: list[
+        tuple[str, list[str], np.ndarray, np.ndarray, dict[tuple[int, int], np.ndarray]]
+    ] = []
+    for gname, spec in mix_by_group.items():
+        terms = spec["terms"]
+        names = list(terms.keys())
+        planes = [terms[k].ravel()[valid].astype(np.float64) for k in names]
+        g = len(names)
+        mass = np.zeros((g, ndense), dtype=np.float64)
+        norm_sq = np.zeros((g, ndense), dtype=np.float64)
+        pair_dots: dict[tuple[int, int], np.ndarray] = {}
+        for i in range(g):
+            mass[i] = np.bincount(dense, weights=planes[i], minlength=ndense)
+            norm_sq[i] = np.bincount(dense, weights=planes[i] * planes[i], minlength=ndense)
+        for i in range(g):
+            for j in range(i + 1, g):
+                pair_dots[(i, j)] = np.bincount(dense, weights=planes[i] * planes[j], minlength=ndense)
+        group_specs.append((gname, names, mass, norm_sq, pair_dots))
+    return unique, g2d, group_specs
 
 
 def compute_prong_a_mix(
@@ -15,31 +44,19 @@ def compute_prong_a_mix(
     *,
     active_eps: float,
     similarity_threshold: float,
+    precomputed: MixPrecompute | None = None,
 ) -> dict[str, Any]:
     """Prong A on expert mixture terms inside each group (w story, not alpha)."""
-    valid, fid, nb = _flat_valid(cell_id)
+    if precomputed is None:
+        unique, g2d, group_specs = precompute_mix_group_specs(mix_by_group, cell_id)
+    else:
+        unique, g2d, group_specs = precomputed
+
     cids = [c for c in nox_by_cell if nox_by_cell[c] > 0]
     if not cids:
-        cids = [i for i in range(nb) if (cell_id == i).any()]
+        cids = [int(g) for g in unique]
         nox_by_cell = {c: 1.0 for c in cids}
-        log.warning("no positive NOx in bundle; equal unit mass over cells with footprint")
-
-    group_specs: list[tuple[str, list[str], list[np.ndarray], np.ndarray, np.ndarray]] = []
-    for gname, spec in mix_by_group.items():
-        terms = spec["terms"]
-        names = list(terms.keys())
-        planes = [terms[k].ravel()[valid].astype(np.float64) for k in names]
-        g = len(names)
-        mass = np.zeros((g, nb), dtype=np.float64)
-        norm_sq = np.zeros((g, nb), dtype=np.float64)
-        pair_dots: dict[tuple[int, int], np.ndarray] = {}
-        for i in range(g):
-            mass[i] = np.bincount(fid, weights=planes[i], minlength=nb)
-            norm_sq[i] = np.bincount(fid, weights=planes[i] * planes[i], minlength=nb)
-        for i in range(g):
-            for j in range(i + 1, g):
-                pair_dots[(i, j)] = np.bincount(fid, weights=planes[i] * planes[j], minlength=nb)
-        group_specs.append((gname, names, planes, mass, norm_sq, pair_dots))
+        log.warning("no positive CAMS mass in bundle; equal unit mass over cells with footprint")
 
     total_nox = float(sum(nox_by_cell[c] for c in cids))
     a1_bins: dict[int, float] = {}
@@ -48,7 +65,8 @@ def compute_prong_a_mix(
     sensitive_cell_ids: list[int] = []
 
     for cid in cids:
-        if cid >= nb:
+        di = g2d.get(int(cid))
+        if di is None:
             continue
         m_c = nox_by_cell[cid]
         max_active = 0
@@ -56,8 +74,8 @@ def compute_prong_a_mix(
         best_mean_sim: float | None = None
         best_n_act = 0
 
-        for _gname, _names, _planes, mass, norm_sq, pair_dots in group_specs:
-            active_ix = [i for i in range(len(_names)) if mass[i, cid] > active_eps]
+        for _gname, _names, mass, norm_sq, pair_dots in group_specs:
+            active_ix = [i for i in range(len(_names)) if mass[i, di] > active_eps]
             n_act = len(active_ix)
             max_active = max(max_active, n_act)
             if n_act < 2:
@@ -68,11 +86,11 @@ def compute_prong_a_mix(
                 for b in range(a + 1, len(active_ix)):
                     i, j = active_ix[a], active_ix[b]
                     key = (i, j) if i < j else (j, i)
-                    ni = float(np.sqrt(norm_sq[i, cid]))
-                    nj = float(np.sqrt(norm_sq[j, cid]))
+                    ni = float(np.sqrt(norm_sq[i, di]))
+                    nj = float(np.sqrt(norm_sq[j, di]))
                     if ni <= 0 or nj <= 0:
                         continue
-                    sims.append(float(pair_dots[key][cid]) / (ni * nj))
+                    sims.append(float(pair_dots[key][di]) / (ni * nj))
 
             if not sims:
                 continue
