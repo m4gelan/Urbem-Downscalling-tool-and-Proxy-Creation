@@ -16,7 +16,7 @@ from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pix
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_population import load_population
 from proxy.core.point_matching.fallback import match_cams_lcp_one_to_one
-from proxy.core.point_matching.matching import match_cams_jrc
+from proxy.core.point_matching.matching import match_cams_jrc, point_match_settings
 from proxy.core.alias import cams_pollutant_var
 from proxy.visualizers.area_weights_map import viz_pollutant_labels, write_area_weights_map
 from proxy.visualizers.viz_map import write_point_match_map
@@ -71,13 +71,18 @@ def build(
         log.info("POINT MATCHING")
         log.info("--------------------------------")
 
-        max_match_distance_km = cfg.get("cams_point_sources").get("max_match_distance_km")
-        log.info(f"Maximum match distance used is {max_match_distance_km} km")
-
+        cps = cfg.get("cams_point_sources") 
         if not country_profile:
             log.error("point_matching needs country_profile from entry")
             raise ValueError("point_matching needs country_profile from entry")
-        cps = cfg.get("cams_point_sources") 
+
+        cams_nc = repo_root / cams_filepath.replace("\\", "/")
+        match_mode, max_match_distance_km, cams_grid_meta = point_match_settings(cps, cams_nc=cams_nc)
+        if match_mode == "distance":
+            log.info(f"Maximum match distance used is {max_match_distance_km} km")
+        else:
+            log.info("Point matching mode: same CAMS cell")
+
         year = int(cps.get("year"))
         ec = list(cps.get("emission_category_indices") )
         st = list(cps.get("source_type_indices") )
@@ -91,7 +96,7 @@ def build(
             f"\n  Pollutants: {', '.join(str(x).strip() for x in pols if str(x).strip())}"
         )
         cams_points = load_cams_points(
-            repo_root / cams_filepath.replace("\\", "/"),
+            cams_nc,
             year=year,
             country_iso3=country_profile["ISO3"],
             emission_category_indices=ec,
@@ -112,7 +117,13 @@ def build(
         log.info("--------------------------------")
         log.info("MATCHING CAMS -> JRC")
         log.info("--------------------------------")
-        matches = match_cams_jrc(cams_points, jrc_points, max_match_distance_km=max_match_distance_km)
+        matches = match_cams_jrc(
+            cams_points,
+            jrc_points,
+            match_mode=match_mode,
+            max_match_distance_km=max_match_distance_km,
+            cams_grid_meta=cams_grid_meta,
+        )
 
         log.info("--------------------------------")
         log.info("EPRTR/LCP FALLBACK (CAMS not matched to JRC)")
@@ -133,7 +144,11 @@ def build(
             if matches.get(pid, {}).get("matched") != "yes"
         }
         lcp_fb = match_cams_lcp_one_to_one(
-            unmatched_cams, lcp_points, max_match_distance_km=max_match_distance_km
+            unmatched_cams,
+            lcp_points,
+            match_mode=match_mode,
+            max_match_distance_km=max_match_distance_km,
+            cams_grid_meta=cams_grid_meta,
         )
         for pid, row in lcp_fb.items():
             matches[pid] = row

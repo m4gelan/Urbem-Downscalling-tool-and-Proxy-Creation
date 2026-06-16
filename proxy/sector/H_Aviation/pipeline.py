@@ -16,6 +16,7 @@ from proxy.core.point_matching.fallback import (
 from proxy.core.point_matching.matching import (
     build_aviation_osm_facilities_by_id,
     match_cams_to_facilities_one_to_one,
+    point_match_settings,
 )
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.dataset_loaders.load_cams_points import load_cams_points
@@ -73,8 +74,12 @@ def build(
         year = int(cps.get("year"))
         ec = list(cps.get("emission_category_indices") or [])
         st = list(cps.get("source_type_indices") or [])
-        max_match_distance_km = float(cps.get("max_match_distance_km", 10.0))
-        log.debug(f"Max match distance: {max_match_distance_km} km")
+        cams_nc = repo_root / str(cams_filepath).replace("\\", "/")
+        match_mode, max_match_distance_km, cams_grid_meta = point_match_settings(cps, cams_nc=cams_nc)
+        if match_mode == "distance":
+            log.debug(f"Max match distance: {max_match_distance_km} km")
+        else:
+            log.info("Point matching mode: same CAMS cell")
 
         log.info(
             "Loading CAMS points:"
@@ -83,7 +88,7 @@ def build(
             f"\n  Pollutants: {', '.join(str(x).strip() for x in pols if str(x).strip())}"
         )
         cams_points = load_cams_points(
-            repo_root / str(cams_filepath).replace("\\", "/"),
+            cams_nc,
             year=year,
             country_iso3=country_profile["ISO3"],
             emission_category_indices=ec,
@@ -138,7 +143,9 @@ def build(
         matches = match_cams_to_facilities_one_to_one(
             cams_points,
             facilities,
+            match_mode=match_mode,
             max_match_distance_km=max_match_distance_km,
+            cams_grid_meta=cams_grid_meta,
             facility_id_field_in_output_rows="osm_facility_id",
             facility_info_field_in_output_rows="osm_facility_info",
             log_label_for_facility_dataset="OSM aerodrome",
@@ -153,7 +160,6 @@ def build(
             corine_band = int(corine_cfg.get("band", 1))
             corine_l3_codes = [int(x) for x in (corine_cfg.get("l3_codes") or [])]
             min_patch_m2 = float(corine_cfg.get("min_patch_area_m2"))
-            max_match_distance_km = float(corine_cfg.get("max_match_distance_km"))
        
             corine_facilities = get_corine_airport_facilities(
                 repo_root / str(corine_filepath).replace("\\", "/"),
@@ -167,7 +173,9 @@ def build(
                 cor_fb = match_cams_to_facilities_one_to_one(
                     unmatched,
                     corine_facilities,
+                    match_mode=match_mode,
                     max_match_distance_km=max_match_distance_km,
+                    cams_grid_meta=cams_grid_meta,
                     facility_id_field_in_output_rows="corine_facility_id",
                     facility_info_field_in_output_rows="corine_facility_info",
                     log_label_for_facility_dataset="CORINE airport",

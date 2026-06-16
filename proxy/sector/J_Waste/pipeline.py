@@ -15,7 +15,7 @@ from proxy.core.area_weights import (
     fuse_alpha_weighted_W_planes,
     normalize_W_per_cams_cell,
 )
-from proxy.core.point_matching.matching import match_cams_to_facilities_one_to_one
+from proxy.core.point_matching.matching import match_cams_to_facilities_one_to_one, point_match_settings
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
@@ -95,10 +95,14 @@ def build(
         year = int(cps.get("year"))
         ec = list(cps.get("emission_category_indices") or [])
         st = list(cps.get("source_type_indices") or [])
-        max_match_distance_km = float(cps.get("max_match_distance_km", 10.0))
+        cams_nc = repo_root / str(cams_filepath).replace("\\", "/")
+        match_mode, max_match_distance_km, cams_grid_meta = point_match_settings(cps, cams_nc=cams_nc)
+        if match_mode == "distance":
+            log.info(f"Maximum match distance used is {max_match_distance_km} km")
+        else:
+            log.info("Point matching mode: same CAMS cell")
 
         uww_cfg = cfg.get("uwwtd_point_sources") or {}
-        uww_max_km = float(uww_cfg.get("max_match_distance_km", max_match_distance_km))
 
         log.info(
             "Loading CAMS points:"
@@ -107,7 +111,7 @@ def build(
             f"\n  Pollutants: {', '.join(str(x).strip() for x in pols if str(x).strip())}"
         )
         cams_points = load_cams_points(
-            repo_root / str(cams_filepath).replace("\\", "/"),
+            cams_nc,
             year=year,
             country_iso3=country_profile["ISO3"],
             emission_category_indices=ec,
@@ -133,7 +137,9 @@ def build(
             matches = match_cams_to_facilities_one_to_one(
                 cams_points,
                 eprtr_points,
+                match_mode=match_mode,
                 max_match_distance_km=max_match_distance_km,
+                cams_grid_meta=cams_grid_meta,
                 facility_id_field_in_output_rows="eprtr_point_id",
                 facility_info_field_in_output_rows="eprtr_point_info",
                 log_label_for_facility_dataset="E-PRTR waste",
@@ -169,7 +175,9 @@ def build(
                 uww_fb = match_cams_to_facilities_one_to_one(
                     unmatched,
                     uwwtd_points,
-                    max_match_distance_km=uww_max_km,
+                    match_mode=match_mode,
+                    max_match_distance_km=max_match_distance_km,
+                    cams_grid_meta=cams_grid_meta,
                     facility_id_field_in_output_rows="uwwtd_facility_id",
                     facility_info_field_in_output_rows="uwwtd_facility_info",
                     log_label_for_facility_dataset="UWWTD treatment plant",

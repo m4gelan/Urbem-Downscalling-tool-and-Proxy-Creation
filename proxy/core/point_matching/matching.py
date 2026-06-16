@@ -12,8 +12,25 @@ from scipy.optimize import linear_sum_assignment
 from shapely.ops import unary_union
 
 from proxy.core import log
-from proxy.core.point_matching.scoring import haversine_km
+from proxy.core.point_matching.scoring import haversine_km, lon_lat_to_cell_ids
+from proxy.dataset_loaders.load_cams_points import load_cams_grid_meta
 
+
+MATCH_MODE_DISTANCE = "distance"
+MATCH_MODE_CAMS_CELL = "cams_cell"
+
+
+def point_match_settings(cps: dict[str, Any], *, cams_nc: Path) -> tuple[str, float | None, dict[str, Any] | None]:
+    """Read ``cams_point_sources`` match mode; load grid meta when using CAMS-cell matching."""
+    match_mode = str(cps["match_mode"]).strip().lower()
+    if match_mode == MATCH_MODE_DISTANCE:
+        return match_mode, float(cps["max_match_distance_km"]), None
+    if match_mode == MATCH_MODE_CAMS_CELL:
+        return match_mode, None, load_cams_grid_meta(cams_nc)
+    raise ValueError(
+        f"cams_point_sources.match_mode must be {MATCH_MODE_DISTANCE!r} or {MATCH_MODE_CAMS_CELL!r}, "
+        f"got {match_mode!r}"
+    )
 
 
 # Sentinel cost assigned to infeasible pairs (distance > threshold).
@@ -26,7 +43,9 @@ def match_cams_to_facilities_one_to_one(
     cams_points: dict[int, dict[str, Any]],
     facilities_by_id: dict[str, dict[str, Any]],
     *,
-    max_match_distance_km: float,
+    match_mode: str,
+    max_match_distance_km: float | None = None,
+    cams_grid_meta: dict[str, Any] | None = None,
     facility_id_field_in_output_rows: str,
     facility_info_field_in_output_rows: str,
     log_label_for_facility_dataset: str,
@@ -38,8 +57,11 @@ def match_cams_to_facilities_one_to_one(
     Overview
     --------
     - Each CAMS point is matched to at most one facility, and each facility to at most one CAMS.
-    - Only pairs within `max_match_distance_km` (haversine) are considered feasible.
-    - The assignment minimises total matched distance across all pairs globally.
+    - Feasible pairs depend on ``match_mode``:
+      - ``distance``: haversine ≤ ``max_match_distance_km``
+      - ``cams_cell``: facility lies in the same CAMS grid cell as the CAMS point
+        (CAMS ``cell_id`` from NetCDF indices; facility cell from WGS84 bounds lookup)
+    - Among feasible pairs the assignment minimises total haversine distance globally.
     - CAMS points with no feasible facility (or outcompeted for every in-range facility)
       are marked ``matched=no`` but still record their nearest facility for diagnostics.
 
@@ -66,7 +88,11 @@ def match_cams_to_facilities_one_to_one(
     facilities_by_id:
         Dict of facility id → row dict (must contain "lon" and "lat").
     max_match_distance_km:
-        Maximum haversine distance for a pair to be considered feasible.
+        Maximum haversine distance for a pair to be considered feasible (``distance`` mode only).
+    match_mode:
+        ``distance`` or ``cams_cell``.
+    cams_grid_meta:
+        Output of :func:`load_cams_grid_meta` (required for ``cams_cell`` mode).
     facility_id_field_in_output_rows:
         Key used to store the matched (or nearest) facility id in each output row.
     facility_info_field_in_output_rows:
@@ -94,6 +120,18 @@ def match_cams_to_facilities_one_to_one(
     if not cams_points or not facilities_by_id:
         log.error(f"No CAMS points or no {log_label_for_facility_dataset} rows to match.")
         raise SystemExit(1)
+
+    mode = str(match_mode).strip().lower()
+    if mode == MATCH_MODE_DISTANCE:
+        if max_match_distance_km is None:
+            raise ValueError("max_match_distance_km is required when match_mode is 'distance'")
+    elif mode == MATCH_MODE_CAMS_CELL:
+        if cams_grid_meta is None:
+            raise ValueError("cams_grid_meta is required when match_mode is 'cams_cell'")
+    else:
+        raise ValueError(
+            f"match_mode must be {MATCH_MODE_DISTANCE!r} or {MATCH_MODE_CAMS_CELL!r}, got {match_mode!r}"
+        )
 
     # ------------------------------------------------------------------ #
     # 2. Index inputs into ordered lists so matrix rows/cols are stable   #
@@ -138,17 +176,38 @@ def match_cams_to_facilities_one_to_one(
     n_skip_cols = n_cams  # one exclusive skip slot per CAMS row
     cost_matrix = np.full((n_cams, n_facilities + n_skip_cols), _INFEASIBLE_PAIR_COST_KM, dtype=np.float64)
 
-    # Fill real facility columns: use actual distance if within threshold, sentinel otherwise.
-    within_threshold = distance_matrix_km <= max_match_distance_km
+    # Fill real facility columns: use actual distance if feasible, sentinel otherwise.
+    if mode == MATCH_MODE_DISTANCE:
+        within_threshold = distance_matrix_km <= float(max_match_distance_km)
+        skip_cost = float(max_match_distance_km) + 1.0
+    else:
+        cams_cell_ids = np.array(
+            [int(cams_points[cid]["cell_id"]) for cid in ordered_cams_ids],
+            dtype=np.int64,
+        )
+        facility_cell_ids = lon_lat_to_cell_ids(
+            facility_lons,
+            facility_lats,
+            longitude_bounds=cams_grid_meta["longitude_bounds"],
+            latitude_bounds=cams_grid_meta["latitude_bounds"],
+            n_longitude=int(cams_grid_meta["n_longitude"]),
+            n_latitude=int(cams_grid_meta["n_latitude"]),
+        )
+        same_cell = cams_cell_ids[:, None] == facility_cell_ids[None, :]
+        within_threshold = same_cell & (facility_cell_ids[None, :] >= 0)
+        if np.any(within_threshold):
+            skip_cost = float(np.max(distance_matrix_km[within_threshold])) + 1.0
+        else:
+            skip_cost = 1e6
+
     cost_matrix[:, :n_facilities] = np.where(
         within_threshold,
         distance_matrix_km,
         _INFEASIBLE_PAIR_COST_KM,
     )
 
-    # Fill skip-slot diagonal: cost is just above the threshold so any valid match beats it,
+    # Fill skip-slot diagonal: cost is just above the best feasible match so any valid match beats it,
     # but it's always cheaper than the infeasible sentinel.
-    skip_cost = max_match_distance_km + 1.0
     skip_col_indices = n_facilities + np.arange(n_cams)
     cost_matrix[np.arange(n_cams), skip_col_indices] = skip_cost
 
@@ -216,10 +275,16 @@ def match_cams_to_facilities_one_to_one(
     # ------------------------------------------------------------------ #
     # 8. Summary log                                                      #
     # ------------------------------------------------------------------ #
-    log.info(
-        f"CAMS–{log_label_for_facility_dataset} one-to-one matching complete: "
-        f"{n_matched}/{n_cams} CAMS matched within {max_match_distance_km} km."
-    )
+    if mode == MATCH_MODE_CAMS_CELL:
+        log.info(
+            f"CAMS–{log_label_for_facility_dataset} one-to-one matching complete: "
+            f"{n_matched}/{n_cams} CAMS matched within same CAMS cell."
+        )
+    else:
+        log.info(
+            f"CAMS–{log_label_for_facility_dataset} one-to-one matching complete: "
+            f"{n_matched}/{n_cams} CAMS matched within {max_match_distance_km} km."
+        )
 
     return out_rows
 
@@ -229,9 +294,11 @@ def match_cams_jrc(
     cams_points: dict[int, dict[str, Any]],
     jrc_points: dict[str, dict[str, Any]],
     *,
-    max_match_distance_km: float,
+    match_mode: str,
+    max_match_distance_km: float | None = None,
+    cams_grid_meta: dict[str, Any] | None = None,
 ) -> dict[int, dict[str, Any]]:
-    """Global one-to-one CAMS↔JRC assignment minimizing total km within *max_match_distance_km*."""
+    """Global one-to-one CAMS↔JRC assignment minimizing total km among feasible pairs."""
     if not cams_points:
         log.error("No CAMS points to match.")
         raise SystemExit(1)
@@ -247,7 +314,9 @@ def match_cams_jrc(
     return match_cams_to_facilities_one_to_one(
         cams_points,
         jrc_points,
+        match_mode=match_mode,
         max_match_distance_km=max_match_distance_km,
+        cams_grid_meta=cams_grid_meta,
         facility_id_field_in_output_rows="jrc_point_id",
         facility_info_field_in_output_rows="jrc_point_info",
         log_label_for_facility_dataset="JRC",

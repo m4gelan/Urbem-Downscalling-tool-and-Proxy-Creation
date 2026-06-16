@@ -29,7 +29,7 @@ SECTORS = [
     "K_Agriculture",
 ]
 
-SECTORS_ENABLED = ["B_Industry"]
+SECTORS_ENABLED = ["A_PublicPower", "B_Industry", "D_Fugitive", "E_Solvents", "H_Aviation", "J_Waste"]
 #SECTORS_ENABLED = SECTORS
   
 
@@ -51,11 +51,11 @@ PRONG_A_SECTORS = "multi_group"
 PRONG_A_W_SECTORS = "mix_export"
 
 # Select country to build the weitghs and city for debug maps
-COUNTRY = "Switzerland"
+COUNTRY = "Germany"
 CITY = "Paris" # City for debug maps
 
 # Info skips all, debug creates maps and other logs
-LOG_LEVEL = "INFO" # INFO | DEBUG option
+LOG_LEVEL = "DEBUG" # INFO | DEBUG option
 MAP_TYPE = 'INTERACTIVE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
 
 EPSG_CRS = "EPSG:3035"

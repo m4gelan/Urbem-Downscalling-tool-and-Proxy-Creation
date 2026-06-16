@@ -27,6 +27,7 @@ cams_point_sources:
   year: 2019
   emission_category_indices: [12]
   source_type_indices: [2]
+  match_mode: distance
   max_match_distance_km: 20.0
 
 cams_area_sources:

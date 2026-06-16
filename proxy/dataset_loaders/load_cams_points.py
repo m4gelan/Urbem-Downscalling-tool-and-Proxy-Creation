@@ -10,6 +10,17 @@ from proxy.core import log
 from proxy.core.alias import cams_country_index_from_iso3, cams_pollutant_var
 
 
+def load_cams_grid_meta(cams_nc: Path) -> dict[str, Any]:
+    """CAMS longitude/latitude bounds and grid size (for facility → cell lookup)."""
+    with xr.open_dataset(cams_nc, engine="netcdf4") as ds:
+        return {
+            "n_longitude": int(ds.sizes["longitude"]),
+            "n_latitude": int(ds.sizes["latitude"]),
+            "longitude_bounds": np.asarray(ds["longitude_bounds"].values, dtype=np.float64),
+            "latitude_bounds": np.asarray(ds["latitude_bounds"].values, dtype=np.float64),
+        }
+
+
 def load_cams_points(
     cams_nc: Path,
     *,
@@ -22,7 +33,8 @@ def load_cams_points(
     """
     Point sources: filter by emission/source type and CAMS ``country_index`` (via ISO3 on ``country_id``).
 
-    Returns ``{point_id: {"latitude", "longitude", "pollutants": {label: value, ...}, "year"}}``.
+    Returns ``{point_id: {latitude, longitude, pollutants, year, longitude_index,
+    latitude_index, cell_id}}``.
     """
     iso3 = str(country_iso3).strip().upper()
     ec_filter = np.asarray(emission_category_indices, dtype=np.int64)
@@ -36,6 +48,16 @@ def load_cams_points(
         source_type_indices = np.asarray(cams_dataset["source_type_index"].values).ravel().astype(np.int64)
         emission_category_indices = np.asarray(cams_dataset["emission_category_index"].values).ravel().astype(np.int64)
         country_index = np.asarray(cams_dataset["country_index"].values).ravel().astype(np.int64)
+        lon_idx = np.asarray(cams_dataset["longitude_index"].values).ravel().astype(np.int64)
+        lat_idx = np.asarray(cams_dataset["latitude_index"].values).ravel().astype(np.int64)
+        nlon = int(cams_dataset.sizes["longitude"])
+        nlat = int(cams_dataset.sizes["latitude"])
+        if lon_idx.size and (lon_idx.max() >= nlon or lat_idx.max() >= nlat):
+            log.debug("CAMS indices look 1-based; shifting to 0-based")
+            lon_idx = lon_idx - 1
+            lat_idx = lat_idx - 1
+        np.clip(lon_idx, 0, nlon - 1, out=lon_idx)
+        np.clip(lat_idx, 0, nlat - 1, out=lat_idx)
 
         pol_m: dict[str, np.ndarray] = {}
         for label in pollutants:
@@ -58,11 +80,16 @@ def load_cams_points(
         out: dict[int, dict[str, Any]] = {}
         for i in np.flatnonzero(mask):
             pid = int(i)
+            lo = int(lon_idx[i])
+            la = int(lat_idx[i])
             out[pid] = {
                 "latitude": float(lat[i]),
                 "longitude": float(lon[i]),
                 "pollutants": {lab: float(pol_m[lab][i]) for lab in pol_m},
                 "year": int(year),
+                "longitude_index": lo,
+                "latitude_index": la,
+                "cell_id": int(la * nlon + lo),
             }
 
     nout = len(out)

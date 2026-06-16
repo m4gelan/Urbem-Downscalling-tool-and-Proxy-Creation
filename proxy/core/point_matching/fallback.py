@@ -35,7 +35,9 @@ def match_cams_lcp_one_to_one(
     cams_without_jrc_match: dict[int, dict[str, Any]],
     lcp_facilities_by_id: dict[str, dict[str, Any]],
     *,
-    max_match_distance_km: float,
+    match_mode: str,
+    max_match_distance_km: float | None = None,
+    cams_grid_meta: dict[str, Any] | None = None,
 ) -> dict[int, dict[str, Any]]:
     """
     Second stage: CAMS left after JRC, matched uniquely to **LCP** installations
@@ -50,7 +52,9 @@ def match_cams_lcp_one_to_one(
     fallback_rows = match_cams_to_facilities_one_to_one(
         cams_without_jrc_match,
         lcp_facilities_by_id,
+        match_mode=match_mode,
         max_match_distance_km=max_match_distance_km,
+        cams_grid_meta=cams_grid_meta,
         facility_id_field_in_output_rows="eprtr_point_id",
         facility_info_field_in_output_rows="eprtr_point_info",
         log_label_for_facility_dataset="LCP",
