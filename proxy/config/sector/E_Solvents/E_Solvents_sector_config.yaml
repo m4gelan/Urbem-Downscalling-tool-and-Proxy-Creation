@@ -195,16 +195,6 @@ beta:
     service: 0.0
     industrial: 0.0
     infrastructure: 0.0
-  road_paving:
-    household: 0.0
-    service: 0.0
-    industrial: 0.0
-    infrastructure: 1.0
-  asphalt_roofing:
-    household: 0.0
-    service: 0.0
-    industrial: 1.0
-    infrastructure: 0.0
   coating_application:
     household: 0.3
     service: 0.25
@@ -229,6 +219,11 @@ beta:
     household: 0.0
     service: 0.5
     industrial: 0.5
+    infrastructure: 0.0
+  pops_heavy_metals:
+    household: 1.0
+    service: 0.0
+    industrial: 0.0
     infrastructure: 0.0
   other:
     household: 0.2

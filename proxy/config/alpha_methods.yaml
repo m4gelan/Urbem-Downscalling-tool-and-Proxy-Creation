@@ -27,8 +27,9 @@ sectors:
       refineries_petroleum:
         - "1A1b"  # Petroleum Refining
         - "1A1c"  # Manufacture of Solid Fuels and Other Energy Industries
+        - "1B1b"  # Solid Fuel Transformation
+        - "1B2aiv" # Oil: Refining/Storage
       manufacturing_combustion_residual:
-        - "1A2gvii"   # Mobile Combustion in Manufacturing Industries and Construction: Other
         - "1A2gviii"  # Stationary Combustion in Manufacturing Industries and Construction: Other
         - "1A2a"      # Stationary Combustion in Manufacturing Industries and Construction: Iron and Steel
         - "1A2b"      # Stationary Combustion in Manufacturing Industries and Construction: Non-ferrous Metals
@@ -41,14 +42,17 @@ sectors:
         - "2H3"       # Other Industrial Processes
         - "2I"        # Wood Processing
         - "2J"        # Not listed in provided reference
-        - "2K"        # Consumption of POPs and Heavy Metals
         - "2L"        # Not listed in provided reference
       mineral:
         - "2A1"   # Cement Production
         - "2A2"   # Lime Production
         - "2A3"   # Glass Production
         - "2A5a"  # Quarrying and Mining of Minerals other than Coal
+        - "2A5b"  # Construction and Demolition
+        - "2A5c"  # Storage, Handling and Transport of Mineral Products
         - "2A6"   # Other Mineral Products
+        - "2D3b"  # Road Paving with Asphalt
+        - "2D3c"  # Asphalt Roofing
       chemical_metal:
         - "2B1"     # Ammonia Production
         - "2B10a"   # Other
@@ -94,12 +98,6 @@ sectors:
         - '1A4ai'   # Commercial/Industrial Stationary Combustion
         - '1A4bi'   # Residential Stationary Combustion
         - '1A4ci'   # Agriculture/Forestry/Fishing Stationary Combustion
-      forestry_offroad:
-        - '1A4cii'  # Off-road Vehicles and Other Machinery from Agriculture/Forestry/Fishing
-      residential_offroad:
-        - '1A4bii'  # Household and Gardening Mobile Combustion
-      commercial_offroad:
-        - '1A4aii'  # Commercial/Institutional: Mobile
     gnfr_letter: C
     defaults:
       method: 1
@@ -127,12 +125,10 @@ sectors:
     groups:
       coal_and_solid_fuels:
         - "1B1a"   # Coal Mining and Handling
-        - "1B1b"   # Solid Fuel Transformation
         - "1B1c"   # Other
       oil_upstream_and_transport:
         - "1B2ai"  # Oil: Exploration, Production, Transport
       storage_refining_distribution:
-        - "1B2aiv" # Oil: Refining/Storage
         - "1B2av"  # Oil: Distribution
       gas_flaring_and_residual_losses:
         - "1B2b"   # Natural Gas: Exploration, Production, Transport
@@ -166,10 +162,6 @@ sectors:
     groups:
       domestic_solvent_use:
         - "2D3a"
-      road_paving:
-        - "2D3b"
-      asphalt_roofing:
-        - "2D3c"
       coating_application:
         - "2D3d"
       degreasing:
@@ -180,8 +172,11 @@ sectors:
         - "2D3g"
       printing:
         - "2D3h"
+      pops_heavy_metals:
+        - "2K"
       other:
         - "2D3i"
+        - "2G"
     gnfr_letter: E
     defaults:
       method: 0
@@ -216,6 +211,17 @@ sectors:
         - "1A3ei" #Pipelines
       non_road_machinery:
         - "1A3eii" #Non-road machinery
+      agriculture_forestry_mobile:
+        - "1A4cii"
+      residential_mobile:
+        - "1A4bii"
+      commercial_mobile:
+        - "1A4aii"
+      manufacturing_mobile:
+        - "1A2gvii"
+      other_mobile:
+        - "1A5b"
+        - "1A5c"
     gnfr_letter: I
     defaults:
       method: 1

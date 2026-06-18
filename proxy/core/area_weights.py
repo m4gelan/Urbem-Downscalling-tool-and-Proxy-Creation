@@ -265,6 +265,8 @@ def compute_i_offroad_S_by_subgroup(
     corine_123: np.ndarray,
     corine_131: np.ndarray,
     corine_124: np.ndarray,
+    corine_132: np.ndarray,
+    corine_133: np.ndarray,
     weights: dict[str, Any],
 ) -> dict[str, np.ndarray]:
     """
@@ -276,6 +278,8 @@ def compute_i_offroad_S_by_subgroup(
     c123 = _clip_01(corine_123)
     c131 = _clip_01(corine_131)
     c124 = _clip_01(corine_124)
+    c132 = _clip_01(corine_132)
+    c133 = _clip_01(corine_133)
 
     out: dict[str, np.ndarray] = {}
 
@@ -299,7 +303,227 @@ def compute_i_offroad_S_by_subgroup(
     )
     w3 = _strip_weight_row(weights.get("non_road_machinery"))
     out["non_road_machinery"] = (float(w3["w_clc_121"]) * c121 + float(w3["w_clc_123"]) * c123 + float(w3["w_clc_124"]) * c124 + float(w3["w_clc_131"]) * c131)
+
+    wm = _strip_weight_row(weights.get("manufacturing_mobile"))
+    S_osm_mfg = _clip_01(osm_rasters_by_subgroup["manufacturing_mobile"]["industrial_sites"])
+    S_cor_mfg = c121 + c131 + c132 + c133
+    out["manufacturing_mobile"] = (
+        float(wm["w_osm"]) * S_osm_mfg + float(wm["w_corine"]) * _clip_01(S_cor_mfg)
+    ).astype(np.float32)
+
+    wo = _strip_weight_row(weights.get("other_mobile"))
+    S_osm_mil = _clip_01(osm_rasters_by_subgroup["other_mobile"]["military"])
+    S_cor_port = c123 + c124
+    out["other_mobile"] = (
+        float(wo["w_osm"]) * S_osm_mil + float(wo["w_corine"]) * _clip_01(S_cor_port)
+    ).astype(np.float32)
+
     return out
+
+
+def compute_i_mobile_S_by_subgroup(
+    repo_root: Path,
+    corine_filepath: str | Path,
+    *,
+    mobile_cfg: dict[str, Any],
+    corine_band: int,
+    cams_cells: dict[int, dict[str, Any]],
+    ref_height: int,
+    ref_width: int,
+    ref_transform: Any,
+    ref_crs: Any,
+    pop_z: np.ndarray,
+) -> tuple[dict[str, np.ndarray], dict[str, dict[str, Any]]]:
+    """GNFR I mobile (1A4*): weighted CORINE masks + population blend per ``mobile_masks`` in sector YAML."""
+    from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
+
+    f32 = np.float32
+    cor_path = repo_root / str(corine_filepath).replace("\\", "/")
+    grid_kw = dict(
+        ref_height=ref_height,
+        ref_width=ref_width,
+        ref_transform=ref_transform,
+        ref_crs=ref_crs,
+    )
+    p = np.maximum(np.asarray(pop_z, dtype=np.float32), 0.0)
+    out: dict[str, np.ndarray] = {}
+    mix: dict[str, dict[str, Any]] = {}
+
+    ag_cfg = mobile_cfg.get("agriculture_forestry_mobile")
+    if not isinstance(ag_cfg, dict):
+        raise ValueError("mobile_masks.agriculture_forestry_mobile required")
+    S_agri = load_corine_weighted_l3(
+        cor_path,
+        {int(k): v for k, v in _strip_weight_row(ag_cfg["agri_l3_weights"]).items()},
+        corine_band,
+        cams_cells,
+        **grid_kw,
+    )
+    S_forest = load_corine_weighted_l3(
+        cor_path,
+        {int(k): v for k, v in _strip_weight_row(ag_cfg["forest_l3_weights"]).items()},
+        corine_band,
+        cams_cells,
+        **grid_kw,
+    )
+    w_agri = float(ag_cfg["w_agri"])
+    w_forest = float(ag_cfg["w_forest"])
+    agri = _clip_01(S_agri)
+    forest = _clip_01(S_forest)
+    out["agriculture_forestry_mobile"] = (w_agri * agri + w_forest * forest).astype(f32)
+    mix["agriculture_forestry_mobile"] = {
+        "mixer": "linear",
+        "weight_keys": ["w_agri", "w_forest"],
+        "weights": {"w_agri": w_agri, "w_forest": w_forest},
+        "terms": {"agri": agri, "forest": forest},
+    }
+    log.info(
+        "I_Offroad agriculture_forestry_mobile S_sum=%.6g w_agri=%s w_forest=%s",
+        float(out["agriculture_forestry_mobile"].sum()),
+        w_agri,
+        w_forest,
+    )
+
+    res_cfg = mobile_cfg.get("residential_mobile")
+    if not isinstance(res_cfg, dict):
+        raise ValueError("mobile_masks.residential_mobile required")
+    S_cor_res = load_corine_weighted_l3(
+        cor_path,
+        {int(k): v for k, v in _strip_weight_row(res_cfg["corine_l3_weights"]).items()},
+        corine_band,
+        cams_cells,
+        **grid_kw,
+    )
+    w_pop = float(res_cfg["w_pop"])
+    w_blend = float(res_cfg["w_blend"])
+    c_res = _clip_01(S_cor_res)
+    out["residential_mobile"] = (w_pop * p + w_blend * c_res * p).astype(f32)
+    mix["residential_mobile"] = {
+        "mixer": "linear",
+        "weight_keys": ["w_pop", "w_blend"],
+        "weights": {"w_pop": w_pop, "w_blend": w_blend},
+        "terms": {"pop": p, "corine_pop": (c_res * p).astype(f32)},
+    }
+    log.info(
+        "I_Offroad residential_mobile S_sum=%.6g w_pop=%s w_blend=%s",
+        float(out["residential_mobile"].sum()),
+        w_pop,
+        w_blend,
+    )
+
+    com_cfg = mobile_cfg.get("commercial_mobile")
+    if not isinstance(com_cfg, dict):
+        raise ValueError("mobile_masks.commercial_mobile required")
+    S_cor_com = load_corine_weighted_l3(
+        cor_path,
+        {int(k): v for k, v in _strip_weight_row(com_cfg["corine_l3_weights"]).items()},
+        corine_band,
+        cams_cells,
+        **grid_kw,
+    )
+    w_cor = float(com_cfg["w_corine"])
+    w_cor_pop = float(com_cfg["w_corine_pop"])
+    c_com = _clip_01(S_cor_com)
+    out["commercial_mobile"] = (w_cor * c_com + w_cor_pop * c_com * p).astype(f32)
+    mix["commercial_mobile"] = {
+        "mixer": "linear",
+        "weight_keys": ["w_corine", "w_corine_pop"],
+        "weights": {"w_corine": w_cor, "w_corine_pop": w_cor_pop},
+        "terms": {"corine": c_com, "corine_pop": (c_com * p).astype(f32)},
+    }
+    log.info(
+        "I_Offroad commercial_mobile S_sum=%.6g w_corine=%s w_corine_pop=%s",
+        float(out["commercial_mobile"].sum()),
+        w_cor,
+        w_cor_pop,
+    )
+    return out, mix
+
+
+def build_i_offroad_mix_by_group(
+    *,
+    osm_rasters_by_subgroup: dict[str, dict[str, np.ndarray]],
+    weights_cfg: dict[str, Any],
+    mobile_mix: dict[str, dict[str, Any]],
+    corine_121: np.ndarray,
+    corine_123: np.ndarray,
+    corine_124: np.ndarray,
+    corine_131: np.ndarray,
+    corine_132: np.ndarray,
+    corine_133: np.ndarray,
+) -> dict[str, dict[str, Any]]:
+    """Mix terms for W_groups export / prong A(w) and B(w); must match ``compute_i_*_S_by_subgroup``."""
+    f32 = np.float32
+    osg = osm_rasters_by_subgroup
+
+    wr = _strip_weight_row(weights_cfg.get("rail_transport"))
+    wp = _strip_weight_row(weights_cfg.get("pipeline_transport"))
+    wm = _strip_weight_row(weights_cfg.get("non_road_machinery"))
+    wmf = _strip_weight_row(weights_cfg.get("manufacturing_mobile"))
+    wom = _strip_weight_row(weights_cfg.get("other_mobile"))
+
+    c121 = _clip_01(corine_121)
+    c123 = _clip_01(corine_123)
+    c124 = _clip_01(corine_124)
+    c131 = _clip_01(corine_131)
+    c132 = _clip_01(corine_132)
+    c133 = _clip_01(corine_133)
+
+    mix: dict[str, dict[str, Any]] = {
+        "rail_transport": {
+            "mixer": "linear",
+            "weight_keys": ["w_osm_diesel", "w_osm_electric", "w_osm_yard"],
+            "weights": {k: float(wr[k]) for k in ("w_osm_diesel", "w_osm_electric", "w_osm_yard")},
+            "terms": {
+                "rail_diesel": np.asarray(osg["rail_transport"]["rail_diesel"], dtype=f32),
+                "rail_electric": np.asarray(osg["rail_transport"]["rail_electric"], dtype=f32),
+                "rail_yards": np.asarray(osg["rail_transport"]["rail_yards"], dtype=f32),
+            },
+        },
+        "pipeline_transport": {
+            "mixer": "linear",
+            "weight_keys": ["w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon"],
+            "weights": {
+                k: float(wp[k]) for k in ("w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon")
+            },
+            "terms": {
+                "oil_gas_facilities": np.asarray(osg["pipeline_transport"]["oil_gas_facilities"], dtype=f32),
+                "pipeline_hydrocarbon": np.asarray(osg["pipeline_transport"]["pipeline_hydrocarbon"], dtype=f32),
+            },
+        },
+        "non_road_machinery": {
+            "mixer": "linear",
+            "weight_keys": ["w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131"],
+            "weights": {k: float(wm[k]) for k in ("w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131")},
+            "terms": {
+                "clc_121": c121,
+                "clc_123": c123,
+                "clc_124": c124,
+                "clc_131": c131,
+            },
+        },
+        "manufacturing_mobile": {
+            "mixer": "linear",
+            "weight_keys": ["w_osm", "w_corine"],
+            "weights": {"w_osm": float(wmf["w_osm"]), "w_corine": float(wmf["w_corine"])},
+            "terms": {
+                "osm_industrial": _clip_01(osg["manufacturing_mobile"]["industrial_sites"]),
+                "corine_industrial": _clip_01(c121 + c131 + c132 + c133),
+            },
+        },
+        "other_mobile": {
+            "mixer": "linear",
+            "weight_keys": ["w_osm", "w_corine"],
+            "weights": {"w_osm": float(wom["w_osm"]), "w_corine": float(wom["w_corine"])},
+            "terms": {
+                "osm_military": _clip_01(osg["other_mobile"]["military"]),
+                "corine_port_air": _clip_01(c123 + c124),
+            },
+        },
+    }
+    mix.update(mobile_mix)
+    return mix
+
 
 def combined_S_industry_group(
     osm_01: np.ndarray,
@@ -398,179 +622,3 @@ def fuse_alpha_weighted_W_planes(
         np.multiply(np.asarray(w, dtype=np.float32), float(a), out=scratch)
         np.add(acc, scratch, out=acc)
     return normalize_W_per_cams_cell(acc, cell_id, cams_cells)
-
-
-def combined_S_offroad_branches(
-    S_forest: np.ndarray,
-    S_residential: np.ndarray,
-    S_commercial: np.ndarray,
-    *,
-    beta_F: float,
-    beta_R: float,
-    beta_B: float,
-) -> np.ndarray:
-    """Weighted sum of three off-road eligibility / score rasters."""
-    return (
-        float(beta_F) * S_forest.astype(np.float64)
-        + float(beta_R) * S_residential.astype(np.float64)
-        + float(beta_B) * S_commercial.astype(np.float64)
-    ).astype(np.float32)
-
-
-def _offroad_branch_betas(
-    alpha_row: np.ndarray,
-    group_index: dict[str, int],
-) -> tuple[float, float, float, float, float]:
-    """(alpha_stat, alpha_off, beta_F, beta_R, beta_B) from one pollutant α row."""
-    a_stat = float(alpha_row[group_index["stationary"]])
-    a_for = float(alpha_row[group_index["forestry_offroad"]])
-    a_res = float(alpha_row[group_index["residential_offroad"]])
-    a_com = float(alpha_row[group_index["commercial_offroad"]])
-    a_off = a_for + a_res + a_com
-    if a_off <= _OFFROAD_EPS:
-        return 1.0, 0.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0
-    return a_stat, a_off, a_for / a_off, a_res / a_off, a_com / a_off
-
-
-def fuse_offroad_combined_band(
-    W_stationary: np.ndarray,
-    S_forest: np.ndarray,
-    S_residential: np.ndarray,
-    S_commercial: np.ndarray,
-    cell_id: np.ndarray,
-    cams_cells: dict[int, dict[str, Any]],
-    alpha_row: np.ndarray,
-    group_index: dict[str, int],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """One pollutant: W_off (CAMS-norm) and W_combined = α_stat·W_stat + α_off·W_off."""
-    a_stat, a_off, bF, bR, bB = _offroad_branch_betas(alpha_row, group_index)
-    S_off = combined_S_offroad_branches(S_forest, S_residential, S_commercial, beta_F=bF, beta_R=bR, beta_B=bB)
-    W_o = normalize_W_per_cams_cell(S_off, cell_id, cams_cells)
-    W_s = np.asarray(W_stationary, dtype=np.float32)
-    W_c = fuse_alpha_weighted_W_planes(
-        [W_s, W_o], np.array([a_stat, a_off], dtype=np.float32), cell_id, cams_cells,
-    )
-    return W_s, W_o, W_c
-
-
-def fuse_stationary_offroad_weights(
-    W_stationary: np.ndarray,
-    S_forest: np.ndarray,
-    S_residential: np.ndarray,
-    S_commercial: np.ndarray,
-    cell_id: np.ndarray,
-    cams_cells: dict[int, dict[str, Any]],
-    alpha_result: AlphaMatrixResult,
-    pollutant_labels: list[str],
-) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
-    """All pollutants at once (needs h×w×p); prefer per-band loop in C_Othercombustion pipeline."""
-    gix = {g: i for i, g in enumerate(alpha_result.group_names)}
-    for g in ("stationary", "forestry_offroad", "residential_offroad", "commercial_offroad"):
-        if g not in gix:
-            raise ValueError(f"alpha groups missing {g!r}; have {alpha_result.group_names}")
-
-    h, w, n_p = W_stationary.shape
-    W_fused = np.zeros((h, w, n_p), dtype=np.float32)
-    w_stat: dict[str, np.ndarray] = {}
-    w_off: dict[str, np.ndarray] = {}
-    w_comb: dict[str, np.ndarray] = {}
-
-    for j, pol in enumerate(pollutant_labels):
-        W_s, W_o, W_c = fuse_offroad_combined_band(
-            W_stationary[:, :, j], S_forest, S_residential, S_commercial,
-            cell_id, cams_cells, alpha_result.alpha[j], gix,
-        )
-        W_fused[:, :, j] = W_c
-        w_stat[pol] = W_s
-        w_off[pol] = W_o
-        w_comb[pol] = W_c
-
-    return np.transpose(W_fused, (2, 0, 1)), w_stat, w_off, w_comb
-
-
-def log_stationary_alpha(
-    alpha_result: AlphaMatrixResult,
-    pollutant_labels: list[str],
-) -> None:
-    gix = {g: i for i, g in enumerate(alpha_result.group_names)}
-    log.info("--- stationary branch ---")
-    for j, pol in enumerate(pollutant_labels):
-        row = alpha_result.alpha[j]
-        log.info(f"  {pol}: alpha={float(row[gix['stationary']]):.6g}")
-
-
-def _log_branch_alpha_beta(
-    alpha_result: AlphaMatrixResult,
-    pollutant_labels: list[str],
-    branch: str,
-) -> None:
-    gix = {g: i for i, g in enumerate(alpha_result.group_names)}
-    group_key = {
-        "forestry": "forestry_offroad",
-        "residential": "residential_offroad",
-        "commercial": "commercial_offroad",
-    }[branch]
-    for j, pol in enumerate(pollutant_labels):
-        row = alpha_result.alpha[j]
-        _, _, bF, bR, bB = _offroad_branch_betas(row, gix)
-        beta = {"forestry": bF, "residential": bR, "commercial": bB}[branch]
-        log.info(
-            f"  {pol}: alpha={float(row[gix[group_key]]):.6g} beta={beta:.6g}"
-        )
-
-
-def build_offroad_S_from_corine(
-    repo_root: Path,
-    corine_filepath: str | Path,
-    *,
-    l3_forest: list[int],
-    l3_residential: list[int],
-    l3_commercial: list[int],
-    corine_band: int,
-    cams_cells: dict[int, dict[str, Any]],
-    cams_grid: dict[str, Any],
-    ref_height: int,
-    ref_width: int,
-    ref_transform: Any,
-    ref_crs: Any,
-    pop_z: np.ndarray,
-    residential_w1: float,
-    residential_w2: float,
-    alpha_result: AlphaMatrixResult | None = None,
-    pollutant_labels: list[str] | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Forest, residential (pop+CORINE), commercial masks on a reference grid."""
-    cor_path = repo_root / str(corine_filepath).replace("\\", "/")
-
-    def _mask(l3_codes: list[int]) -> np.ndarray:
-        m, tr, crs, _ = load_corine(
-            cor_path, l3_codes, corine_band, cams_cells, cams_grid, need_cell_id=False,
-        )
-        return warp_raster_to_grid(
-            m, tr, crs, ref_height, ref_width, ref_transform, ref_crs, dest_init_nan=False,
-        )
-
-    log.info("--- building mask for forestry ---")
-    S_forest = _mask(l3_forest)
-    log.info(f"  S sum={float(S_forest.sum()):.6g}")
-    if alpha_result is not None and pollutant_labels:
-        _log_branch_alpha_beta(alpha_result, pollutant_labels, "forestry")
-
-    log.info("--- building mask for residential ---")
-    cor_res = _mask(l3_residential)
-    S_residential = combined_S_publicpower(
-        pop_z, cor_res, w1=residential_w1, w2=residential_w2,
-    )
-    log.info(
-        f"  S sum={float(S_residential.sum()):.6g} "
-        f"w1={residential_w1} w2={residential_w2}"
-    )
-    if alpha_result is not None and pollutant_labels:
-        _log_branch_alpha_beta(alpha_result, pollutant_labels, "residential")
-
-    log.info("--- building mask for commercial ---")
-    S_commercial = _mask(l3_commercial)
-    log.info(f"  S sum={float(S_commercial.sum()):.6g}")
-    if alpha_result is not None and pollutant_labels:
-        _log_branch_alpha_beta(alpha_result, pollutant_labels, "commercial")
-    return S_forest, S_residential, S_commercial

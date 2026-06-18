@@ -7,12 +7,6 @@ import numpy as np
 from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var
-from proxy.core.area_weights import (
-    build_offroad_S_from_corine,
-    fuse_offroad_combined_band,
-    log_stationary_alpha,
-    normalize_W_per_cams_cell,
-)
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.sector.C_Othercombustion.M_matrix import MODEL_CLASSES, build_m_matrix, write_area_weights_debug
 from proxy.sector.C_Othercombustion.U_matrix import stationary_weight_band
@@ -140,40 +134,10 @@ def build(
             country_profile=country_profile,
             pollutant_labels=pol_list,
         )
-        gix = {g: i for i, g in enumerate(alpha_result.group_names)}
-        log_stationary_alpha(alpha_result, pol_list)
-
-        corine_cfg = cfg.get("corine") or {}
-        orb = cfg.get("offroad") or {}
-        l3_forest = [int(x) for x in corine_cfg.get("l3_forest_agriculture", [])]
-        l3_res = [int(x) for x in corine_cfg.get("l3_residential", [])]
-        l3_com = [int(x) for x in corine_cfg.get("l3_commercial", [])]
-        if not l3_forest or not l3_res or not l3_com:
-            raise ValueError("corine l3_forest_agriculture, l3_residential, l3_commercial required for offroad")
-        S_forest, S_residential, S_commercial = build_offroad_S_from_corine(
-            repo_root,
-            corine_filepath,
-            l3_forest=l3_forest,
-            l3_residential=l3_res,
-            l3_commercial=l3_com,
-            corine_band=int(corine_cfg.get("band", 1)),
-            cams_cells=xb.cams_cells,
-            cams_grid=xb.cams_grid,
-            ref_height=ch,
-            ref_width=cw,
-            ref_transform=xb.transform,
-            ref_crs=xb.crs,
-            pop_z=xb.pop_z,
-            residential_w1=float(orb.get("residential_w1")),
-            residential_w2=float(orb.get("residential_w2")),
-            alpha_result=alpha_result,
-            pollutant_labels=pol_list,
-        )
 
         viz_pollutants: set[str] = set()
         xb_viz = None
         X_by_class_viz: dict[str, np.ndarray] | None = None
-        offroad_W_viz: dict[str, np.ndarray] | None = None
         if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
             viz_classes, viz_list = parse_c_othercombustion_debug_viz(cfg, pols, model_classes=MODEL_CLASSES)
             viz_pollutants = set(viz_list)
@@ -181,18 +145,13 @@ def build(
                 c: np.asarray(xb.X[:, :, MODEL_CLASSES.index(c)], dtype=np.float32)
                 for c in viz_classes
             }
-            offroad_W_viz = {
-                "forest": normalize_W_per_cams_cell(S_forest, xb.cell_id, xb.cams_cells),
-                "residential": normalize_W_per_cams_cell(S_residential, xb.cell_id, xb.cams_cells),
-                "commercial": normalize_W_per_cams_cell(S_commercial, xb.cell_id, xb.cams_cells),
-            }
             xb_viz = replace(
                 xb,
                 X=np.empty((0, 0, 0), dtype=np.float32),
                 stock_by_class={c: xb.stock_by_class[c] for c in viz_classes},
                 load_by_class={c: xb.load_by_class[c] for c in viz_classes},
             )
-        # U loop only needs X; drop duplicate per-class rasters and z-score layers from RAM. Memory crash otherwise
+
         xb = replace(
             xb,
             stock_by_class={},
@@ -208,26 +167,22 @@ def build(
         gc.collect()
 
         country_tag = country_profile["full_name"].replace(" ", "_")
-        out_tif = area_weights_tif_path(output_dir, "C_Othercombustion", country_tag, year)
+        out_tif = area_weights_tif_path(output_dir, "C_OtherCombustion", country_tag, year)
         band_labels = [cams_pollutant_var(p) for p in alpha_result.pollutant_labels]
         dst = open_area_weight_stack(out_tif, ch, cw, len(band_labels), xb.transform, xb.crs)
 
-        W_comb_by_pol: dict[str, np.ndarray] = {}
+        W_by_pol: dict[str, np.ndarray] = {}
 
         for j, pol in enumerate(alpha_result.pollutant_labels):
             W_s = stationary_weight_band(
                 xb.X, M_rows[j], xb.cell_id, xb.cams_cells,
             )
-            _W_s, _W_o, W_c = fuse_offroad_combined_band(
-                W_s, S_forest, S_residential, S_commercial,
-                xb.cell_id, xb.cams_cells, alpha_result.alpha[j], gix,
-            )
-            write_area_weight_plane(dst, j + 1, band_labels[j], W_c)
+            write_area_weight_plane(dst, j + 1, band_labels[j], W_s)
             if pol in viz_pollutants:
-                W_comb_by_pol[pol] = W_c
+                W_by_pol[pol] = W_s
 
         dst.close()
-        del M_rows, dst, S_forest, S_residential, S_commercial
+        del M_rows, dst
         xb = replace(xb, X=np.empty((0, 0, 0), dtype=np.float32))
         gc.collect()
         log.info(f"PIPELINE FINISHED: area-weight stack written: {out_tif}")
@@ -237,9 +192,12 @@ def build(
             and area_weights_viz_bbox_wgs84 is not None
             and xb_viz is not None
             and X_by_class_viz is not None
-            and offroad_W_viz is not None
         ):
             map_html = output_dir / f"C_OtherCombustion_{country_tag}_area_weights_debug_{year}.html"
+            offroad_W_viz = {
+                branch: np.zeros((ch, cw), dtype=np.float32)
+                for branch in ("forest", "residential", "commercial")
+            }
             try:
                 write_c_othercombustion_area_weights_debug_map(
                     map_html,
@@ -250,7 +208,7 @@ def build(
                     x_build=xb_viz,
                     X_by_class=X_by_class_viz,
                     offroad_W=offroad_W_viz,
-                    W_combined_poll=W_comb_by_pol,
+                    W_combined_poll=W_by_pol,
                 )
                 log.info(f"C_OtherCombustion area-weights debug map: {map_html}")
             except Exception as exc:

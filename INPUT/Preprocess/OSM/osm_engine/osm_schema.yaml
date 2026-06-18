@@ -154,6 +154,19 @@ sectors:
       - nwr/pipeline
       - nwr/substation
       - nwr/industrial
+      - nwr/landuse=military
+      - nwr/military
+      - nwr/industrial=mine
+      - nwr/industrial=quarry
+      - nwr/industrial=manufacturing
+      - nwr/industrial=steelmaking
+      - nwr/industrial=chemical
+      - nwr/industrial=cement
+      - nwr/industrial=oil
+      - nwr/industrial=refinery
+      - nwr/industrial=sawmill
+      - nwr/industrial=shipyard
+      - nwr/industrial=port
     augment:
       columns:
         offroad_family:
@@ -173,10 +186,10 @@ sectors:
             - match: { tag_key: landuse, in_set: landuse_polygon_values }
               value_template: "landuse_{landuse}"
           default: other
-      copy_tags: [name, landuse, railway, man_made, industrial, electrified, substance, substation, pipeline]
-    row_tags: [name, landuse, railway, man_made, industrial, electrified, substance, substation, pipeline]
+      copy_tags: [name, landuse, railway, man_made, industrial, electrified, substance, substation, pipeline, military]
+    row_tags: [name, landuse, railway, man_made, industrial, electrified, substance, substation, pipeline, military]
     strategies: { nodes: first, lines: first, areas: first }
-    layer_order: [osm_offroad_rail_lines, osm_offroad_pipeline_lines, osm_offroad_pipeline_facilities, osm_offroad_rail_areas, osm_offroad_areas]
+    layer_order: [osm_offroad_rail_lines, osm_offroad_pipeline_lines, osm_offroad_pipeline_facilities, osm_offroad_rail_areas, osm_offroad_areas, osm_offroad_industrial, osm_offroad_military]
 
     offroad_sets:
       railway_line_values: [rail, narrow_gauge, light_rail, subway, tram, monorail]
@@ -241,6 +254,15 @@ sectors:
             - { tag: { key: man_made, in: [valve, pipeline_valve] } }
             - { tag: { key: pipeline, equals: valve } }
         layers: [osm_offroad_pipeline_facilities]
+      - match:
+          tag:
+            key: industrial
+            in: [mine, quarry, manufacturing, steelmaking, chemical, cement, oil, refinery, sawmill, shipyard, port]
+        layers: [osm_offroad_industrial]
+      - match: { tag: { key: landuse, equals: military } }
+        layers: [osm_offroad_military]
+      - match: { tag: { key: military, exists: true } }
+        layers: [osm_offroad_military]
 
       areas:
         # ---------- RAIL FACILITY POLYGONS (1A3c) ----------
@@ -298,6 +320,19 @@ sectors:
               - { tag: { key: industrial, in: [gas, oil_and_gas, petroleum] } }
           layers: [osm_offroad_pipeline_facilities]
           extra_fields: { facility_confidence: medium }
+
+        # ---------- MANUFACTURING MOBILE (1A2gvii) ----------
+        - match:
+            tag:
+              key: industrial
+              in: [mine, quarry, manufacturing, steelmaking, chemical, cement, oil, refinery, sawmill, shipyard, port]
+          layers: [osm_offroad_industrial]
+
+        # ---------- OTHER MOBILE / MULTILATERAL (1A5b, 1A5c) ----------
+        - match: { tag: { key: landuse, equals: military } }
+          layers: [osm_offroad_military]
+        - match: { tag: { key: military, exists: true } }
+          layers: [osm_offroad_military]
 
   shipping:
     mode: rules

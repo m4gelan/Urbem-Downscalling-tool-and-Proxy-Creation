@@ -134,13 +134,16 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
     "I_Offroad": {
         "c121": LayerStyle("CORINE L3 121", kind="mask_rgb", rgb=(139, 90, 43), show=True),
         "c123": LayerStyle("CORINE L3 123 ports", kind="mask_rgb", rgb=(30, 144, 200), show=False),
-        "c124": LayerStyle("CORINE L3 124 transport", kind="mask_rgb", rgb=(70, 130, 180), show=False),
+        "c124": LayerStyle("CORINE L3 124 airports", kind="mask_rgb", rgb=(70, 130, 180), show=False),
         "c131": LayerStyle("CORINE L3 131 mineral", kind="mask_rgb", rgb=(34, 139, 34), show=False),
+        "c132": LayerStyle("CORINE L3 132 dump sites", kind="mask_rgb", rgb=(65, 65, 65), show=False),
+        "c133": LayerStyle("CORINE L3 133 construction", kind="mask_rgb", rgb=(210, 105, 30), show=False),
+        "popz": LayerStyle("Population z-score", cmap="viridis", show=False),
         "osm_slot_default": LayerStyle("OSM slot", kind="mask_rgb", rgb=(30, 110, 255), show=False, nearest=True),
-        "W_default": LayerStyle("W subgroup", cmap="inferno", scale_per_cams=True, show=False, opacity=0.84),
+        "W_default": LayerStyle("W subgroup", cmap="inferno", scale_per_cams=True, show=True, opacity=0.84),
         "wp_default": LayerStyle("W fused pollutant", cmap="plasma", scale_per_cams=True, show=True, opacity=0.86),
-        "wp_nmvoc": LayerStyle("W fused NMVOC", cmap="plasma", scale_per_cams=True, show=True),
-        "wp_nox": LayerStyle("W fused NOx", cmap="plasma", scale_per_cams=True, show=False),
+        "wp_pm10": LayerStyle("W fused PM10", cmap="plasma", scale_per_cams=True, show=True),
+        "wp_co": LayerStyle("W fused CO", cmap="plasma", scale_per_cams=True, show=True),
     },
     "J_Waste": {
         "osm": LayerStyle("OSM waste layers", kind="osm_blue", show=True),
@@ -185,6 +188,7 @@ _CORINE_L3_RGB: dict[str, tuple[int, int, int, int]] = {
     "c124": (70, 130, 180, 218),
     "c131": (34, 139, 34, 215),
     "c132": (65, 65, 65, 235),
+    "c133": (210, 105, 30, 220),
     "u111": (205, 92, 92, 220),
     "u112": (210, 105, 30, 220),
     "u121": (30, 144, 200, 218),
@@ -246,6 +250,17 @@ _F_ROADS_AADT_CMAP: dict[str, str] = {
 
 _F_ROADS_DRAW_ORDER = ("tertiary", "secondary", "primary")
 _CAMS_DISPLAY_FLOOR_FRAC = 0.05
+
+I_OFFROAD_EXPORT_GROUPS: list[tuple[str, str]] = [
+    ("rail_transport", "g1 Rail"),
+    ("pipeline_transport", "g2 Pipeline"),
+    ("non_road_machinery", "g3 Non-road machinery"),
+    ("agriculture_forestry_mobile", "g4 Agriculture/forestry"),
+    ("residential_mobile", "g5 Residential gardening"),
+    ("commercial_mobile", "g6 Commercial/institutional"),
+    ("manufacturing_mobile", "g7 Manufacturing mobile"),
+    ("other_mobile", "g8 Other mobile"),
+]
 
 
 # =============================================================================
@@ -540,6 +555,7 @@ def _style_for_key(sector: str, key: str, overrides: dict[str, LayerStyle] | Non
             "c124": "CORINE L3 124",
             "c131": "CORINE L3 131",
             "c132": "CORINE L3 132",
+            "c133": "CORINE L3 133",
             "u111": "CORINE u111",
             "u112": "CORINE u112",
             "u121": "CORINE u121",
@@ -619,6 +635,7 @@ def _prepare_layers(
     cell_id: np.ndarray,
     style_overrides: dict[str, LayerStyle] | None = None,
     render_wh: tuple[int, int] | None = None,
+    layer_keys: list[str] | None = None,
 ) -> tuple[list[RenderedLayer], tuple[float, float, float, float], tuple[int, int]]:
     keys = {k: v for k, v in arrays.items() if k != "cid"}
     keys["cid"] = cell_id
@@ -645,7 +662,10 @@ def _prepare_layers(
     rendered: list[RenderedLayer] = []
     slot_i = 0
 
-    for key in sorted(k for k in cropped if k != "cid"):
+    keys = layer_keys if layer_keys is not None else sorted(k for k in cropped if k != "cid")
+    for key in keys:
+        if key not in cropped:
+            raise ValueError(f"layer_keys: missing raster {key!r}")
         st = _style_for_key(sector, key, style_overrides)
         raw = cropped[key]
         if st.scale_per_cams:
@@ -1283,6 +1303,7 @@ def _emit_sector_viz(
     cell_id: np.ndarray,
     legend_html: str = "",
     style_overrides: dict[str, LayerStyle] | None = None,
+    layer_keys: list[str] | None = None,
 ) -> Path:
     render_wh = None
     if map_type() == "FIXED_IMAGE":
@@ -1293,7 +1314,7 @@ def _emit_sector_viz(
     layers, bbox_use, dst_wh = _prepare_layers(
         sector, arrays, bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
         cams_cells=cams_cells, cell_id=cell_id, style_overrides=style_overrides,
-        render_wh=render_wh,
+        render_wh=render_wh, layer_keys=layer_keys,
     )
     if map_type() == "FIXED_IMAGE":
         return _write_fixed_images(
@@ -1640,23 +1661,53 @@ def write_i_offroad_area_weights_debug_map(
     corine_l3_123: np.ndarray,
     corine_l3_124: np.ndarray,
     corine_l3_131: np.ndarray,
+    corine_l3_132: np.ndarray,
+    corine_l3_133: np.ndarray,
     osm_by_subgroup: dict[str, dict[str, np.ndarray]],
     W_by_subgroup: dict[str, np.ndarray],
     W_pollutant: dict[str, np.ndarray],
     legend_alpha_html: str,
+    pop_z: np.ndarray | None = None,
 ) -> Path:
-    arrays: dict[str, np.ndarray] = {
+    w_base = SECTOR_LAYER_STYLES["I_Offroad"]["W_default"]
+    if map_type() == "FIXED_IMAGE":
+        arrays: dict[str, np.ndarray] = {}
+        layer_keys: list[str] = []
+        style_overrides: dict[str, LayerStyle] = {}
+        for gkey, title in I_OFFROAD_EXPORT_GROUPS:
+            if gkey not in W_by_subgroup:
+                raise ValueError(f"I_Offroad export: missing W raster for group {gkey!r}")
+            k = f"W_{gkey}"
+            arrays[k] = np.asarray(W_by_subgroup[gkey], dtype=np.float32)
+            layer_keys.append(k)
+            style_overrides[k] = replace(w_base, title=title, show=True)
+        for pk, a in W_pollutant.items():
+            k = f"wp_{pk}"
+            arrays[k] = np.asarray(a, dtype=np.float32)
+            layer_keys.append(k)
+        return _emit_sector_viz(
+            out_html, "I_Offroad", arrays,
+            bbox_wgs84=bbox_wgs84, transform=transform, raster_crs=raster_crs,
+            cams_cells=cams_cells, cell_id=cell_id, legend_html=legend_alpha_html,
+            style_overrides=style_overrides, layer_keys=layer_keys,
+        )
+
+    arrays = {
         "c121": corine_l3_121.astype(np.uint8),
         "c123": corine_l3_123.astype(np.uint8),
         "c124": corine_l3_124.astype(np.uint8),
         "c131": corine_l3_131.astype(np.uint8),
+        "c132": corine_l3_132.astype(np.uint8),
+        "c133": corine_l3_133.astype(np.uint8),
     }
+    if pop_z is not None and pop_z.size:
+        arrays["popz"] = np.asarray(pop_z, dtype=np.float32)
     for sg in sorted(osm_by_subgroup.keys()):
         for sid in sorted((osm_by_subgroup[sg] or {}).keys()):
             arrays[f"osm__{sg}__{sid}"] = np.asarray(osm_by_subgroup[sg][sid], dtype=np.float32)
-    for g, a in W_by_subgroup.items():
+    for g, a in sorted(W_by_subgroup.items()):
         arrays[f"W_{g}"] = np.asarray(a, dtype=np.float32)
-    for pk, a in W_pollutant.items():
+    for pk, a in sorted(W_pollutant.items()):
         arrays[f"wp_{pk}"] = np.asarray(a, dtype=np.float32)
     return _emit_sector_viz(
         out_html, "I_Offroad", arrays,

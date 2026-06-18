@@ -10,14 +10,19 @@ from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
 from proxy.core.area_weights import (
+    build_i_offroad_mix_by_group,
+    compute_i_mobile_S_by_subgroup,
     compute_i_offroad_S_by_subgroup,
     fuse_alpha_weighted_W_planes,
     normalize_W_per_cams_cell,
 )
+from proxy.core.raster_helpers import warp_raster_to_grid
+from proxy.core.z_score import z_score_inside
 from proxy.dataset_loaders import require_filepaths_exist
-from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
+from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
+from proxy.dataset_loaders.load_population import load_population
 from proxy.visualizers.area_weights_map import (
     alpha_legend_html,
     write_i_offroad_area_weights_debug_map,
@@ -59,6 +64,9 @@ def build(
 
     cams_filepath = filepaths.get("CAMS", {}).get("path")
     corine_filepath = filepaths.get("CORINE", {}).get("path")
+    population_filepath = filepaths.get("Population", {}).get("path")
+    if not population_filepath:
+        raise ValueError("filepaths.Population.path required for I_Offroad mobile masks")
 
     if point_matching:
         log.info("--------------------------------")
@@ -100,6 +108,8 @@ def build(
         corine_l3_123 = [int(x) for x in (corine_cfg.get("l3_codes_123") or [])]
         corine_l3_124 = [int(x) for x in (corine_cfg.get("l3_codes_124") or [])]
         corine_l3_131 = [int(x) for x in (corine_cfg.get("l3_codes_131") or [])]
+        corine_l3_132 = [int(x) for x in (corine_cfg.get("l3_codes_132") or [])]
+        corine_l3_133 = [int(x) for x in (corine_cfg.get("l3_codes_133") or [])]
         
         corine_map_121, cor_tr, cor_crs, cell_id = load_corine(
             repo_root / str(corine_filepath).replace("\\", "/"),
@@ -129,8 +139,63 @@ def build(
             cams_cells_mask,
             cams_grid,
         )
+        corine_map_132, _, _, _ = load_corine(
+            repo_root / str(corine_filepath).replace("\\", "/"),
+            corine_l3_132,
+            corine_band,
+            cams_cells_mask,
+            cams_grid,
+        )
+        corine_map_133, _, _, _ = load_corine(
+            repo_root / str(corine_filepath).replace("\\", "/"),
+            corine_l3_133,
+            corine_band,
+            cams_cells_mask,
+            cams_grid,
+        )
 
         ch, cw = corine_map_121.shape
+
+        population_map, _, pop_transform, pop_crs, pop_nodata = load_population(
+            repo_root / str(population_filepath).replace("\\", "/"),
+            cams_cells_mask,
+        )
+        population_map = warp_raster_to_grid(
+            population_map,
+            pop_transform,
+            pop_crs,
+            ch,
+            cw,
+            cor_tr,
+            cor_crs,
+            src_nodata=pop_nodata,
+            dest_init_nan=True,
+            nan_fill=0.0,
+        )
+        inside_pop = pixels_inside_cams_cells(ch, cw, cor_tr, cor_crs, cams_cells_mask) & np.isfinite(
+            population_map
+        )
+        population_z = z_score_inside(
+            population_map,
+            inside_pop,
+            upper_quantile=0.99,
+            rescale_to_01=True,
+        )
+
+        mobile_cfg = cfg.get("mobile_masks") or {}
+        S_mobile, mobile_mix = compute_i_mobile_S_by_subgroup(
+            repo_root,
+            corine_filepath,
+            mobile_cfg=mobile_cfg,
+            corine_band=corine_band,
+            cams_cells=cams_cells_mask,
+            ref_height=ch,
+            ref_width=cw,
+            ref_transform=cor_tr,
+            ref_crs=cor_crs,
+            pop_z=population_z,
+        )
+        S_by_subgroup = dict(S_mobile)
 
         osm_rasters_by_subgroup: dict[str, dict[str, np.ndarray]] | None = None
 
@@ -177,14 +242,22 @@ def build(
 
 
             weights_cfg = cfg.get("weights") or {}
-            S_by_subgroup = compute_i_offroad_S_by_subgroup(
-                osm_rasters_by_subgroup=osm_rasters_by_subgroup,
-                corine_121=corine_map_121,
-                corine_123=corine_map_123,
-                corine_131=corine_map_131,
-                corine_124=corine_map_124,
-                weights=weights_cfg,
+            S_by_subgroup.update(
+                compute_i_offroad_S_by_subgroup(
+                    osm_rasters_by_subgroup=osm_rasters_by_subgroup,
+                    corine_121=corine_map_121,
+                    corine_123=corine_map_123,
+                    corine_131=corine_map_131,
+                    corine_124=corine_map_124,
+                    corine_132=corine_map_132,
+                    corine_133=corine_map_133,
+                    weights=weights_cfg,
+                )
             )
+
+        if not cams_cells_mask:
+            log.warning("I_Offroad area_weights: no CAMS cells; skipping weight stack.")
+        else:
             W_by_subgroup: dict[str, np.ndarray] = {}
             for gname, S_g in S_by_subgroup.items():
                 W_g = normalize_W_per_cams_cell(S_g, cell_id, cams_cells_mask)
@@ -232,55 +305,34 @@ def build(
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
             country_tag = country_profile["full_name"].replace(" ", "_")
-            wr = weights_cfg.get("rail_transport") or {}
-            wp = weights_cfg.get("pipeline_transport") or {}
-            wm = weights_cfg.get("non_road_machinery") or {}
-            osg = osm_rasters_by_subgroup
-            mix_by_group = {
-                "rail_transport": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm_diesel", "w_osm_electric", "w_osm_yard"],
-                    "weights": {k: float(wr[k]) for k in ("w_osm_diesel", "w_osm_electric", "w_osm_yard")},
-                    "terms": {
-                        "rail_diesel": np.asarray(osg["rail_transport"]["rail_diesel"], dtype=np.float32),
-                        "rail_electric": np.asarray(osg["rail_transport"]["rail_electric"], dtype=np.float32),
-                        "rail_yards": np.asarray(osg["rail_transport"]["rail_yards"], dtype=np.float32),
-                    },
-                },
-                "pipeline_transport": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon"],
-                    "weights": {k: float(wp[k]) for k in ("w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon")},
-                    "terms": {
-                        "oil_gas_facilities": np.asarray(osg["pipeline_transport"]["oil_gas_facilities"], dtype=np.float32),
-                        "pipeline_hydrocarbon": np.asarray(osg["pipeline_transport"]["pipeline_hydrocarbon"], dtype=np.float32),
-                    },
-                },
-                "non_road_machinery": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131"],
-                    "weights": {k: float(wm[k]) for k in ("w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131")},
-                    "terms": {
-                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
-                        "clc_123": np.asarray(corine_map_123, dtype=np.float32),
-                        "clc_124": np.asarray(corine_map_124, dtype=np.float32),
-                        "clc_131": np.asarray(corine_map_131, dtype=np.float32),
-                    },
-                },
-            }
+            mix_by_group: dict[str, dict] | None = None
+            if osm_rasters_by_subgroup is not None:
+                mix_by_group = build_i_offroad_mix_by_group(
+                    osm_rasters_by_subgroup=osm_rasters_by_subgroup,
+                    weights_cfg=weights_cfg,
+                    mobile_mix=mobile_mix,
+                    corine_121=corine_map_121,
+                    corine_123=corine_map_123,
+                    corine_124=corine_map_124,
+                    corine_131=corine_map_131,
+                    corine_132=corine_map_132,
+                    corine_133=corine_map_133,
+                )
+            W_export = {g: W_by_subgroup[g] for g in group_names}
+            mix_export = {g: mix_by_group[g] for g in group_names} if mix_by_group else None
             maybe_export_w_groups(
                 export_w_groups,
                 w_groups_export_root,
                 sector_key="I_Offroad",
                 country_tag=country_tag,
                 year=year,
-                W_by_group=W_by_subgroup,
+                W_by_group=W_export,
                 cell_id=cell_id,
                 transform=cor_tr,
                 crs=cor_crs,
                 alpha_result=alpha_result,
                 cams_cells=cams_cells_mask,
-                mix_by_group=mix_by_group,
+                mix_by_group=mix_export,
             )
 
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
@@ -321,10 +373,13 @@ def build(
                         corine_l3_123=corine_map_123,
                         corine_l3_124=corine_map_124,
                         corine_l3_131=corine_map_131,
-                        osm_by_subgroup=osm_rasters_by_subgroup,
+                        corine_l3_132=corine_map_132,
+                        corine_l3_133=corine_map_133,
+                        osm_by_subgroup=osm_rasters_by_subgroup or {},
                         W_by_subgroup=W_by_subgroup,
                         W_pollutant=w_poll,
                         legend_alpha_html=legend_alpha_html,
+                        pop_z=population_z,
                     )
                     log.info(f"I_Offroad area-weights debug map: {map_html}")
                 except Exception as exc:

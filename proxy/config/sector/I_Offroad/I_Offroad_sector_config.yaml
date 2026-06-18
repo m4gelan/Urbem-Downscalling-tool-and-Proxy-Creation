@@ -5,14 +5,16 @@ filepaths:
     path: INPUT/Proxy/OSM/Country/offroad_layers.gpkg
   CORINE:
     path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  Population:
+    path: INPUT/Proxy/Population/JRC-ESTAT_Census_Population_2021_100m.tif
   Alpha:
     path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
     config: proxy/config/alpha_methods.yaml
 
 area_weights_debug:
   viz_pollutants:
-    - NMVOC
-    - NOx
+    - PM10
+    - CO
 
 pollutants:
 - CO
@@ -46,6 +48,49 @@ corine:
     - 124
   l3_codes_131:
     - 131
+  l3_codes_132:
+    - 132
+  l3_codes_133:
+    - 133
+
+mobile_masks:
+  agriculture_forestry_mobile:
+    w_agri: 0.85
+    w_forest: 0.15
+    agri_l3_weights:
+      211: 0.8
+      212: 1.0
+      213: 1.0
+      221: 0.8
+      222: 0.8
+      223: 0.7
+      231: 0.3
+      241: 0.6
+      242: 0.6
+      243: 0.4
+    forest_l3_weights:
+      244: 0.3
+      311: 0.2
+      312: 0.2
+      313: 0.2
+      324: 0.1
+  residential_mobile:
+    w_pop: 0.6
+    w_blend: 0.4
+    corine_l3_weights:
+      111: 0.1
+      112: 0.4
+      141: 0.25
+      142: 0.25
+  commercial_mobile:
+    w_corine: 0.7
+    w_corine_pop: 0.3
+    corine_l3_weights:
+      121: 1.0
+      142: 0.8
+      141: 0.7
+      111: 0.3
+      112: 0.2
 
 # OSM: ``INPUT/Preprocess/OSM/osm_engine/osm_schema.yaml`` sector ``offroad`` → offroad_layers.gpkg.
 osm:
@@ -61,6 +106,8 @@ osm:
     - osm_offroad_pipeline_facilities
     - osm_offroad_rail_areas
     - osm_offroad_areas
+    - osm_offroad_industrial
+    - osm_offroad_military
   rasterize:
     burn_value: 1.0
     fill: 0.0
@@ -143,8 +190,38 @@ osm:
               - man_made: pipeline
                 substance: petroleum
     
+    manufacturing_mobile:
+      slots:
+        - id: industrial_sites
+          buffer_m:
+            point: 50
+            polygon: 25
+          match:
+            any_of:
+              - industrial: mine
+              - industrial: quarry
+              - industrial: manufacturing
+              - industrial: steelmaking
+              - industrial: chemical
+              - industrial: cement
+              - industrial: oil
+              - industrial: refinery
+              - industrial: sawmill
+              - industrial: shipyard
+              - industrial: port
 
-# CEIP legs ``I_Offroad_groups.yaml``: G1 rail / G2 pipeline / G3 non-road. Placeholders until S/W are wired in pipeline.
+    other_mobile:
+      slots:
+        - id: military
+          buffer_m:
+            point: 50
+            polygon: 25
+          match:
+            any_of:
+              - landuse: military
+              - military: "*"
+
+# CEIP legs ``I_Offroad_groups.yaml``: G1 rail / G2 pipeline / G3 non-road.
 weights:
   rail_transport:
     w_osm_diesel: 0.6
@@ -158,3 +235,9 @@ weights:
     w_clc_123: 0.15
     w_clc_124: 0.10
     w_clc_131: 0.40
+  manufacturing_mobile:
+    w_osm: 0.6
+    w_corine: 0.4
+  other_mobile:
+    w_osm: 0.6
+    w_corine: 0.4

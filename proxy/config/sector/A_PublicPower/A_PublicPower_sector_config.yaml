@@ -25,7 +25,7 @@ cams_point_sources:
   year: 2019
   emission_category_indices: [1]
   source_type_indices: [2]
-  match_mode: cams_cell
+  match_mode: distance
   max_match_distance_km: 10.0
 
 # CAMS area grid (source_type_index 1 = area); used for area weights only

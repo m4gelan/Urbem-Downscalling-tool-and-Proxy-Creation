@@ -53,21 +53,6 @@ corine:
     - 112
   l3_code_121:
     - 121
-  l3_forest_agriculture:
-    - 244
-    - 211
-    - 212
-    - 311
-    - 312
-    - 313
-  l3_residential:
-    - 112
-  l3_commercial:
-    - 121
-
-offroad:
-  residential_w1: 0.4
-  residential_w2: 0.6
 
 ghsl_smod:
   rural_codes: [11, 12, 13, 21, 22]

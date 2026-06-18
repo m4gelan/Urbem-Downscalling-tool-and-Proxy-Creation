@@ -252,6 +252,11 @@ def load_osm_filtered(
                         s = ""
                     else:
                         s = str(val).strip().lower()
+                    if str(v).strip() == "*":
+                        if not s:
+                            ok = False
+                            break
+                        continue
                     if s != str(v).strip().lower():
                         ok = False
                         break
