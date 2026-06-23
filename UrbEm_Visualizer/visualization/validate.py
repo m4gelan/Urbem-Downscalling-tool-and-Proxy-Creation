@@ -78,6 +78,15 @@ def validate_output_folder(output_dir: Path) -> dict:
     if out_fmt not in ("csv", "netcdf4"):
         errors.append(f"unsupported output.format: {out_fmt!r}")
 
+    from UrbEm_Visualizer.downscaling.output_config import parse_point_matching
+
+    try:
+        pm = parse_point_matching(config.get("output") or {})
+    except KeyError:
+        pm = {"procedure": "separate", "unmatched": "keep_location"}
+    is_merged = pm["procedure"] == "merged"
+    grid_names = ("merged_emission_grid",) if is_merged else _GRID_NAMES
+
     sectors_cfg = config.get("sectors") or {}
     found_sectors: list[str] = []
     pollutants_found: set[str] = set()
@@ -89,7 +98,7 @@ def validate_output_folder(output_dir: Path) -> dict:
         mode = sector_mode(sid)
         has_area = False
         has_point = False
-        for stem in _GRID_NAMES:
+        for stem in grid_names:
             csv_p = sub / f"{stem}.csv"
             nc_p = sub / f"{stem}.nc"
             path = csv_p if csv_p.is_file() else (nc_p if nc_p.is_file() else None)
@@ -103,14 +112,17 @@ def validate_output_folder(output_dir: Path) -> dict:
                 else:
                     errors.append(f"{sid}/{path.name}: {exc}")
                     continue
-            if stem == "area_emission_grid":
+            if is_merged or stem == "area_emission_grid" or stem == "merged_emission_grid":
                 has_area = True
             else:
                 has_point = True
             pollutants_found |= pols
-        if mode in ("both", "area_only") and not has_area:
+        if is_merged:
+            if mode in ("both", "area_only", "point_only") and not has_area:
+                errors.append(f"{sid}: merged_emission_grid missing")
+        elif mode in ("both", "area_only") and not has_area:
             errors.append(f"{sid}: area_emission_grid missing (mode={mode})")
-        if mode in ("both", "point_only") and not has_point:
+        if not is_merged and mode in ("both", "point_only") and not has_point:
             pt_path = sub / f"point_emission_grid.{'csv' if out_fmt == 'csv' else 'nc'}"
             if not pt_path.is_file():
                 errors.append(f"{sid}: point_emission_grid missing (mode={mode})")
@@ -126,10 +138,10 @@ def validate_output_folder(output_dir: Path) -> dict:
 
     merged_csv = output_dir / "merged_emission_grid.csv"
     merged_nc = output_dir / "merged_emission_grid.nc"
-    if (config.get("output") or {}).get("layer_mode") == "merged":
+    if is_merged:
         mp = merged_csv if merged_csv.is_file() else (merged_nc if merged_nc.is_file() else None)
         if mp is None:
-            warnings.append("layer_mode merged but merged_emission_grid file missing")
+            warnings.append("merged procedure but root merged_emission_grid file missing")
 
     if not found_sectors:
         errors.append("no sector emission grids found")

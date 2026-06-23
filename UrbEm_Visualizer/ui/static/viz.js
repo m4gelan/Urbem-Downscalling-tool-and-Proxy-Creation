@@ -20,6 +20,7 @@ const UrbEmViz = (function () {
   let basemapLayer = null;
   let domainLayer = null;
   let camsLayer = null;
+  let matchLineLayer = null;
   const areaLayers = {};
   const pointLayers = {};
   let layerState = {};
@@ -83,6 +84,12 @@ const UrbEmViz = (function () {
     const sectors = props.sectors || [];
     const sm = sectors.length === 1 ? sectorMeta(sectors[0]) : null;
     const glyph = sm ? ICON_GLYPH[sm.icon] || ICON_GLYPH.dot : "◆";
+    const shape =
+      props.point_shape === "sphere"
+        ? "sphere"
+        : props.point_shape === "diamond"
+          ? "diamond"
+          : "box";
     let bg;
     if (accents.length === 1) {
       bg = accents[0];
@@ -91,10 +98,20 @@ const UrbEmViz = (function () {
       const stops = accents.map((c, i) => `${c} ${i * step}% ${(i + 1) * step}%`).join(", ");
       bg = `conic-gradient(${stops})`;
     }
-    const html =
-      `<div class="pin-wrap"><div style="width:32px;height:32px;border-radius:50%;background:${bg};` +
-      `display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.45)">` +
-      `${glyph}</div></div>`;
+    let inner;
+    if (shape === "diamond") {
+      inner =
+        `<div class="viz-point-marker viz-point-marker--diamond" style="background:${bg};` +
+        `display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.45)">` +
+        `<span class="viz-point-glyph">${glyph}</span></div>`;
+    } else {
+      const radius = shape === "sphere" ? "50%" : "6px";
+      inner =
+        `<div class="viz-point-marker viz-point-marker--${shape}" style="width:32px;height:32px;border-radius:${radius};background:${bg};` +
+        `display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.45)">` +
+        `${glyph}</div>`;
+    }
+    const html = `<div class="pin-wrap">${inner}</div>`;
     return L.divIcon({ className: "viz-point-icon", html, iconSize: [32, 32], iconAnchor: [16, 16] });
   }
 
@@ -233,6 +250,28 @@ const UrbEmViz = (function () {
     }
   }
 
+  async function refreshMatchLines() {
+    if (matchLineLayer) {
+      map.removeLayer(matchLineLayer);
+      matchLineLayer = null;
+    }
+    const anyPointOn = Object.keys(layerState).some((id) => layerState[id].enabled && layerState[id].pointOn);
+    if (!anyPointOn) return;
+    const q = new URLSearchParams({ pollutant, sectors: activePointSectorsParam() });
+    const r = await fetch(`${API}/api/viz/match-lines?${q}`);
+    const gj = await r.json();
+    if (gj.error || !gj.features?.length) return;
+    matchLineLayer = L.geoJSON(gj, {
+      style: (f) => ({
+        color: f.properties.accent || "#4f7cff",
+        weight: 2,
+        opacity: 0.72,
+        dashArray: "5 7",
+      }),
+      interactive: false,
+    }).addTo(map);
+  }
+
   async function refreshPoints() {
     const q = new URLSearchParams({ pollutant, sectors: activePointSectorsParam() });
     const r = await fetch(`${API}/api/viz/points?${q}`);
@@ -296,6 +335,28 @@ const UrbEmViz = (function () {
       ds.classList.add("hidden");
     }
 
+    const outcomeEl = document.getElementById("facility-outcome");
+    if (outcomeEl) {
+      if (data.mass_outcome) {
+        outcomeEl.textContent = data.mass_outcome;
+        outcomeEl.classList.remove("hidden");
+      } else {
+        outcomeEl.textContent = "";
+        outcomeEl.classList.add("hidden");
+      }
+    }
+
+    const partialEl = document.getElementById("facility-partial-notice");
+    if (partialEl) {
+      if (data.partial_match_notice) {
+        partialEl.textContent = data.partial_match_notice;
+        partialEl.classList.remove("hidden");
+      } else {
+        partialEl.textContent = "";
+        partialEl.classList.add("hidden");
+      }
+    }
+
     const nameEl = document.getElementById("facility-name");
     if (data.facility_name && data.facility_name !== title) {
       nameEl.textContent = data.facility_name;
@@ -324,9 +385,13 @@ const UrbEmViz = (function () {
       metaDl.appendChild(dt);
       metaDl.appendChild(dd);
     }
-
+    const camsPart =
+      data.cams_lon != null && data.cams_lat != null
+        ? ` · CAMS ${Number(data.cams_lat).toFixed(5)}°, ${Number(data.cams_lon).toFixed(5)}°`
+        : "";
     document.getElementById("facility-coords").textContent =
-      `${latlng.lat.toFixed(5)}°, ${latlng.lng.toFixed(5)}°` +
+      `Facility ${latlng.lat.toFixed(5)}°, ${latlng.lng.toFixed(5)}°` +
+      camsPart +
       (data.cams_point_id != null && data.cams_point_id >= 0 ? ` · CAMS #${data.cams_point_id}` : "");
 
     const tbody = document.getElementById("facility-tbody");
@@ -385,6 +450,7 @@ const UrbEmViz = (function () {
       if (sid !== "TOTAL") refreshArea(sid);
     }
     await refreshPoints();
+    await refreshMatchLines();
     refreshViewportCard();
   }
 

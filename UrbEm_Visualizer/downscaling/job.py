@@ -11,7 +11,7 @@ _JOBS: dict[str, dict[str, Any]] = {}
 _LOCK = threading.Lock()
 
 
-def start_downscale_job(config_path: Path) -> str:
+def start_downscale_job(config_path: Path, *, partial_match_handling: str | None = None) -> str:
     job_id = uuid.uuid4().hex
     with _LOCK:
         _JOBS[job_id] = {
@@ -35,7 +35,12 @@ def start_downscale_job(config_path: Path) -> str:
 
     def _worker() -> None:
         try:
-            run_downscaling(config_path, on_progress=_on_progress, cancel_flag=_cancel)
+            run_downscaling(
+                config_path,
+                on_progress=_on_progress,
+                cancel_flag=_cancel,
+                partial_match_handling=partial_match_handling,
+            )
         except Exception as exc:
             with _LOCK:
                 st = _JOBS[job_id]["state"]

@@ -1,7 +1,7 @@
 """City point-source matching map from Proxy_weights *_matches.json.
 
-Visualizes CAMS grid cells ↔ real facility (JRC / E-PRTR / OSM / CORINE / UWWTD)
-linkages within a city bounding box.
+Visualizes CAMS grid cells ↔ real facilities (RI-URBANS primary, JRC / E-PRTR /
+OSM / CORINE / UWWTD fallback) within a city bounding box.
 """
 
 from __future__ import annotations
@@ -51,20 +51,16 @@ ICON_GLYPH = {
 # Matplotlib markers (DejaVu-safe) for facility / sidebar icons
 SECTOR_MARKERS = {
     "A_PublicPower": "*",
-    "B_Industry": "s",
+    "B_Industry": "D",
     "D_Fugitive": "D",
     "E_Solvents": "o",
     "H_Aviation": "^",
     "J_Waste": "h",
 }
 
-SECTOR_MATCH_DATASETS: dict[str, dict[str, str | None]] = {
-    "A_PublicPower": {"primary": "jrc", "fallback": "eprtr"},
-    "B_Industry": {"primary": "eprtr", "fallback": None},
-    "D_Fugitive": {"primary": "eprtr", "fallback": None},
-    "E_Solvents": {"primary": "eprtr", "fallback": None},
-    "H_Aviation": {"primary": "osm", "fallback": "corine"},
-    "J_Waste": {"primary": "eprtr", "fallback": "uwwtd"},
+# Industry stands out on the map (distinct from other sector markers/colors)
+FACILITY_STYLE: dict[str, dict[str, str]] = {
+    "B_Industry": {"marker": "D", "color": "#c62828"},
 }
 
 SECTOR_SHORT = {
@@ -83,11 +79,13 @@ SECTOR_SHORT = {
 }
 
 DATASET_LABEL = {
+    "riurbans": "RI-URBANS",
     "jrc": "JRC", "eprtr": "E-PRTR", "osm": "OSM",
     "corine": "CORINE", "uwwtd": "UWWTD",
 }
 
 DATASET_COLOR = {
+    "riurbans": "#6a1b9a",
     "jrc":    "#546e7a",
     "eprtr":  "#0277bd",
     "osm":    "#3949ab",
@@ -130,6 +128,46 @@ def _matches_path(proxy_root: Path, sector_id: str, country: str, year: int) -> 
     return proxy_root / sector_id / f"{stem}_matches.json"
 
 
+def _match_dataset_key(row: dict[str, Any]) -> str:
+    return str(row.get("dataset_key") or row.get("match_source") or "")
+
+
+def _sidecar_facility_links(row: dict[str, Any]) -> list[dict[str, Any]]:
+    links = row.get("facility_links")
+    if isinstance(links, list) and links:
+        return links
+    if str(row.get("matched") or "no") != "yes":
+        return []
+    flon, flat = row.get("facility_lon"), row.get("facility_lat")
+    if flon is not None and flat is not None:
+        return [{
+            "facility_id": row.get("facility_id"),
+            "facility_lon": flon,
+            "facility_lat": flat,
+            "match_distance_km": row.get("match_distance_km"),
+        }]
+    return []
+
+
+def _cams_summary(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for p in points:
+        k = (p["sector_id"], p["cams_id"])
+        if k not in by_key:
+            by_key[k] = {
+                "sector_id": p["sector_id"],
+                "cams_id": p["cams_id"],
+                "cams_lon": p["cams_lon"],
+                "cams_lat": p["cams_lat"],
+                "matched": False,
+                "dataset_key": "",
+            }
+        if p["matched"]:
+            by_key[k]["matched"] = True
+            by_key[k]["dataset_key"] = p["dataset_key"]
+    return list(by_key.values())
+
+
 def _load_sector_points(
     proxy_root: Path,
     sectors: list[str],
@@ -148,28 +186,48 @@ def _load_sector_points(
             cams_lon = float(row["cams_lon"])
             cams_lat = float(row["cams_lat"])
             matched = str(row.get("matched") or "no") == "yes"
-            fac_lon = row.get("facility_lon")
-            fac_lat = row.get("facility_lat")
+            ds_key = _match_dataset_key(row)
             cams_in = _in_bbox(cams_lon, cams_lat, bbox)
-            fac_in = (
-                matched
-                and fac_lon is not None
-                and fac_lat is not None
-                and _in_bbox(float(fac_lon), float(fac_lat), bbox)
-            )
-            if not (cams_in or fac_in):
+            link_rows = _sidecar_facility_links(row)
+
+            if not link_rows:
+                if not cams_in:
+                    continue
+                out.append({
+                    "cams_id": str(cams_id),
+                    "sector_id": sector_id,
+                    "cams_lon": cams_lon,
+                    "cams_lat": cams_lat,
+                    "matched": matched,
+                    "facility_lon": None,
+                    "facility_lat": None,
+                    "facility_id": None,
+                    "dataset_key": ds_key,
+                    "dataset": str(row.get("dataset") or ""),
+                })
                 continue
-            out.append({
-                "cams_id": str(cams_id),
-                "sector_id": sector_id,
-                "cams_lon": cams_lon,
-                "cams_lat": cams_lat,
-                "matched": matched,
-                "facility_lon": float(fac_lon) if fac_lon is not None else None,
-                "facility_lat": float(fac_lat) if fac_lat is not None else None,
-                "dataset_key": str(row.get("dataset_key") or ""),
-                "dataset": str(row.get("dataset") or ""),
-            })
+
+            for lk in link_rows:
+                flon, flat = lk.get("facility_lon"), lk.get("facility_lat")
+                fac_in = (
+                    flon is not None
+                    and flat is not None
+                    and _in_bbox(float(flon), float(flat), bbox)
+                )
+                if not (cams_in or fac_in):
+                    continue
+                out.append({
+                    "cams_id": str(cams_id),
+                    "sector_id": sector_id,
+                    "cams_lon": cams_lon,
+                    "cams_lat": cams_lat,
+                    "matched": matched,
+                    "facility_lon": float(flon) if flon is not None else None,
+                    "facility_lat": float(flat) if flat is not None else None,
+                    "facility_id": lk.get("facility_id"),
+                    "dataset_key": ds_key,
+                    "dataset": str(row.get("dataset") or ""),
+                })
     return out
 
 
@@ -240,6 +298,11 @@ def _draw_cams_cell(ax, rec: dict[str, Any]) -> None:
     )
 
 
+def _link_color(rec: dict[str, Any]) -> str:
+    key = rec.get("dataset_key") or ""
+    return DATASET_COLOR.get(key, COL_LINK)
+
+
 def _draw_link(ax, rec: dict[str, Any]) -> None:
     if not rec["matched"] or rec["facility_lon"] is None:
         return
@@ -248,7 +311,7 @@ def _draw_link(ax, rec: dict[str, Any]) -> None:
     ax.annotate(
         "", xy=(fx, fy), xytext=(cx0, cy0),
         arrowprops=dict(
-            arrowstyle="-|>", color=COL_LINK,
+            arrowstyle="-|>", color=_link_color(rec),
             lw=0.8, alpha=0.75,
             shrinkA=3, shrinkB=4,
         ),
@@ -256,12 +319,18 @@ def _draw_link(ax, rec: dict[str, Any]) -> None:
     )
 
 
+def _facility_style(sector_id: str) -> tuple[str, str]:
+    override = FACILITY_STYLE.get(sector_id)
+    if override:
+        return override["marker"], override["color"]
+    return _sector_marker(sector_id), _sector_color(sector_id)
+
+
 def _draw_facility(ax, rec: dict[str, Any]) -> None:
     if not rec["matched"] or rec["facility_lon"] is None:
         return
     fx, fy = _xy(rec["facility_lon"], rec["facility_lat"])
-    sector_color = _sector_color(rec["sector_id"])
-    mk = _sector_marker(rec["sector_id"])
+    mk, sector_color = _facility_style(rec["sector_id"])
 
     ax.scatter(
         [fx], [fy], s=55, c=sector_color,
@@ -326,14 +395,15 @@ def _write_png(
     xmin, xmax = min(x0, x1), max(x0, x1)
     ymin, ymax = min(y0, y1), max(y0, y1)
 
-    # ── stats ──────────────────────────────────────────────────────────────
-    n_total = len(points)
-    n_matched = sum(1 for p in points if p["matched"])
+    # ── stats (CAMS-level for rates, link-level for facility counts) ─────
+    cams_points = _cams_summary(points)
+    n_total = len(cams_points)
+    n_matched = sum(1 for p in cams_points if p["matched"])
     n_unmatched = n_total - n_matched
     match_rate = 100.0 * n_matched / n_total if n_total else 0.0
 
     by_sector: dict[str, list[dict]] = defaultdict(list)
-    for p in points:
+    for p in cams_points:
         by_sector[p["sector_id"]].append(p)
     by_dataset = Counter(p["dataset_key"] for p in points if p["matched"])
 
@@ -407,7 +477,7 @@ def _write_png(
     )
 
     # draw in z-order: CAMS cells → links → facilities
-    for rec in points:
+    for rec in cams_points:
         _draw_cams_cell(ax, rec)
     for rec in points:
         _draw_link(ax, rec)
@@ -431,15 +501,13 @@ def _write_png(
     for sector_id in sorted(by_sector.keys()):
         recs = by_sector[sector_id]
         t = len(recs)
-        ds_cfg = SECTOR_MATCH_DATASETS.get(sector_id, {"primary": "eprtr", "fallback": None})
-        primary_key = str(ds_cfg.get("primary") or "")
-        fallback_key = ds_cfg.get("fallback")
+        primary_key = "riurbans"
         n_primary = sum(
             1 for r in recs if r["matched"] and r["dataset_key"] == primary_key
         )
         n_fallback = sum(
             1 for r in recs
-            if r["matched"] and fallback_key and r["dataset_key"] == fallback_key
+            if r["matched"] and r["dataset_key"] != primary_key
         )
         n_matched_sector = n_primary + n_fallback
         n_unmatched_sector = t - n_matched_sector
@@ -477,16 +545,15 @@ def _write_png(
             w_p = bar_w * (n_primary / t)
             ax_side.add_patch(Rectangle(
                 (x_off, bar_y), w_p, bar_h,
-                facecolor=color, edgecolor="none",
+                facecolor=DATASET_COLOR.get(primary_key, color), edgecolor="none",
                 transform=ax_side.transAxes,
             ))
             x_off += w_p
-        if n_fallback and fallback_key:
+        if n_fallback:
             w_f = bar_w * (n_fallback / t)
-            fb_color = DATASET_COLOR.get(str(fallback_key), "#888888")
             ax_side.add_patch(Rectangle(
                 (x_off, bar_y), w_f, bar_h,
-                facecolor=fb_color, edgecolor="none",
+                facecolor="#546e7a", edgecolor="none",
                 transform=ax_side.transAxes,
             ))
             x_off += w_f
@@ -502,7 +569,7 @@ def _write_png(
 
     ax_side.text(
         0.55, y_cursor + 0.01,
-        "Bar: primary | fallback | unmatched",
+        "Bar: RI-URBANS | fallback | unmatched",
         fontsize=6.2, color="#777", va="bottom",
     )
     y_cursor -= 0.02
@@ -545,16 +612,8 @@ def _write_png(
         Line2D([0], [0], marker="s", color="w",
                markerfacecolor=COL_UNMATCHED, markeredgecolor="white",
                markersize=7, label=f"CAMS cell — unmatched ({n_unmatched})"),
-        Line2D([0], [0], marker="s", color="w",
-               markerfacecolor="#e85d5c", markeredgecolor="white",
-               markersize=7, label="Facility — Industry ■"),
-        Line2D([0], [0], marker="D", color="w",
-               markerfacecolor="#5bc0de", markeredgecolor="white",
-               markersize=7, label="Facility — Fugitive ◆"),
         Line2D([0], [0], color=COL_LINK, linewidth=1.2,
-               label="CAMS → facility link"),
-        Line2D([0], [0], color=COL_BBOX, linewidth=1.2, linestyle="--",
-               label="City bounding box"),
+               label="→ matched assignment"),
     ]
     sym_leg = ax_side.legend(
         handles=symbology_items,
@@ -566,16 +625,7 @@ def _write_png(
         handlelength=1.4, labelspacing=0.55,
     )
     sym_leg.get_title().set_fontweight("bold")
-    y_cursor -= 0.22
-
-    ax_side.text(
-        0.0, max(y_cursor, 0.02),
-        "□ CAMS = 0.1°×0.05° grid cell\n"
-        "◆ Facility = real point source (sector marker)\n"
-        "→ Arrow = matched assignment",
-        fontsize=6.8, color="#555", va="top",
-        linespacing=1.5,
-    )
+    y_cursor -= 0.14
 
     # ── save ───────────────────────────────────────────────────────────────
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -618,10 +668,13 @@ def main() -> None:
     path = _write_png(
         points, bbox, args.city, args.country, args.year, out, dpi=args.dpi,
     )
-    n_unmatched = sum(1 for p in points if not p["matched"])
+    cams_points = _cams_summary(points)
+    n_unmatched = sum(1 for p in cams_points if not p["matched"])
+    n_links = sum(1 for p in points if p["matched"])
     print(
         f"Wrote {path} "
-        f"({len(points)} CAMS in {args.city} bbox, {n_unmatched} unmatched in view)"
+        f"({len(cams_points)} CAMS, {n_links} facility links in {args.city} bbox, "
+        f"{n_unmatched} unmatched CAMS in view)"
     )
 
 

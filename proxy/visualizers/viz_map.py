@@ -7,6 +7,9 @@ from typing import Any
 import geopandas as gpd
 
 
+from proxy.writers.point_link import _facility_links
+
+
 def _jitter_latlon(uid: str, lat: float, lon: float, meters: float = 180.0) -> tuple[float, float]:
     deg = meters / 111_320.0
     h = sum(ord(c) for c in str(uid)) % 360
@@ -20,12 +23,18 @@ def _in_bbox_wgs84(lon: float, lat: float, bbox: tuple[float, float, float, floa
 
 
 def _facility_info_for_line(m: dict[str, Any]) -> dict[str, Any] | None:
+    links = _facility_links(m)
+    if links:
+        info = links[0].get("facility_info") or {}
+        if info.get("lon") is not None and info.get("lat") is not None:
+            return info
     for key in (
         "corine_facility_info",
         "uwwtd_facility_info",
         "eprtr_point_info",
         "jrc_point_info",
         "osm_facility_info",
+        "riurbans_point_info",
     ):
         info = m.get(key)
         if isinstance(info, dict) and info.get("lon") is not None and info.get("lat") is not None:
@@ -71,9 +80,20 @@ def write_point_match_map(
     assigned_uwwtd: set[str] = set()
     uwwtd_to_cams: dict[str, list[tuple[int, str, float]]] = {}
 
+    assigned_ri: set[str] = set()
+    ri_to_cams: dict[str, list[tuple[int, str, float]]] = {}
+
     for pid, m in matches.items():
         dist = float(m["scoring_value"]) if m.get("scoring_value") is not None else float("nan")
         matched_yes = m.get("matched") == "yes"
+        for lk in _facility_links(m):
+            fid = str(lk.get("facility_id") or "")
+            d = float(lk.get("scoring_value") or dist)
+            src = str(m.get("match_source") or "")
+            if fid and (src == "riurbans" or fid.startswith("ri_")):
+                ri_to_cams.setdefault(fid, []).append((int(pid), str(m.get("matched", "")), d))
+                if matched_yes:
+                    assigned_ri.add(fid)
         jid = m.get("jrc_point_id")
         if jid:
             jid = str(jid)
@@ -183,6 +203,8 @@ def write_point_match_map(
         dist_s = f"{float(dist):.2f} km" if dist is not None else "—"
         if m.get("match_source") == "corine":
             layer = "corine"
+        elif m.get("match_source") == "riurbans":
+            layer = "riurbans"
         elif m.get("osm_facility_id"):
             layer = "osm"
         elif m.get("match_source") == "uwwtd":
@@ -190,8 +212,9 @@ def write_point_match_map(
         elif m.get("eprtr_point_id"):
             layer = "eprtr"
         else:
-            layer = m.get("match_layer", "jrc")
-        fac = (
+            layer = m.get("match_layer", m.get("match_source") or "jrc")
+        links = _facility_links(m)
+        fac = links[0].get("facility_id") if links else (
             m.get("corine_facility_id")
             or m.get("uwwtd_facility_id")
             or m.get("eprtr_point_id")
@@ -199,6 +222,8 @@ def write_point_match_map(
             or m.get("osm_facility_id")
             or "—"
         )
+        n_links = len(links)
+        popup_extra = f"<br>facility links: {n_links}" if n_links > 1 else ""
         folium.CircleMarker(
             location=[c["latitude"], c["longitude"]],
             radius=7,
@@ -209,11 +234,31 @@ def write_point_match_map(
             weight=2,
             popup=folium.Popup(
                 f"<b>CAMS {pid}</b><br>matched: {m.get('matched')}<br>"
-                f"layer: {layer}<br>facility: {fac}<br>distance: {dist_s}",
+                f"layer: {layer}<br>facility: {fac}{popup_extra}<br>distance: {dist_s}",
                 max_width=280,
             ),
         ).add_to(fmap)
-        if ok and m.get("match_source") == "corine" and m.get("corine_facility_info"):
+        if ok and links:
+            src = str(m.get("match_source") or "")
+            line_color = {
+                "riurbans": "#6a1b9a",
+                "jrc": "#333333",
+                "eprtr": "#0088cc",
+                "osm": "#3949ab",
+                "corine": "#5d4037",
+                "uwwtd": "#00695c",
+            }.get(src, "#666666")
+            for lk in links:
+                info = lk.get("facility_info") or {}
+                if info.get("lat") is None or info.get("lon") is None:
+                    continue
+                folium.PolyLine(
+                    locations=[[c["latitude"], c["longitude"]], [float(info["lat"]), float(info["lon"])]],
+                    color=line_color,
+                    weight=2,
+                    opacity=0.8,
+                ).add_to(fmap)
+        elif ok and m.get("match_source") == "corine" and m.get("corine_facility_info"):
             ci = m["corine_facility_info"]
             folium.PolyLine(
                 locations=[[c["latitude"], c["longitude"]], [float(ci["lat"]), float(ci["lon"])]],
@@ -263,6 +308,45 @@ def write_point_match_map(
                     opacity=0.65,
                     dash_array="6, 8",
                 ).add_to(fmap)
+
+    ri_points: dict[str, dict[str, Any]] = {}
+    for m in matches.values():
+        for lk in _facility_links(m):
+            fid = str(lk.get("facility_id") or "")
+            if not fid:
+                continue
+            src = str(m.get("match_source") or "")
+            if src == "riurbans" or fid.startswith("ri_"):
+                info = dict(lk.get("facility_info") or {})
+                info.setdefault("lon", lk.get("facility_lon"))
+                info.setdefault("lat", lk.get("facility_lat"))
+                ri_points[fid] = info
+
+    for rid, r in ri_points.items():
+        if r.get("lon") is None or r.get("lat") is None:
+            continue
+        if not _show_facility(float(r["lon"]), float(r["lat"])):
+            continue
+        linked = rid in assigned_ri
+        lat, lon = _jitter_latlon(rid, float(r["lat"]), float(r["lon"]))
+        links = ri_to_cams.get(rid, [])
+        link_lines = "<br>".join(f"CAMS {p}: {st} ({d:.1f} km)" for p, st, d in links[:8])
+        gnfr = str(r.get("gnfr") or "")
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=6 if linked else 8,
+            color="#6a1b9a" if linked else "#ce93d8",
+            fill=True,
+            fill_color="#6a1b9a" if linked else "#f3e5f5",
+            fill_opacity=0.88,
+            weight=2,
+            popup=folium.Popup(
+                f"<b>RI-URBANS {gnfr}</b><br>id: {rid}<br>"
+                f"matched to CAMS: {'yes' if linked else 'no'}"
+                + (f"<br><br>{link_lines}" if link_lines else ""),
+                max_width=320,
+            ),
+        ).add_to(fmap)
 
     for jid, j in jrc_points.items():
         if not _show_facility(float(j["lon"]), float(j["lat"])):
@@ -387,6 +471,8 @@ def write_point_match_map(
         "<b>CAMS</b> <span style='color:green'>&#9679;</span> matched "
         "<span style='color:red'>&#9679;</span> not matched",
         "<span style='color:#e65100'>- -</span> dashed = unmatched CAMS → nearest facility",
+        "<b>RI-URBANS</b> <span style='color:#6a1b9a'>&#9679;</span> matched "
+        "<span style='color:#ce93d8'>&#9679;</span> unmatched pool",
         "<b>JRC</b> <span style='color:blue'>&#9679;</span> matched "
         "<span style='color:purple'>&#9679;</span> unmatched pool",
         "<b>EPRTR</b> <span style='color:cyan'>&#9679;</span> matched "

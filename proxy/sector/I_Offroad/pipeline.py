@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 from typing import Any
 
@@ -25,11 +26,15 @@ from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
 from proxy.visualizers.area_weights_map import (
     alpha_legend_html,
+    alpha_row_index,
+    viz_pollutant_labels,
     write_i_offroad_area_weights_debug_map,
-    w_pollutant_for_viz,
 )
-from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
+from proxy.writers.area_weight_stack import area_weights_tif_path, open_area_weight_stack, write_area_weight_plane
 from proxy.writers.w_groups_export import maybe_export_w_groups
+from proxy.core.point_matching.sector_flow import run_sector_point_matching
+from proxy.dataset_loaders.load_cams_points import load_cams_points
+from proxy.writers.point_link import write_cams_facility_link_tif
 
 
 def build(
@@ -70,8 +75,47 @@ def build(
 
     if point_matching:
         log.info("--------------------------------")
-        log.info("NO POINT MATCHING NEEDED FOR I_Offroad")
+        log.info("POINT MATCHING (I_Offroad)")
         log.info("--------------------------------")
+
+        if not country_profile:
+            raise ValueError("point_matching needs country_profile from entry")
+
+        cps = cfg.get("cams_point_sources") or {}
+        year = int(cps.get("year"))
+        ec = list(cps.get("emission_category_indices") or [])
+        st = list(cps.get("source_type_indices") or [])
+        cams_nc = repo_root / str(cams_filepath).replace("\\", "/")
+        pol_labels = [str(x).strip() for x in pols if str(x).strip()]
+
+        cams_points = load_cams_points(
+            cams_nc,
+            year=year,
+            country_iso3=country_profile["ISO3"],
+            emission_category_indices=ec,
+            source_type_indices=st,
+            pollutants=pol_labels,
+        )
+        if not cams_points:
+            log.info("No CAMS point sources for this sector/country; skipping point matching.")
+        else:
+            matches = run_sector_point_matching(
+                cams_points,
+                cfg=cfg,
+                repo_root=repo_root,
+                country_profile=country_profile,
+                pollutant_labels=pol_labels,
+                cams_nc=cams_nc,
+                fallback_sources=None,
+            )
+            country_tag = country_profile["full_name"].replace(" ", "_")
+            write_cams_facility_link_tif(
+                matches,
+                output_dir / f"I_Offroad_{country_tag}_point_source_{year}.tif",
+                crs=crs,
+                resolution_m=resolution_m,
+                pad_m=pad_m,
+            )
 
 
     if area_weights:
@@ -181,6 +225,7 @@ def build(
             upper_quantile=0.99,
             rescale_to_01=True,
         )
+        del population_map, inside_pop
 
         mobile_cfg = cfg.get("mobile_masks") or {}
         S_mobile, mobile_mix = compute_i_mobile_S_by_subgroup(
@@ -268,6 +313,7 @@ def build(
                     float(np.sum(S_g)),
                     float(np.sum(W_g)),
                 )
+            del S_by_subgroup, S_mobile
 
             alpha_sector_key = "I_Offroad"
             pol_list = [str(x).strip() for x in pols if str(x).strip()]
@@ -334,26 +380,33 @@ def build(
                 cams_cells=cams_cells_mask,
                 mix_by_group=mix_export,
             )
-
-            W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
-            for j in range(n_poll):
-                W_poll_stack[j] = fuse_alpha_weighted_W_planes(
-                    W_per_group, a_alpha[j], cell_id, cams_cells_mask,
-                )
+            del mix_by_group, mix_export, mobile_mix
+            gc.collect()
 
             band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
             out_w_tif = area_weights_tif_path(output_dir, "I_Offroad", country_tag, year)
-            write_area_weight_stack_multiband(
-                out_w_tif,
-                W_poll_stack,
-                band_names,
-                cor_tr,
-                cor_crs,
-            )
+            dst = open_area_weight_stack(out_w_tif, ch, cw, n_poll, cor_tr, cor_crs)
+            try:
+                for j in range(n_poll):
+                    W_j = fuse_alpha_weighted_W_planes(
+                        W_per_group, a_alpha[j], cell_id, cams_cells_mask,
+                    )
+                    write_area_weight_plane(dst, j + 1, band_names[j], W_j)
+            finally:
+                dst.close()
             log.info(f"I_Offroad alpha-fused area weights GeoTIFF: {out_w_tif}")
 
             if log.debug_enabled() and area_weights_viz_bbox_wgs84 is not None:
-                w_poll = w_pollutant_for_viz(cfg, W_poll_stack, alpha_result.pollutant_labels)
+                w_poll: dict[str, np.ndarray] = {}
+                for label in viz_pollutant_labels(cfg):
+                    ix = alpha_row_index(alpha_result.pollutant_labels, label)
+                    if ix is None:
+                        raise ValueError(
+                            f"area_weights_debug.viz_pollutants: {label!r} not in alpha pollutant_labels"
+                        )
+                    w_poll[cams_pollutant_var(label)] = fuse_alpha_weighted_W_planes(
+                        W_per_group, a_alpha[ix], cell_id, cams_cells_mask,
+                    )
                 legend_alpha_html = alpha_legend_html(
                     alpha_result.pollutant_labels,
                     alpha_result.alpha,
@@ -384,3 +437,7 @@ def build(
                     log.info(f"I_Offroad area-weights debug map: {map_html}")
                 except Exception as exc:
                     log.error(f"I_Offroad area-weights debug map failed: {exc}")
+
+            if osm_rasters_by_subgroup is not None:
+                del osm_rasters_by_subgroup
+            gc.collect()

@@ -15,7 +15,7 @@ import yaml
 
 SECTORS = ["waste", "solvents", "offroad", 'shipping', "industry", "fugitive", "aviation", "agricultural"]
 SECTORS_ENABLED = ["offroad"]  #[s for s in SECTORS if s != "waste"]
-COUNTRY = "France"  # maps to NUTS CNTR_CODE 
+COUNTRY = "Spain"  # maps to NUTS CNTR_CODE 
 OUTPUT_DIR = f"INPUT/Proxy/OSM/{COUNTRY}"  # GeoPackage output folder (repo-relative or absolute)
 LOG_LEVEL = "DEBUG"  # DEBUG | INFO | WARNING | ERROR
 NO_BBOX_EXTRACT = False

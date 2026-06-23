@@ -7,7 +7,10 @@ from proxy.core import log
 from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
 from proxy.core.area_weights import fuse_alpha_weighted_W_planes, normalize_W_per_cams_cell
 from proxy.dataset_loaders import require_filepaths_exist
+from proxy.core.point_matching.sector_flow import run_sector_point_matching
+from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
+from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 from proxy.writers.debug_dump import KAgAreaWeightsDebug, write_k_agriculture_area_weights_debug
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
@@ -60,8 +63,6 @@ def build(
         BiomassBurningResult,
     ] | None
 ):
-    _ = point_matching
-
     repo_root = Path(__file__).resolve().parents[3]
     with sector_config_path.open(encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
@@ -74,7 +75,46 @@ def build(
         raise ValueError("sector config pollutants list missing or empty")
 
     if point_matching:
-        log.info("NO POINT MATCHING for K_Agriculture")
+        log.info("--------------------------------")
+        log.info("POINT MATCHING (K_Agriculture)")
+        log.info("--------------------------------")
+        if not country_profile:
+            raise ValueError("point_matching needs country_profile from entry")
+        cps = cfg.get("cams_point_sources") or {}
+        year = int(cps.get("year"))
+        ec = list(cps.get("emission_category_indices") or [])
+        st = list(cps.get("source_type_indices") or [])
+        cams_filepath = filepaths.get("CAMS", {}).get("path")
+        cams_nc = repo_root / str(cams_filepath).replace("\\", "/")
+        pol_labels = [str(x).strip() for x in pols if str(x).strip()]
+        cams_points = load_cams_points(
+            cams_nc,
+            year=year,
+            country_iso3=country_profile["ISO3"],
+            emission_category_indices=ec,
+            source_type_indices=st,
+            pollutants=pol_labels,
+        )
+        if not cams_points:
+            log.info("No CAMS point sources for this sector/country; skipping point matching.")
+        else:
+            matches = run_sector_point_matching(
+                cams_points,
+                cfg=cfg,
+                repo_root=repo_root,
+                country_profile=country_profile,
+                pollutant_labels=pol_labels,
+                cams_nc=cams_nc,
+                fallback_sources=None,
+            )
+            country_tag = country_profile["full_name"].replace(" ", "_")
+            write_cams_facility_link_tif(
+                matches,
+                output_dir / f"K_Agriculture_{country_tag}_point_source_{year}.tif",
+                crs=crs,
+                resolution_m=resolution_m,
+                pad_m=pad_m,
+            )
     if not area_weights:
         return None
     if not country_profile:

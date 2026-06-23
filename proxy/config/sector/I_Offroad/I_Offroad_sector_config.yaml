@@ -10,6 +10,8 @@ filepaths:
   Alpha:
     path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
     config: proxy/config/alpha_methods.yaml
+  RI-URBANS:
+    path: INPUT/Proxy/Emissions_RI-URBANS_2018_main_v1_0.csv
 
 area_weights_debug:
   viz_pollutants:
@@ -29,13 +31,17 @@ cams_point_sources:
   year: 2019
   emission_category_indices: [12]
   source_type_indices: [2]
-  match_mode: distance
+  match_mode: cams_cell
   max_match_distance_km: 20.0
+
+ri_urbans_point_sources:
+  gnfr_sector: I
 
 cams_area_sources:
   year: 2019
   emission_category_indices: [12]
-  source_type_indices: [1]
+  # to get the full grid we add point source type as well (important for downscaling)
+  source_type_indices: [1, 2]
 
 corine:
   band: 1

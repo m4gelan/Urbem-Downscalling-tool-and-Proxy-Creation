@@ -346,13 +346,23 @@ def api_config_output():
     output = data.get("output")
     if not isinstance(output, dict):
         return jsonify({"error": "output object required"}), 400
-    for k in ("format", "layer_mode", "grid_resolution_m"):
+    for k in ("format", "grid_resolution_m", "point_matching"):
         if k not in output:
             return jsonify({"error": f"output.{k} required"}), 400
+    pm = output["point_matching"]
+    if not isinstance(pm, dict):
+        return jsonify({"error": "output.point_matching must be an object"}), 400
     if output["format"] not in ("csv", "netcdf4"):
         return jsonify({"error": "output.format must be csv or netcdf4"}), 400
-    if output["layer_mode"] not in ("separate", "merged"):
-        return jsonify({"error": "output.layer_mode must be separate or merged"}), 400
+    procedure = pm.get("procedure")
+    if procedure not in ("separate", "merged"):
+        return jsonify({"error": "output.point_matching.procedure must be separate or merged"}), 400
+    if procedure == "separate":
+        unmatched = pm.get("unmatched")
+        if unmatched not in ("keep_location", "burn_to_area"):
+            return jsonify({
+                "error": "output.point_matching.unmatched must be keep_location or burn_to_area",
+            }), 400
     try:
         grid_res = int(output["grid_resolution_m"])
     except (TypeError, ValueError):
@@ -361,9 +371,12 @@ def api_config_output():
         return jsonify({"error": "output.grid_resolution_m must be 100 or 1000"}), 400
     if _SESSION.get("config") is None:
         return jsonify({"error": "no active configuration"}), 400
+    stored_pm = {"procedure": procedure}
+    if procedure == "separate":
+        stored_pm["unmatched"] = pm["unmatched"]
     _SESSION["config"]["output"] = {
         "format": output["format"],
-        "layer_mode": output["layer_mode"],
+        "point_matching": stored_pm,
         "grid_resolution_m": grid_res,
     }
     return _config_response()
@@ -392,6 +405,48 @@ def api_config_save():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/config/load-path", methods=["POST"])
+def api_config_load_path():
+    data = request.get_json() or {}
+    config_path = data.get("config_path") or _SESSION.get("config_path")
+    if not config_path:
+        return jsonify({"error": "config_path required"}), 400
+    path = Path(config_path)
+    if not path.is_file():
+        return jsonify({"error": f"configuration not found: {path}"}), 404
+    try:
+        cfg = load_yaml(path)
+        check = check_input(cfg.get("country", ""), absent_sources=list(cfg.get("absent_sources") or []))
+        cfg = merge_check_paths(cfg, check)
+        _SESSION["config"] = cfg
+        _SESSION["config_path"] = str(path.resolve())
+        return jsonify(_config_response())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/downscale/precheck", methods=["POST"])
+def api_downscale_precheck():
+    data = request.get_json() or {}
+    config_path = data.get("config_path") or _SESSION.get("config_path")
+    if not config_path:
+        return jsonify({"error": "save a configuration file first"}), 400
+    path = Path(config_path)
+    if not path.is_file():
+        return jsonify({"error": f"configuration not found: {path}"}), 404
+    try:
+        cfg = load_yaml(path)
+        for key in ("domain", "pollutants", "sectors", "paths"):
+            if key not in cfg:
+                return jsonify({"error": f"run config missing {key!r}"}), 400
+        from UrbEm_Visualizer.downscaling.orchestrator import collect_point_match_stats
+
+        stats = collect_point_match_stats(cfg, project_root())
+        return jsonify({"ok": True, **stats})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/downscale/start", methods=["POST"])
 def api_downscale_start():
     data = request.get_json() or {}
@@ -408,9 +463,15 @@ def api_downscale_start():
                 return jsonify({"error": f"run config missing {key!r}"}), 400
         if "grid_resolution_m" not in cfg["output"]:
             return jsonify({"error": "run config missing output.grid_resolution_m"}), 400
+        from UrbEm_Visualizer.downscaling.output_config import parse_point_matching
+
+        parse_point_matching(cfg["output"])
         from UrbEm_Visualizer.downscaling.job import start_downscale_job
 
-        job_id = start_downscale_job(path.resolve())
+        handling = data.get("partial_match_handling")
+        if handling is not None and handling not in ("facility_or_drop",):
+            return jsonify({"error": "invalid partial_match_handling"}), 400
+        job_id = start_downscale_job(path.resolve(), partial_match_handling=handling)
         return jsonify({"ok": True, "job_id": job_id})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -621,6 +682,24 @@ def api_viz_points():
     if not active:
         active = ctx.sector_ids()
     return jsonify(points_geojson(ctx, active, pollutant))
+
+
+@app.route("/api/viz/match-lines", methods=["GET"])
+def api_viz_match_lines():
+    from UrbEm_Visualizer.visualization.geojson_layers import match_lines_geojson
+    from UrbEm_Visualizer.visualization.session import get_context
+
+    ctx = get_context()
+    if ctx is None:
+        return jsonify({"error": "no visualization session"}), 400
+    pollutant = request.args.get("pollutant")
+    if not pollutant:
+        return jsonify({"error": "pollutant required"}), 400
+    sectors = request.args.get("sectors", "")
+    active = [s.strip() for s in sectors.split(",") if s.strip() and s.strip() != "TOTAL"]
+    if not active:
+        active = ctx.sector_ids()
+    return jsonify(match_lines_geojson(ctx, active, pollutant))
 
 
 @app.route("/api/viz/facility", methods=["GET"])

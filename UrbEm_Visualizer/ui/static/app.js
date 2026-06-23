@@ -180,7 +180,13 @@ function showMenuB(config, tableRows) {
   }
   if (config.output) {
     document.querySelector('input[name="out-format"][value="' + config.output.format + '"]').checked = true;
-    document.querySelector('input[name="layer-mode"][value="' + config.output.layer_mode + '"]').checked = true;
+    const pm = config.output.point_matching || {};
+    const legacyMode = config.output.layer_mode;
+    const procedure = pm.procedure || (legacyMode === "merged" ? "merged" : "separate");
+    const unmatched = pm.unmatched || "keep_location";
+    document.querySelector('input[name="pm-procedure"][value="' + procedure + '"]').checked = true;
+    document.querySelector('input[name="pm-unmatched"][value="' + unmatched + '"]').checked = true;
+    syncPointMatchingUi();
     if (config.output.grid_resolution_m != null) {
       const gridEl = document.querySelector(
         'input[name="grid-resolution"][value="' + config.output.grid_resolution_m + '"]'
@@ -188,6 +194,56 @@ function showMenuB(config, tableRows) {
       if (gridEl) gridEl.checked = true;
     }
   }
+}
+
+function syncPointMatchingUi() {
+  const separate = document.querySelector('input[name="pm-procedure"][value="separate"]').checked;
+  const nested = document.getElementById("pm-separate-options");
+  if (nested) nested.classList.toggle("hidden", !separate);
+}
+
+function readPointMatchingConfig() {
+  const procedure = document.querySelector('input[name="pm-procedure"]:checked').value;
+  const pm = { procedure };
+  if (procedure === "separate") {
+    pm.unmatched = document.querySelector('input[name="pm-unmatched"]:checked').value;
+  }
+  return pm;
+}
+
+function formatPointMatchStats(stats, sectorLabels) {
+  const ids = Object.keys(stats || {});
+  if (!ids.length) return "";
+  const lines = ids.map((sid) => {
+    const s = stats[sid];
+    const label = (sectorLabels && sectorLabels[sid]) || sid;
+    let line =
+      label +
+      ": " +
+      s.total +
+      " CAMS point(s) in domain — " +
+      s.facilities_0 +
+      " with 0 facility, " +
+      s.facilities_1 +
+      " with 1, " +
+      s.facilities_2plus +
+      " with 2+";
+    if (s.partial_match > 0) {
+      line += ", " + s.partial_match + " partial match";
+    }
+    return line;
+  });
+  return lines.join("\n");
+}
+
+function partialMatchWarningText(total) {
+  if (!total || total < 1) return "";
+  const n = total === 1 ? "1 point source is a partial match" : total + " point sources are partial matches";
+  return (
+    n +
+    ": the emission is linked to a facility, but either the CAMS location or the facility " +
+    "coordinates fall outside your domain (facility coordinates / CAMS point outside the domain)."
+  );
 }
 
 function updateDomainSummary() {
@@ -958,6 +1014,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (data.config) activeConfig = data.config;
   });
 
+  document.querySelectorAll('input[name="pm-procedure"]').forEach((el) => {
+    el.addEventListener("change", syncPointMatchingUi);
+  });
+  syncPointMatchingUi();
+
   document.getElementById("btn-save-config").addEventListener("click", async () => {
     const name = document.getElementById("config-name").value.trim();
     if (!name) {
@@ -965,12 +1026,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     const format = document.querySelector('input[name="out-format"]:checked').value;
-    const layerMode = document.querySelector('input[name="layer-mode"]:checked').value;
+    const pointMatching = readPointMatchingConfig();
     const gridResolutionM = parseInt(document.querySelector('input[name="grid-resolution"]:checked').value, 10);
     await fetch(API + "/api/config/output", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ output: { format, layer_mode: layerMode, grid_resolution_m: gridResolutionM } }),
+      body: JSON.stringify({
+        output: { format, point_matching: pointMatching, grid_resolution_m: gridResolutionM },
+      }),
     });
     const pollutants = collectSelectedPollutants("pollutants-checkboxes");
     if (pollutants.length) {
@@ -1007,7 +1070,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderProcessingState(state) {
     const list = document.getElementById("processing-sectors");
     const alert = document.getElementById("processing-alert");
+    const matchBox = document.getElementById("processing-match-summary");
     list.innerHTML = "";
+
+    if (matchBox) {
+      const stats = state.point_match_stats;
+      const labels = {};
+      (state.sectors || []).forEach((s) => {
+        labels[s.id] = s.label || s.id;
+      });
+      const text = formatPointMatchStats(stats, labels);
+      if (text) {
+        matchBox.textContent = text;
+        matchBox.classList.remove("hidden");
+      } else {
+        matchBox.textContent = "";
+        matchBox.classList.add("hidden");
+      }
+    }
+
+    const partialBox = document.getElementById("processing-partial-warning");
+    if (partialBox) {
+      const ptext = partialMatchWarningText(state.partial_match_total);
+      if (ptext) {
+        partialBox.textContent = ptext;
+        partialBox.classList.remove("hidden");
+      } else {
+        partialBox.textContent = "";
+        partialBox.classList.add("hidden");
+      }
+    }
 
     (state.sectors || []).forEach((s) => {
       const row = document.createElement("div");
@@ -1115,7 +1207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  document.getElementById("btn-start-downscaling").addEventListener("click", async () => {
+  async function runDownscaleJob(partialMatchHandling) {
     document.getElementById("btn-processing-close").classList.add("hidden");
     document.getElementById("btn-processing-cancel").classList.remove("hidden");
     document.getElementById("processing-alert").classList.add("hidden");
@@ -1125,10 +1217,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       doneMsg.textContent = "";
     }
     showScreen("screen-processing");
+    const body = { config_path: configPath };
+    if (partialMatchHandling) body.partial_match_handling = partialMatchHandling;
     const r = await fetch(API + "/api/downscale/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config_path: configPath }),
+      body: JSON.stringify(body),
     });
     const data = await r.json();
     if (data.error) {
@@ -1141,6 +1235,87 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderProcessingState({ status: "running", sectors: [] });
     downscalePollTimer = setInterval(() => pollDownscale(downscaleJobId), 1000);
     pollDownscale(downscaleJobId);
+  }
+
+  function showPartialMatchModal(preData) {
+    const modal = document.getElementById("partial-match-modal");
+    const text = document.getElementById("partial-match-modal-text");
+    const counts = document.getElementById("partial-match-counts");
+    const total = preData.partial_match_total || 0;
+    const n =
+      total === 1
+        ? "1 point source is a partial match"
+        : total + " point sources are partial matches";
+    text.textContent =
+      n +
+      ": the emission is linked to a facility, but only one of the CAMS location and the " +
+      "facility coordinates falls inside your bounding box.";
+    counts.innerHTML = "";
+    const fac = preData.facility_outside_domain || 0;
+    const cams = preData.cams_outside_domain || 0;
+    const li1 = document.createElement("li");
+    li1.textContent =
+      fac === 1
+        ? "1 facility falls outside your domain"
+        : fac + " facilities fall outside your domain";
+    counts.appendChild(li1);
+    const li2 = document.createElement("li");
+    li2.textContent =
+      cams === 1
+        ? "1 CAMS point source falls outside your domain"
+        : cams + " CAMS point sources fall outside your domain";
+    counts.appendChild(li2);
+    modal.classList.remove("hidden");
+  }
+
+  function hidePartialMatchModal() {
+    document.getElementById("partial-match-modal").classList.add("hidden");
+  }
+
+  async function openB3FromSavedConfig() {
+    if (!activeConfig && configPath) {
+      const r = await fetch(API + "/api/config/load-path", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config_path: configPath }),
+      });
+      const data = await r.json();
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      activeConfig = data.config;
+    }
+    await openB3();
+  }
+
+  document.getElementById("btn-partial-adjust").addEventListener("click", async () => {
+    hidePartialMatchModal();
+    await openB3FromSavedConfig();
+  });
+
+  document.getElementById("btn-partial-facility-attrib").addEventListener("click", () => {
+    hidePartialMatchModal();
+    runDownscaleJob("facility_or_drop");
+  });
+
+  document.getElementById("btn-start-downscaling").addEventListener("click", async () => {
+    const pre = await fetch(API + "/api/downscale/precheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config_path: configPath }),
+    });
+    const preData = await pre.json();
+    if (preData.error) {
+      alert(preData.error);
+      return;
+    }
+    const partialTotal = preData.partial_match_total || 0;
+    if (partialTotal >= 1) {
+      showPartialMatchModal(preData);
+      return;
+    }
+    runDownscaleJob(null);
   });
 
   document.getElementById("btn-processing-cancel").addEventListener("click", async () => {

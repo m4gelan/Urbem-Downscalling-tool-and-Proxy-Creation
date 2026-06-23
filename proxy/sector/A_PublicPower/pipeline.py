@@ -7,6 +7,7 @@ import yaml
 from rasterio.warp import Resampling
 
 from proxy.core import log
+from proxy.core.alias import cams_pollutant_var
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points_energy
@@ -15,9 +16,7 @@ from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_population import load_population
-from proxy.core.point_matching.fallback import match_cams_lcp_one_to_one
-from proxy.core.point_matching.matching import match_cams_jrc, point_match_settings
-from proxy.core.alias import cams_pollutant_var
+from proxy.core.point_matching.sector_flow import run_sector_point_matching
 from proxy.visualizers.area_weights_map import viz_pollutant_labels, write_area_weights_map
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.point_link import write_cams_facility_link_tif
@@ -77,23 +76,16 @@ def build(
             raise ValueError("point_matching needs country_profile from entry")
 
         cams_nc = repo_root / cams_filepath.replace("\\", "/")
-        match_mode, max_match_distance_km, cams_grid_meta = point_match_settings(cps, cams_nc=cams_nc)
-        if match_mode == "distance":
-            log.info(f"Maximum match distance used is {max_match_distance_km} km")
-        else:
-            log.info("Point matching mode: same CAMS cell")
-
         year = int(cps.get("year"))
         ec = list(cps.get("emission_category_indices") )
         st = list(cps.get("source_type_indices") )
 
-        eps = cfg.get("eprtr_point_sources") 
-
+        pol_labels = [str(x).strip() for x in pols if str(x).strip()]
         log.info(
             "Loading CAMS points:"
             f"\n  File     : {cams_filepath}"
             f"\n  Country  : {country_profile['ISO3']}"
-            f"\n  Pollutants: {', '.join(str(x).strip() for x in pols if str(x).strip())}"
+            f"\n  Pollutants: {', '.join(pol_labels)}"
         )
         cams_points = load_cams_points(
             cams_nc,
@@ -101,77 +93,66 @@ def build(
             country_iso3=country_profile["ISO3"],
             emission_category_indices=ec,
             source_type_indices=st,
-            pollutants=[str(x).strip() for x in pols if str(x).strip()],
+            pollutants=pol_labels,
         )
 
-        log.info(
-            "Loading JRC points:"
-            f"\n  File    : {jrc_filepath}"
-        )
-        jrc_points = load_jrc_points(
-            repo_root / jrc_filepath.replace("\\", "/"),
-            year=year,
-            country_full_name=country_profile["full_name"],
-        )
-
-        log.info("--------------------------------")
-        log.info("MATCHING CAMS -> JRC")
-        log.info("--------------------------------")
-        matches = match_cams_jrc(
-            cams_points,
-            jrc_points,
-            match_mode=match_mode,
-            max_match_distance_km=max_match_distance_km,
-            cams_grid_meta=cams_grid_meta,
-        )
-
-        log.info("--------------------------------")
-        log.info("EPRTR/LCP FALLBACK (CAMS not matched to JRC)")
-        log.info("--------------------------------")
-
-        log.info(
-            "Loading Large Combustion Plants points:"
-            f"\n  File    : {lcp_filepath}"
-        )
-        lcp_points = load_eprtr_points_energy(
-            repo_root / lcp_filepath.replace("\\", "/"),
-            country_full_name=country_profile["full_name"],
-        )
-
-        unmatched_cams = {
-            pid: cams_points[pid]
-            for pid in cams_points
-            if matches.get(pid, {}).get("matched") != "yes"
-        }
-        lcp_fb = match_cams_lcp_one_to_one(
-            unmatched_cams,
-            lcp_points,
-            match_mode=match_mode,
-            max_match_distance_km=max_match_distance_km,
-            cams_grid_meta=cams_grid_meta,
-        )
-        for pid, row in lcp_fb.items():
-            matches[pid] = row
-
-        country_tag = country_profile["full_name"].replace(" ", "_")
-
-        point_source_tif = write_cams_facility_link_tif(
-            matches,
-            output_dir / f"A_PublicPower_{country_tag}_point_source_{year}.tif",
-            crs=crs,
-            resolution_m=resolution_m,
-            pad_m=pad_m,
-        )
-
-        if log.debug_enabled():
-            log.info("Writing point match map...")
-            map_html = write_point_match_map(
-                matches,
-                jrc_points,
-                output_dir / f"A_PublicPower_{country_tag}_point_match_map.html",
-                eprtr_points=lcp_points,
+        if not cams_points:
+            log.info("No CAMS point sources for this sector/country; skipping point matching.")
+        else:
+            log.info(
+                "Loading JRC points:"
+                f"\n  File    : {jrc_filepath}"
             )
-            log.info(f"Matching map written in : {output_dir}")
+            jrc_points = load_jrc_points(
+                repo_root / jrc_filepath.replace("\\", "/"),
+                year=year,
+                country_full_name=country_profile["full_name"],
+            )
+
+            log.info(
+                "Loading Large Combustion Plants points:"
+                f"\n  File    : {lcp_filepath}"
+            )
+            lcp_points = load_eprtr_points_energy(
+                repo_root / lcp_filepath.replace("\\", "/"),
+                country_full_name=country_profile["full_name"],
+            )
+
+            fallback: dict = {}
+            if jrc_points:
+                fallback["jrc"] = jrc_points
+            if lcp_points:
+                fallback["lcp"] = lcp_points
+
+            matches = run_sector_point_matching(
+                cams_points,
+                cfg=cfg,
+                repo_root=repo_root,
+                country_profile=country_profile,
+                pollutant_labels=pol_labels,
+                cams_nc=cams_nc,
+                fallback_sources=fallback or None,
+            )
+
+            country_tag = country_profile["full_name"].replace(" ", "_")
+
+            point_source_tif = write_cams_facility_link_tif(
+                matches,
+                output_dir / f"A_PublicPower_{country_tag}_point_source_{year}.tif",
+                crs=crs,
+                resolution_m=resolution_m,
+                pad_m=pad_m,
+            )
+
+            if log.debug_enabled():
+                log.info("Writing point match map...")
+                map_html = write_point_match_map(
+                    matches,
+                    jrc_points,
+                    output_dir / f"A_PublicPower_{country_tag}_point_match_map.html",
+                    eprtr_points=lcp_points,
+                )
+                log.info(f"Matching map written in : {output_dir}")
     
     if area_weights:
         log.info("--------------------------------")

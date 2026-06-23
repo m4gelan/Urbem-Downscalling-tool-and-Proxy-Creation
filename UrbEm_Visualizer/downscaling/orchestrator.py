@@ -10,7 +10,13 @@ from UrbEm_Visualizer.downscaling.area import downscale_area, prepare_sector_cam
 from UrbEm_Visualizer.downscaling.roads import downscale_roads_sector
 from UrbEm_Visualizer.dataset_loaders.tif_grid import cell_id_plane
 from UrbEm_Visualizer.downscaling.merge import merge_grids
-from UrbEm_Visualizer.downscaling.point import run_point_sector
+from UrbEm_Visualizer.downscaling.output_config import parse_point_matching
+from UrbEm_Visualizer.downscaling.point import (
+    add_unmatched_to_cams_cells,
+    load_point_records,
+    point_match_stats,
+    run_point_sector,
+)
 from UrbEm_Visualizer.writer.downscale_export import export_run
 from UrbEm_Visualizer.downscaling.sector_meta import sector_label, sector_mode, sector_order
 from UrbEm_Visualizer.downscaling.spatial import (
@@ -29,6 +35,35 @@ def output_dir_for_run(config_path: Path, config: dict) -> Path:
     if not run_name:
         run_name = config_path.stem
     return project_root() / "Output" / "UrbEm" / str(run_name)
+
+
+def collect_point_match_stats(config: dict, root: Path) -> dict[str, Any]:
+    domain = config["domain"]
+    pollutants = list(config["pollutants"])
+    order = sector_order(config)
+    by_sector: dict[str, dict[str, int]] = {}
+    labels: dict[str, str] = {}
+    partial_total = 0
+    for sid in order:
+        labels[sid] = sector_label(sid)
+        sec = config["sectors"][sid]
+        mode = sector_mode(sid)
+        ps = sec.get("point_source") or {}
+        if not ps.get("path") or mode not in ("both", "point_only"):
+            continue
+        ps_path = resolve_path(ps["path"], root)
+        st = point_match_stats(ps_path, domain, pollutants)
+        by_sector[sid] = st
+        partial_total += int(st.get("partial_match", 0))
+    fac_out = sum(int(st.get("facility_outside_domain", 0)) for st in by_sector.values())
+    cams_out = sum(int(st.get("cams_outside_domain", 0)) for st in by_sector.values())
+    return {
+        "by_sector": by_sector,
+        "sector_labels": labels,
+        "partial_match_total": partial_total,
+        "facility_outside_domain": fac_out,
+        "cams_outside_domain": cams_out,
+    }
 
 
 def _sector_step_plan(sec: dict, mode: str) -> list[tuple[str, float]]:
@@ -53,8 +88,13 @@ def run_downscaling(
     *,
     on_progress: Callable[[dict], None] | None = None,
     cancel_flag: Callable[[], bool] | None = None,
+    partial_match_handling: str | None = None,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
+    if partial_match_handling:
+        config = dict(config)
+        config["output"] = dict(config["output"])
+        config["output"]["partial_match_handling"] = partial_match_handling
     root = project_root()
     for key in ("country", "year", "domain", "pollutants", "output", "paths"):
         if key not in config:
@@ -65,7 +105,13 @@ def run_downscaling(
     output_cfg = config["output"]
     if "grid_resolution_m" not in output_cfg:
         raise KeyError("run config missing output.grid_resolution_m")
-    layer_mode = output_cfg["layer_mode"]
+    pm_cfg = parse_point_matching(output_cfg)
+    procedure = pm_cfg["procedure"]
+    burn_unmatched_to_area = procedure == "merged" or (
+        procedure == "separate" and pm_cfg["unmatched"] == "burn_to_area"
+    )
+    pm_handling = partial_match_handling or output_cfg.get("partial_match_handling")
+    skip_not_app_for_area = pm_handling == "facility_or_drop"
     fmt = output_cfg["format"]
     grid_resolution_m = int(output_cfg["grid_resolution_m"])
     order = sector_order(config)
@@ -93,11 +139,26 @@ def run_downscaling(
         "sectors": sectors_state,
         "error": None,
         "output_dir": str(out_dir),
+        "point_matching": pm_cfg,
+        "point_match_stats": {},
     }
 
     def push() -> None:
         if on_progress:
             on_progress(dict(state))
+
+    for sid in order:
+        sec = config["sectors"][sid]
+        mode = sector_mode(sid)
+        ps = sec.get("point_source") or {}
+        if ps.get("path") and mode in ("both", "point_only"):
+            ps_path = resolve_path(ps["path"], root)
+            state["point_match_stats"][sid] = point_match_stats(
+                ps_path, domain, pollutants,
+            )
+    state["partial_match_total"] = sum(
+        int(st.get("partial_match", 0)) for st in state["point_match_stats"].values()
+    )
 
     push()
     sector_results: dict[str, dict[str, Any]] = {}
@@ -138,6 +199,34 @@ def run_downscaling(
             )
             _set_progress(step, 1.0)
             step += 1
+
+            ps = sec.get("point_source") or {}
+            point_records = None
+            if ps.get("path") and mode in ("both", "point_only"):
+                ps_path = resolve_path(ps["path"], root)
+                if on_progress:
+                    sectors_state[i]["step"] = "Classifying point sources"
+                    push()
+                point_records = load_point_records(ps_path, domain, pollutants)
+                if burn_unmatched_to_area and mode == "both":
+                    _, not_app, unmatched_burn = point_records
+                    extra = list(unmatched_burn)
+                    if procedure == "merged" and not skip_not_app_for_area:
+                        extra.extend(not_app)
+                    if extra:
+                        if not cams_grid_meta:
+                            raise ValueError(
+                                f"{sid}: unmatched points need CAMS grid metadata for area downscaling"
+                            )
+                        cams_cells = add_unmatched_to_cams_cells(
+                            cams_cells, extra, cams_grid_meta, pollutants,
+                        )
+                elif burn_unmatched_to_area and mode == "point_only":
+                    _, _, unmatched_burn = point_records
+                    if unmatched_burn:
+                        raise ValueError(
+                            f"{sid}: merged / burn_to_area needs area weights (sector is point_only)"
+                        )
 
             if cams_grid_meta:
                 cache_key = sid
@@ -207,10 +296,8 @@ def run_downscaling(
                 _set_progress(step, 1.0)
                 step += 1
 
-            ps = sec.get("point_source") or {}
             if ps.get("path") and mode in ("both", "point_only"):
                 ps_path = resolve_path(ps["path"], root)
-                aw_path = resolve_path(aw["path"], root) if aw.get("path") else None
                 _set_progress(step, 0.0)
 
                 def _point_prog(label: str, sub: float) -> None:
@@ -225,11 +312,9 @@ def run_downscaling(
                     year=int(config["year"]),
                     pollutants=pollutants,
                     domain=domain,
-                    layer_mode=layer_mode,
-                    cell_id=cell_id,
-                    area_weight_path=aw_path,
-                    output_resolution_m=grid_resolution_m,
-                    native_meta=native_meta,
+                    procedure=procedure,
+                    burn_unmatched_to_area=burn_unmatched_to_area,
+                    partial_match_handling=pm_handling,
                     on_progress=_point_prog,
                 )
                 res["point_emission"] = point_da
@@ -238,6 +323,14 @@ def run_downscaling(
                 res["point_unmatched"] = g3
                 _set_progress(step, 1.0)
 
+            if procedure == "merged":
+                res["sector_merged"] = merge_grids(
+                    res.get("area_emission"),
+                    res.get("point_emission"),
+                    pollutants,
+                    (grid.height, grid.width),
+                )
+
             sector_results[sid] = res
             sectors_state[i]["progress"] = 100
             sectors_state[i]["step"] = "Complete"
@@ -245,28 +338,21 @@ def run_downscaling(
             push()
 
         merged_acc = None
-        if layer_mode == "merged":
+        if procedure == "merged":
             for sid in order:
-                r = sector_results.get(sid, {})
-                merged_acc = merge_grids(
-                    merged_acc,
-                    merge_grids(
-                        r.get("area_emission"),
-                        r.get("point_emission"),
-                        pollutants,
-                        (grid.height, grid.width),
-                    ),
-                    pollutants,
-                    (grid.height, grid.width),
-                )
+                sm = sector_results.get(sid, {}).get("sector_merged")
+                if sm is not None:
+                    merged_acc = merge_grids(
+                        merged_acc, sm, pollutants, (grid.height, grid.width),
+                    )
 
         export_run(
             out_dir,
             config=config,
             fmt=fmt,
-            layer_mode=layer_mode,
+            procedure=procedure,
             sector_results=sector_results,
-            merged=merged_acc if layer_mode == "merged" else None,
+            merged=merged_acc if procedure == "merged" else None,
             weight_check_log=weight_check_log,
             clip_log=clip_log,
             grid_transform=grid.transform,

@@ -29,14 +29,12 @@ SECTORS = [
     "K_Agriculture",
 ]
 
-SECTORS_ENABLED = ["A_PublicPower", "B_Industry", "D_Fugitive", "I_Offroad", "J_Waste"]
-#SECTORS_ENABLED = ["A_PublicPower"]
+SECTORS_ENABLED = ["J_Waste"]
 #SECTORS_ENABLED = SECTORS
-  
 
 # Select area and or point matching
 AREA_WEIGHTS = True
-POINT_MATCHING = True
+POINT_MATCHING = False
 
 # Select run mode
 # Options: build | prong_a | build_and_export | export_and_prong_a
@@ -44,7 +42,7 @@ POINT_MATCHING = True
 # prong_a: only run the prong_a analysis
 # build_and_export: build the weights and export the W_groups
 # D: export the W_groups and run the prong_a analysis
-RUN_MODE = "build_and_export" 
+RUN_MODE = "build" 
 
 EXPORT_W_GROUPS = True
 W_GROUPS_EXPORT_ROOT = "OUTPUT/Proxy_diagnostics/W_groups"
@@ -52,12 +50,12 @@ PRONG_A_SECTORS = "multi_group"
 PRONG_A_W_SECTORS = "mix_export"
 
 # Select country to build the weitghs and city for debug maps
-COUNTRY = "Greece"
-CITY = "Vienna" # City for debug maps
+COUNTRY = "Netherlands"
+CITY = "Athens" # City for debug maps
 
 # Info skips all, debug creates maps and other logs
 LOG_LEVEL = "INFO" # INFO | DEBUG option
-MAP_TYPE = 'FIXED_IMAGE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
+MAP_TYPE = 'INTERACTIVE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
 
 EPSG_CRS = "EPSG:3035"
 RESOLUTION_M = 100.0

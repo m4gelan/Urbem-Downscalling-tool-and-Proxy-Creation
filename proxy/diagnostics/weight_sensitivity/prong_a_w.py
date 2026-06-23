@@ -68,8 +68,8 @@ def run_sector_prong_a_w(
     if not data.get("has_mix"):
         raise ValueError(f"{sector_key}: bundle has no mix export — re-run build_and_export")
     mix_by_group = load_mix_from_manifest(data["manifest"], bundle_dir)
-    log.info(f"Prong A (w) {sector_key}: mix terms loaded, aggregating cells")
-    precomputed = precompute_mix_group_specs(mix_by_group, data["cell_id"])
+    log.info(f"Prong A (w) {sector_key}: mix specs loaded, aggregating cells")
+    precomputed = precompute_mix_group_specs(mix_by_group, data["cell_id"], bundle_dir=bundle_dir)
     log.info(f"Prong A (w) {sector_key}: {len(precomputed[0])} footprint cells")
     by_pollutant: dict[str, Any] = {}
     for pol in reference_pollutants:

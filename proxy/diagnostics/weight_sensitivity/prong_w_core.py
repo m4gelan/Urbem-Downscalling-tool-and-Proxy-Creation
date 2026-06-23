@@ -143,6 +143,31 @@ def _pack_linear_terms(raw: dict[str, np.ndarray], keys: list[str]) -> dict[str,
     return {f"t{i + 1}": raw[k] for i, k in enumerate(keys)}
 
 
+def _load_terms(spec: dict[str, Any], bundle_dir: Path) -> dict[str, np.ndarray]:
+    cached = spec.get("terms")
+    if cached is not None:
+        return cached
+    term_files = spec.get("term_files")
+    if not term_files:
+        raise ValueError("mix spec has neither terms nor term_files")
+    raw: dict[str, np.ndarray] = {}
+    for tkey, rel in term_files.items():
+        with rasterio.open(bundle_dir / rel) as src:
+            raw[tkey] = src.read(1).astype(np.float32)
+    mixer = str(spec["mixer"])
+    term_keys = list(spec["term_keys"])
+    if mixer in ("linear3", "linear4"):
+        n = 3 if mixer == "linear3" else 4
+        spec["terms"] = _pack_linear_terms(raw, term_keys[:n])
+    else:
+        spec["terms"] = raw
+    return spec["terms"]
+
+
+def _clear_terms(spec: dict[str, Any]) -> None:
+    spec.pop("terms", None)
+
+
 def load_mix_from_manifest(manifest: dict[str, Any], bundle_dir: Path) -> dict[str, dict[str, Any]]:
     mix_doc = manifest.get("mix")
     if not mix_doc:
@@ -152,13 +177,12 @@ def load_mix_from_manifest(manifest: dict[str, Any], bundle_dir: Path) -> dict[s
     out: dict[str, dict[str, Any]] = {}
     for ent in mix_doc:
         gname = str(ent["name"])
-        terms: dict[str, np.ndarray] = {}
+        term_files: dict[str, str] = {}
         term_keys: list[str] = []
         for te in ent["terms"]:
             tkey = str(te["key"])
             term_keys.append(tkey)
-            with rasterio.open(bundle_dir / str(te["file"])) as src:
-                terms[tkey] = src.read(1).astype(np.float32)
+            term_files[tkey] = str(te["file"])
         mixer = str(ent["mixer"])
         weights = {str(k): float(v) for k, v in ent["weights"].items()}
         if mixer == "linear":
@@ -168,17 +192,26 @@ def load_mix_from_manifest(manifest: dict[str, Any], bundle_dir: Path) -> dict[s
             out[gname] = {
                 "mixer": "linear",
                 "weights": weights,
-                "terms": terms,
+                "term_files": term_files,
                 "term_keys": term_keys,
                 "weight_keys": wkeys,
             }
             continue
         if mixer in ("linear3", "linear4"):
             n = 3 if mixer == "linear3" else 4
-            packed = _pack_linear_terms(terms, term_keys[:n])
-            spec = {"mixer": mixer, "weights": weights, "terms": packed, "term_keys": term_keys[:n]}
+            spec = {
+                "mixer": mixer,
+                "weights": weights,
+                "term_files": term_files,
+                "term_keys": term_keys[:n],
+            }
         else:
-            spec = {"mixer": mixer, "weights": weights, "terms": terms, "term_keys": term_keys}
+            spec = {
+                "mixer": mixer,
+                "weights": weights,
+                "term_files": term_files,
+                "term_keys": term_keys,
+            }
         out[gname] = spec
     return out
 
@@ -243,7 +276,11 @@ def W_g_from_spec(
     valid: np.ndarray,
     fid: np.ndarray,
     nb: int,
+    *,
+    bundle_dir: Path | None = None,
 ) -> np.ndarray:
+    if bundle_dir is not None:
+        _load_terms(spec, bundle_dir)
     S = score_from_mix(spec)
     return _normalize_S(S, cell_id, valid, fid, nb)
 
@@ -255,9 +292,17 @@ def stack_from_mix(
     valid: np.ndarray,
     fid: np.ndarray,
     nb: int,
+    *,
+    bundle_dir: Path | None = None,
 ) -> np.ndarray:
-    planes = [W_g_from_spec(mix_by_group[g], cell_id, valid, fid, nb) for g in group_names]
-    return np.stack(planes, axis=0)
+    g = len(group_names)
+    stack = np.empty((g, *cell_id.shape), dtype=np.float32)
+    for i, gname in enumerate(group_names):
+        spec = mix_by_group[gname]
+        stack[i] = W_g_from_spec(spec, cell_id, valid, fid, nb, bundle_dir=bundle_dir)
+        if bundle_dir is not None:
+            _clear_terms(spec)
+    return stack
 
 
 def stack_with_perturbed_group(
@@ -269,12 +314,15 @@ def stack_with_perturbed_group(
     valid: np.ndarray,
     fid: np.ndarray,
     nb: int,
+    *,
+    bundle_dir: Path | None = None,
 ) -> np.ndarray:
     """Reuse frozen group planes; recompute only the perturbed group."""
     out = np.asarray(base_stack, dtype=np.float32, order="C").copy()
     perturbed = dict(spec)
     perturbed["weights"] = weights
-    out[group_ix] = W_g_from_spec(perturbed, cell_id, valid, fid, nb)
+    out[group_ix] = W_g_from_spec(perturbed, cell_id, valid, fid, nb, bundle_dir=bundle_dir)
+    _clear_terms(perturbed)
     return out
 
 
@@ -308,6 +356,7 @@ def prepare_w2_state(
             nox,
             active_eps=active_eps,
             similarity_threshold=similarity_threshold,
+            bundle_dir=bundle_dir,
         )
         sensitive = set(pa.get("sensitive_cell_ids") or [])
         log.info(f"Prong B (w): computed {len(sensitive)} mix-sensitive cells")
@@ -315,7 +364,9 @@ def prepare_w2_state(
         pa = {"a3_w_exposure_fraction": None}
         log.info(f"Prong B (w): loaded {len(sensitive)} mix-sensitive cells from prong_a_w")
 
-    stack = stack_from_mix(mix_by_group, group_names, cell_id, valid, fid, nb)
+    stack = stack_from_mix(
+        mix_by_group, group_names, cell_id, valid, fid, nb, bundle_dir=bundle_dir
+    )
     return {
         "group_names": group_names,
         "mix_by_group": mix_by_group,
@@ -329,6 +380,7 @@ def prepare_w2_state(
         "sensitive": sensitive,
         "alpha_doc": data["alpha"],
         "mix_a3": pa.get("a3_w_exposure_fraction"),
+        "bundle_dir": bundle_dir,
     }
 
 
@@ -352,6 +404,7 @@ def run_w2_on_state(
     sensitive = state["sensitive"]
     mix_by_group = state["mix_by_group"]
     group_names = state["group_names"]
+    bundle_dir = state.get("bundle_dir")
 
     tag = f" {label}" if label else ""
     log.info(f"Prong B (w){tag}: fuse baseline W0 ({g} groups, alpha fixed)")
@@ -388,6 +441,7 @@ def run_w2_on_state(
                     valid,
                     fid,
                     nb,
+                    bundle_dir=bundle_dir,
                 )
                 Wp = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
                 tv_arr = tv_per_cell_all(
@@ -406,6 +460,7 @@ def run_w2_on_state(
                         tv_sens.append(tv)
                 if k % 4 == 0 or k == n_pert:
                     log.info(f"Prong B (w){tag}: perturb {k}/{n_pert}")
+                del stack_p, Wp, tv_arr
 
     def _stats(vals: list[float]) -> dict[str, float]:
         if not vals:
@@ -440,6 +495,7 @@ def run_w2_all_representatives(
         bdir = export_root / sk / f"{country_tag}_{int(year)}"
         log.info(f"Prong B (w) role={role} sector={sk} pollutant={report_pol}")
         data = load_bundle(bdir)
+        data.pop("W_by_group", None)
         if not data["manifest"].get("mix"):
             raise ValueError(f"{sk}: no mix export in bundle — re-run build_and_export")
         state = prepare_w2_state(
@@ -462,6 +518,7 @@ def run_w2_all_representatives(
                 sp, alpha_row, pct, pollutant=report_pol, label=f"{sk} {report_pol}",
             ),
         }
+        del state, sp, data
     return summaries
 
 
@@ -480,6 +537,7 @@ def collect_w_perturb_tvs(
     group_names = state["group_names"]
     gi_map = {g: i for i, g in enumerate(group_names)}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     pct = float(perturb_pct)
 
     tag = f" {label}" if label else ""
@@ -502,7 +560,15 @@ def collect_w_perturb_tvs(
                 spec["weights"], wkey, pct, sign, mixer, weight_keys=wkeys
             )
             stack_p = stack_with_perturbed_group(
-                base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+                base_stack,
+                gi_map[gname],
+                spec,
+                w_new,
+                cell_id,
+                valid,
+                fid,
+                nb,
+                bundle_dir=bundle_dir,
             )
             Wp = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
             tv_arr = tv_per_cell_all(np.nan_to_num(W0, nan=0.0), np.nan_to_num(Wp, nan=0.0), cell_id)
@@ -537,6 +603,7 @@ def collect_w_perturb_tvs_multi(
     group_names = state["group_names"]
     gi_map = {g: i for i, g in enumerate(group_names)}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     pct = float(perturb_pct)
 
     w0: dict[str, np.ndarray] = {}
@@ -562,7 +629,15 @@ def collect_w_perturb_tvs_multi(
                 spec["weights"], wkey, pct, sign, mixer, weight_keys=wkeys
             )
             stack_p = stack_with_perturbed_group(
-                base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+                base_stack,
+                gi_map[gname],
+                spec,
+                w_new,
+                cell_id,
+                valid,
+                fid,
+                nb,
+                bundle_dir=bundle_dir,
             )
             for pol, pspec in by_pollutant.items():
                 cids = pspec["cids"]

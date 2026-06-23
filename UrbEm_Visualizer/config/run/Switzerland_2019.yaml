@@ -69,5 +69,7 @@ domain:
   ymax: 2637299.9476391724
 output:
   format: csv
-  layer_mode: separate
+  point_matching:
+    procedure: separate
+    unmatched: keep_location
   grid_resolution_m: 100

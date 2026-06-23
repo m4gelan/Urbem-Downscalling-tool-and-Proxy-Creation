@@ -99,6 +99,7 @@ def _tv_values_w(
     group_names = state["group_names"]
     gi_map = {g: i for i, g in enumerate(group_names)}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     W0 = fuse_alpha_stack(base_stack, alpha_row, cell_id, valid, fid, nb)
     tv_all: list[float] = []
     for gname in group_names:
@@ -111,7 +112,15 @@ def _tv_values_w(
                     spec["weights"], wkey, pct, sign, mixer, weight_keys=wkeys
                 )
                 stack_p = stack_with_perturbed_group(
-                    base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+                    base_stack,
+                    gi_map[gname],
+                    spec,
+                    w_new,
+                    cell_id,
+                    valid,
+                    fid,
+                    nb,
+                    bundle_dir=bundle_dir,
                 )
                 Wp = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
                 tv_arr = tv_per_cell_all(
@@ -162,6 +171,7 @@ def collect_tv_by_weight(
     group_names = state["group_names"]
     gi_map = {g: i for i, g in enumerate(group_names)}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     W0 = fuse_alpha_stack(base_stack, alpha_row, cell_id, valid, fid, nb)
     out: list[tuple[str, list[float]]] = []
     for gname in group_names:
@@ -175,7 +185,15 @@ def collect_tv_by_weight(
                     spec["weights"], wkey, pct, sign, mixer, weight_keys=wkeys
                 )
                 stack_p = stack_with_perturbed_group(
-                    base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+                    base_stack,
+                    gi_map[gname],
+                    spec,
+                    w_new,
+                    cell_id,
+                    valid,
+                    fid,
+                    nb,
+                    bundle_dir=bundle_dir,
                 )
                 Wp = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
                 tv_arr = tv_per_cell_all(
@@ -202,6 +220,7 @@ def collect_b4_rows(
     group_names = state["group_names"]
     gi_map = {g: i for i, g in enumerate(group_names)}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     W0 = fuse_alpha_stack(base_stack, alpha_row, cell_id, valid, fid, nb)
     rows: list[tuple[str, str, str, str, float]] = []
     for gname in group_names:
@@ -211,7 +230,15 @@ def collect_b4_rows(
         for wkey in perturb_keys_for_spec(spec):
             w_new = perturb_weight(spec["weights"], wkey, pct, 1, mixer, weight_keys=wkeys)
             stack_p = stack_with_perturbed_group(
-                base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+                base_stack,
+                gi_map[gname],
+                spec,
+                w_new,
+                cell_id,
+                valid,
+                fid,
+                nb,
+                bundle_dir=bundle_dir,
             )
             Wp = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
             tv_arr = tv_per_cell_all(
@@ -245,10 +272,19 @@ def pick_b3_case(
     valid, fid, nb = state["valid"], state["fid"], state["nb"]
     gi_map = {g: i for i, g in enumerate(state["group_names"])}
     base_stack = state["stack"]
+    bundle_dir = state.get("bundle_dir")
     W0_full = fuse_alpha_stack(base_stack, alpha_row, cell_id, valid, fid, nb)
     w_new = perturb_weight(spec["weights"], wkey, pct, 1, mixer, weight_keys=wkeys)
     stack_p = stack_with_perturbed_group(
-        base_stack, gi_map[gname], spec, w_new, cell_id, valid, fid, nb
+        base_stack,
+        gi_map[gname],
+        spec,
+        w_new,
+        cell_id,
+        valid,
+        fid,
+        nb,
+        bundle_dir=bundle_dir,
     )
     W1_full = fuse_alpha_stack(stack_p, alpha_row, cell_id, valid, fid, nb)
     patch0 = crop_cell_patch(W0_full, cell_id, cid)

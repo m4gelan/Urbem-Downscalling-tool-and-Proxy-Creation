@@ -59,6 +59,11 @@ def load_cams_points(
         np.clip(lon_idx, 0, nlon - 1, out=lon_idx)
         np.clip(lat_idx, 0, nlat - 1, out=lat_idx)
 
+        emis_codes = [
+            c.decode() if isinstance(c, bytes) else str(c)
+            for c in cams_dataset["emis_cat_code"].values
+        ]
+
         pol_m: dict[str, np.ndarray] = {}
         for label in pollutants:
             vname = cams_pollutant_var(label)
@@ -73,15 +78,16 @@ def load_cams_points(
             mask &= np.max(np.stack(list(pol_m.values()), axis=1), axis=1) > 0.0
 
         if not np.any(mask):
-            log.error("No cams points source for this sector for this country, consider desabling the Point source matching")
-            SystemExit(1)
-       
+            log.info("No CAMS point sources for this sector/country (after filters).")
+            return {}
+
         # Create the output dictionary
         out: dict[int, dict[str, Any]] = {}
         for i in np.flatnonzero(mask):
             pid = int(i)
             lo = int(lon_idx[i])
             la = int(lat_idx[i])
+            ec_i = int(emission_category_indices[i])
             out[pid] = {
                 "latitude": float(lat[i]),
                 "longitude": float(lon[i]),
@@ -90,6 +96,8 @@ def load_cams_points(
                 "longitude_index": lo,
                 "latitude_index": la,
                 "cell_id": int(la * nlon + lo),
+                "gnfr": emis_codes[ec_i - 1],
+                "emission_category_index": ec_i,
             }
 
     nout = len(out)

@@ -36,7 +36,7 @@ def export_run(
     *,
     config: dict,
     fmt: str,
-    layer_mode: str,
+    procedure: str,
     sector_results: dict[str, dict[str, Any]],
     merged: xr.DataArray | None,
     weight_check_log: dict[str, Any],
@@ -71,18 +71,25 @@ def export_run(
             df = res.get(key)
             if isinstance(df, pd.DataFrame) and not df.empty:
                 df.to_csv(sub / f"{name}.csv", index=False)
-        if fmt == "netcdf4":
+        if procedure == "merged":
+            sm = res.get("sector_merged")
+            if sm is not None:
+                if fmt == "netcdf4":
+                    _write_netcdf(sub / "merged_emission_grid.nc", sm, sid, "merged")
+                else:
+                    _write_csv_grid(sub / "merged_emission_grid.csv", sm, grid_transform)
+        elif fmt == "netcdf4":
             if res.get("area_emission") is not None:
                 _write_netcdf(sub / "area_emission_grid.nc", res["area_emission"], sid, "area")
             if res.get("point_emission") is not None:
                 _write_netcdf(sub / "point_emission_grid.nc", res["point_emission"], sid, "point")
-        elif fmt == "csv":
+        else:
             if res.get("area_emission") is not None:
                 _write_csv_grid(sub / "area_emission_grid.csv", res["area_emission"], grid_transform)
             if res.get("point_emission") is not None:
                 _write_csv_grid(sub / "point_emission_grid.csv", res["point_emission"], grid_transform)
 
-    if layer_mode == "merged" and merged is not None:
+    if procedure == "merged" and merged is not None:
         if fmt == "netcdf4":
             _write_netcdf(output_dir / "merged_emission_grid.nc", merged, "all", "merged")
         else:

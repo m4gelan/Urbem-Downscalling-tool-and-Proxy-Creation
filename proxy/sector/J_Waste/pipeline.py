@@ -15,12 +15,13 @@ from proxy.core.area_weights import (
     fuse_alpha_weighted_W_planes,
     normalize_W_per_cams_cell,
 )
-from proxy.core.point_matching.matching import match_cams_to_facilities_one_to_one, point_match_settings
+from proxy.core.point_matching.sector_flow import run_sector_point_matching
+from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.dataset_loaders import require_filepaths_exist
-from proxy.dataset_loaders.load_cams_points import load_cams_points
-from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
+from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_corine import load_corine
+from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
 from proxy.dataset_loaders.load_osm import load_osm, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
 from proxy.dataset_loaders.load_uwwtd_treatment_plants import (
@@ -28,8 +29,6 @@ from proxy.dataset_loaders.load_uwwtd_treatment_plants import (
     load_uwwtd_treatment_plants,
     load_uwwtd_treatment_plants_raster,
 )
-from proxy.core.raster_helpers import warp_raster_to_grid
-from proxy.core.point_matching.fallback import merge_uwwtd_waste_fallback
 from proxy.dataset_loaders.load_waste_rasters import load_ghsl_smod, load_imperviousness
 from proxy.visualizers.area_weights_map import (
     write_j_waste_area_weights_debug_map,
@@ -96,19 +95,14 @@ def build(
         ec = list(cps.get("emission_category_indices") or [])
         st = list(cps.get("source_type_indices") or [])
         cams_nc = repo_root / str(cams_filepath).replace("\\", "/")
-        match_mode, max_match_distance_km, cams_grid_meta = point_match_settings(cps, cams_nc=cams_nc)
-        if match_mode == "distance":
-            log.info(f"Maximum match distance used is {max_match_distance_km} km")
-        else:
-            log.info("Point matching mode: same CAMS cell")
-
+        pol_labels = [str(x).strip() for x in pols if str(x).strip()]
         uww_cfg = cfg.get("uwwtd_point_sources") or {}
 
         log.info(
             "Loading CAMS points:"
             f"\n  File     : {cams_filepath}"
             f"\n  Country  : {country_profile['ISO3']}"
-            f"\n  Pollutants: {', '.join(str(x).strip() for x in pols if str(x).strip())}"
+            f"\n  Pollutants: {', '.join(pol_labels)}"
         )
         cams_points = load_cams_points(
             cams_nc,
@@ -116,105 +110,71 @@ def build(
             country_iso3=country_profile["ISO3"],
             emission_category_indices=ec,
             source_type_indices=st,
-            pollutants=[str(x).strip() for x in pols if str(x).strip()],
+            pollutants=pol_labels,
         )
 
-        eprtr_cfg = cfg.get("eprtr_point_sources") or {}
-        reporting_years = [int(y) for y in eprtr_cfg.get("reportingYears")]
-        eprtr_sector_code = int(eprtr_cfg.get("eprtr_sector_code"))
-        sub_raw = eprtr_cfg.get("eprtr_sub_sector_codes")
-        eprtr_sub_sector_codes = [str(code).strip() for code in sub_raw]
-
-        eprtr_points = load_eprtr_points(
-            repo_root / str(eprtr_filepath).replace("\\", "/"),
-            reporting_years=reporting_years,
-            country_full_name=country_profile["full_name"],
-            eprtr_sector_code=eprtr_sector_code,
-            eprtr_sub_sector_codes=eprtr_sub_sector_codes,
-        )
-
-        if eprtr_points:
-            matches = match_cams_to_facilities_one_to_one(
-                cams_points,
-                eprtr_points,
-                match_mode=match_mode,
-                max_match_distance_km=max_match_distance_km,
-                cams_grid_meta=cams_grid_meta,
-                facility_id_field_in_output_rows="eprtr_point_id",
-                facility_info_field_in_output_rows="eprtr_point_info",
-                log_label_for_facility_dataset="E-PRTR waste",
-            )
-            for m in matches.values():
-                if m.get("matched") == "yes":
-                    m.setdefault("match_source", "eprtr")
+        if not cams_points:
+            log.info("No CAMS point sources for this sector/country; skipping point matching.")
         else:
-            log.info("No E-PRTR waste facilities for this country/filter; CAMS remain unmatched until UWWTD.")
-            matches = {
-                pid: {
-                    "cams": dict(row),
-                    "matched": "no",
-                    "scoring_value": None,
-                    "eprtr_point_id": None,
-                    "eprtr_point_info": None,
-                }
-                for pid, row in cams_points.items()
-            }
+            eprtr_cfg = cfg.get("eprtr_point_sources") or {}
+            reporting_years = [int(y) for y in eprtr_cfg.get("reportingYears")]
+            eprtr_sector_code = int(eprtr_cfg.get("eprtr_sector_code"))
+            eprtr_sub_sector_codes = [str(code).strip() for code in eprtr_cfg.get("eprtr_sub_sector_codes")]
 
-        n_eprtr = sum(1 for m in matches.values() if m.get("matched") == "yes" and m.get("match_source") == "eprtr")
-        unmatched = {pid: dict(matches[pid]["cams"]) for pid in matches if matches[pid].get("matched") != "yes"}
+            eprtr_points = load_eprtr_points(
+                repo_root / str(eprtr_filepath).replace("\\", "/"),
+                reporting_years=reporting_years,
+                country_full_name=country_profile["full_name"],
+                eprtr_sector_code=eprtr_sector_code,
+                eprtr_sub_sector_codes=eprtr_sub_sector_codes,
+            )
 
-        uwwtd_points: dict[str, dict[str, Any]] = {}
-        if unmatched:
             uwwtd_rpt_key = str(country_profile["other"]).strip().upper()
             uwwtd_points = load_uwwtd_treatment_plants(
                 repo_root / str(uwwtd_treatment_plants_filepath).replace("\\", "/"),
                 rpt_state_key=uwwtd_rpt_key,
                 active_only=bool(uww_cfg.get("active_only", True)),
             )
+
+            fallback: dict[str, dict[str, Any]] = {}
+            if eprtr_points:
+                fallback["eprtr"] = eprtr_points
             if uwwtd_points:
-                uww_fb = match_cams_to_facilities_one_to_one(
-                    unmatched,
-                    uwwtd_points,
-                    match_mode=match_mode,
-                    max_match_distance_km=max_match_distance_km,
-                    cams_grid_meta=cams_grid_meta,
-                    facility_id_field_in_output_rows="uwwtd_facility_id",
-                    facility_info_field_in_output_rows="uwwtd_facility_info",
-                    log_label_for_facility_dataset="UWWTD treatment plant",
-                )
-                merge_uwwtd_waste_fallback(matches, uww_fb)
-            else:
-                log.info("UWWTD fallback skipped: no treatment plant points for this country.")
+                fallback["uwwtd"] = uwwtd_points
 
-        n_uww = sum(1 for m in matches.values() if m.get("match_source") == "uwwtd")
-        n_yes = sum(1 for m in matches.values() if m.get("matched") == "yes")
-        log.info(
-            f"J_Waste point matching: {n_eprtr} CAMS→E-PRTR, {n_uww} via UWWTD, {n_yes}/{len(matches)} total matched."
-        )
+            matches = run_sector_point_matching(
+                cams_points,
+                cfg=cfg,
+                repo_root=repo_root,
+                country_profile=country_profile,
+                pollutant_labels=pol_labels,
+                cams_nc=cams_nc,
+                fallback_sources=fallback or None,
+            )
 
-        country_tag = country_profile["full_name"].replace(" ", "_")
-        link_tif = write_cams_facility_link_tif(
-            matches,
-            output_dir / f"J_Waste_{country_tag}_point_source_{year}.tif",
-            crs=crs,
-            resolution_m=resolution_m,
-            pad_m=pad_m,
-        )
-        log.info(f"J_Waste point link GeoTIFF: {link_tif}")
+            country_tag = country_profile["full_name"].replace(" ", "_")
+            link_tif = write_cams_facility_link_tif(
+                matches,
+                output_dir / f"J_Waste_{country_tag}_point_source_{year}.tif",
+                crs=crs,
+                resolution_m=resolution_m,
+                pad_m=pad_m,
+            )
+            log.info(f"J_Waste point link GeoTIFF: {link_tif}")
 
-        if log.debug_enabled():
-            map_html = output_dir / f"J_Waste_{country_tag}_point_match_map.html"
-            try:
-                write_point_match_map(
-                    matches,
-                    {},
-                    map_html,
-                    eprtr_points=eprtr_points,
-                    uwwtd_facility_points=uwwtd_points,
-                )
-                log.info(f"J_Waste point match map (open in browser): {map_html}")
-            except Exception as exc:
-                log.error(f"J_Waste point match map failed: {exc}")
+            if log.debug_enabled():
+                map_html = output_dir / f"J_Waste_{country_tag}_point_match_map.html"
+                try:
+                    write_point_match_map(
+                        matches,
+                        {},
+                        map_html,
+                        eprtr_points=eprtr_points,
+                        uwwtd_facility_points=uwwtd_points,
+                    )
+                    log.info(f"J_Waste point match map (open in browser): {map_html}")
+                except Exception as exc:
+                    log.error(f"J_Waste point match map failed: {exc}")
 
     if area_weights:
         log.info("--------------------------------")

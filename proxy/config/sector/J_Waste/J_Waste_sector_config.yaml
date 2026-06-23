@@ -21,7 +21,9 @@ filepaths:
   UWWTD_Agglomerations:
     path: INPUT/Proxy/ProxySpecific/Waste/UWWTD_Agglomerations.gpkg
   Imperviousness:
-    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_GRC.tif
+    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_NET.tif
+  RI-URBANS:
+    path: INPUT/Proxy/Emissions_RI-URBANS_2018_main_v1_0.csv
 
   
 
@@ -42,10 +44,14 @@ cams_point_sources:
   match_mode: cams_cell
   max_match_distance_km: 15.0
 
+ri_urbans_point_sources:
+  gnfr_sector: J
+
 cams_area_sources:
   year: 2019
   emission_category_indices: [13]
-  source_type_indices: [1]
+  # to get the full grid we add point source type as well (important for downscaling)
+  source_type_indices: [1, 2]
 
   
 eprtr_point_sources:

@@ -116,6 +116,11 @@ def _round_key(lon: float, lat: float) -> tuple[float, float]:
     return (round(lon, 5), round(lat, 5))
 
 
+def _merge_point_shape(current: str, new: str) -> str:
+    rank = {"box": 0, "diamond": 1, "sphere": 2}
+    return new if rank.get(new, 0) > rank.get(current, 0) else current
+
+
 def _real_sector_ids(sector_ids: list[str]) -> list[str]:
     return [s for s in sector_ids if s != "TOTAL"]
 
@@ -143,12 +148,17 @@ def points_geojson(
                         "sectors": [],
                         "emissions": {},
                         "accents": [],
+                        "point_shape": "box",
                     }
                 b = buckets[key]
                 if sid not in b["sectors"]:
                     b["sectors"].append(sid)
                     b["accents"].append(meta.get("accent", "#4f7cff"))
                 b["emissions"][sid] = b["emissions"].get(sid, 0.0) + float(rec.emission)
+                b["point_shape"] = _merge_point_shape(
+                    b.get("point_shape", "box"),
+                    getattr(rec, "point_shape", "box"),
+                )
             continue
 
         df = ctx.grid_df(sid, "point", pollutant)
@@ -171,6 +181,7 @@ def points_geojson(
                 b["sectors"].append(sid)
                 b["accents"].append(meta.get("accent", "#4f7cff"))
             b["emissions"][sid] = b["emissions"].get(sid, 0.0) + float(rec.emission)
+            b["point_shape"] = b.get("point_shape", "box")
 
     features = []
     for i, b in enumerate(buckets.values()):
@@ -184,6 +195,7 @@ def points_geojson(
                 "emissions": b["emissions"],
                 "emission": total,
                 "pollutant": pollutant,
+                "point_shape": b.get("point_shape", "box"),
             },
             "geometry": {"type": "Point", "coordinates": [b["lon"], b["lat"]]},
         })
@@ -205,6 +217,65 @@ def domain_wgs84_from_ctx(ctx: RunContext) -> tuple[float, float, float, float]:
     from UrbEm_Visualizer.visualization.load_run import domain_wgs84
 
     return domain_wgs84(ctx.domain)
+
+
+def match_lines_geojson(
+    ctx: RunContext,
+    sector_ids: list[str],
+    pollutant: str,
+) -> dict[str, Any]:
+    from UrbEm_Visualizer.downscaling.point_meta import (
+        appointed_meta,
+        facility_links,
+        load_match_sidecar,
+        sidecar_pollutant_mass,
+    )
+
+    w, s, e, n = domain_wgs84_from_ctx(ctx)
+
+    def _in_dom(lon: float, lat: float) -> bool:
+        return w <= lon <= e and s <= lat <= n
+
+    features = []
+    for sid in _real_sector_ids(sector_ids):
+        if not ctx.sector_layers(sid)["point"]:
+            continue
+        link_path = ctx._sector_link_path(sid)
+        if not link_path:
+            continue
+        accent = sector_viz_meta(sid).get("accent", "#4f7cff")
+        sidecar = load_match_sidecar(link_path)
+        for pid_str, rec in sidecar.items():
+            if rec.get("matched") != "yes":
+                continue
+            clon, clat = float(rec["cams_lon"]), float(rec["cams_lat"])
+            for lk in facility_links(rec):
+                flon, flat = lk.get("facility_lon"), lk.get("facility_lat")
+                if flon is None or flat is None:
+                    continue
+                flon, flat = float(flon), float(flat)
+                if not (_in_dom(clon, clat) or _in_dom(flon, flat)):
+                    continue
+                attr = lk.get("attributed_pollutants") or {}
+                mass = sidecar_pollutant_mass(attr, pollutant) if attr else 0.0
+                if mass <= 0 and attr:
+                    continue
+                meta = appointed_meta(rec, lk)
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "sector": sid,
+                        "accent": accent,
+                        "cams_point_id": int(pid_str),
+                        "dataset": meta.get("dataset"),
+                        "facility_id": meta.get("facility_id"),
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[clon, clat], [flon, flat]],
+                    },
+                })
+    return {"type": "FeatureCollection", "features": features}
 
 
 def facility_detail(
@@ -234,11 +305,24 @@ def facility_detail(
             df = ctx.facility_points_df(sid, pollutant)
             for row in df.itertuples(index=False):
                 if _round_key(float(row.lon), float(row.lat)) == _round_key(lon, lat):
+                    fac_in = None
+                    if hasattr(row, "facility_lon") and getattr(row, "facility_lon", None) is not None:
+                        try:
+                            fac_in = ctx.facility_in_domain(
+                                float(row.facility_lon), float(row.facility_lat),
+                            )
+                        except (TypeError, ValueError):
+                            pass
                     facilities.append({
                         "sector_id": sid,
                         "sector": sid,
                         "sector_label": sector_viz_meta(sid).get("tree_label", sid),
                         "match_status": str(getattr(row, "match_status", "unknown")),
+                        "mass_outcome": ctx.mass_outcome_line(str(getattr(row, "match_status", "unknown"))),
+                        "partial_match_notice": ctx.partial_match_notice(
+                            str(getattr(row, "match_status", "unknown")),
+                            facility_in_domain=fac_in,
+                        ),
                         "pollutants": [{
                             "pollutant": pollutant,
                             "emission": float(row.emission),
@@ -298,12 +382,17 @@ def facility_detail(
         "lon": lon,
         "lat": lat,
         "match_status": primary.get("match_status"),
+        "mass_outcome": primary.get("mass_outcome") or ctx.mass_outcome_line(primary.get("match_status")),
+        "partial_match_notice": primary.get("partial_match_notice")
+        or ctx.partial_match_notice(primary.get("match_status")),
         "dataset": primary.get("dataset"),
         "facility_name": primary.get("facility_name"),
         "facility_id": primary.get("facility_id"),
         "details": primary.get("details") or [],
         "match_distance_km": primary.get("match_distance_km"),
         "cams_point_id": primary.get("cams_point_id"),
+        "cams_lon": primary.get("cams_lon"),
+        "cams_lat": primary.get("cams_lat"),
         "pollutants": pollutant_rows,
         "sectors": [
             {

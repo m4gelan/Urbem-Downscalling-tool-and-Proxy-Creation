@@ -7,6 +7,8 @@ filepaths:
     path: INPUT/Proxy/OSM/Country/aviation_layers.gpkg
   CORINE:
     path: INPUT/Proxy/CORINE/U2018_CLC2018_V2020_20u1.tif
+  RI-URBANS:
+    path: INPUT/Proxy/Emissions_RI-URBANS_2018_main_v1_0.csv
 
 pollutants:
   - CO
@@ -23,6 +25,9 @@ cams_point_sources:
   source_type_indices: [2]
   match_mode: cams_cell
   max_match_distance_km: 15.0
+
+ri_urbans_point_sources:
+  gnfr_sector: H
 
 # Same rules as PROXY/sectors/H_Aviation/README.md (polygon pool + apron match location).
 point_matching:

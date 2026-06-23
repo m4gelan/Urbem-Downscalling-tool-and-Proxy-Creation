@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -13,13 +14,19 @@ MixPrecompute = tuple[np.ndarray, dict[int, int], list[tuple[str, list[str], np.
 def precompute_mix_group_specs(
     mix_by_group: dict[str, dict[str, Any]],
     cell_id: np.ndarray,
+    *,
+    bundle_dir: Path | None = None,
 ) -> MixPrecompute:
+    from proxy.diagnostics.weight_sensitivity.prong_w_core import _clear_terms, _load_terms
+
     valid, dense, unique, ndense = _cell_aggregate_setup(cell_id)
     g2d = {int(g): i for i, g in enumerate(unique)}
     group_specs: list[
         tuple[str, list[str], np.ndarray, np.ndarray, dict[tuple[int, int], np.ndarray]]
     ] = []
     for gname, spec in mix_by_group.items():
+        if bundle_dir is not None:
+            _load_terms(spec, bundle_dir)
         terms = spec["terms"]
         names = list(terms.keys())
         planes = [terms[k].ravel()[valid].astype(np.float64) for k in names]
@@ -34,6 +41,8 @@ def precompute_mix_group_specs(
             for j in range(i + 1, g):
                 pair_dots[(i, j)] = np.bincount(dense, weights=planes[i] * planes[j], minlength=ndense)
         group_specs.append((gname, names, mass, norm_sq, pair_dots))
+        if bundle_dir is not None:
+            _clear_terms(spec)
     return unique, g2d, group_specs
 
 
@@ -45,10 +54,13 @@ def compute_prong_a_mix(
     active_eps: float,
     similarity_threshold: float,
     precomputed: MixPrecompute | None = None,
+    bundle_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Prong A on expert mixture terms inside each group (w story, not alpha)."""
     if precomputed is None:
-        unique, g2d, group_specs = precompute_mix_group_specs(mix_by_group, cell_id)
+        unique, g2d, group_specs = precompute_mix_group_specs(
+            mix_by_group, cell_id, bundle_dir=bundle_dir
+        )
     else:
         unique, g2d, group_specs = precomputed
 

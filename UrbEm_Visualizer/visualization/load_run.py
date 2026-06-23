@@ -8,6 +8,7 @@ import xarray as xr
 import yaml
 from pyproj import Transformer
 
+from UrbEm_Visualizer.downscaling.output_config import parse_point_matching, procedure_label
 from UrbEm_Visualizer.downscaling.sector_meta import sector_mode
 from UrbEm_Visualizer.paths import project_root
 from UrbEm_Visualizer.visualization.scale import _fmt_sci
@@ -69,6 +70,10 @@ def domain_wgs84(domain: dict) -> tuple[float, float, float, float]:
     return float(min(lons)), float(min(lats)), float(max(lons)), float(max(lats))
 
 
+def _in_wgs84_bbox(lon: float, lat: float, west: float, south: float, east: float, north: float) -> bool:
+    return west <= lon <= east and south <= lat <= north
+
+
 class RunContext:
     def __init__(self, output_dir: Path, config: dict):
         self.output_dir = output_dir.resolve()
@@ -76,7 +81,7 @@ class RunContext:
         self.domain = config["domain"]
         self.pollutants = list(config["pollutants"])
         self.fmt = (config.get("output") or {}).get("format", "csv")
-        self.layer_mode = (config.get("output") or {}).get("layer_mode", "separate")
+        self.point_matching = parse_point_matching(config.get("output") or {})
         self.unit = load_map_config().get("emission_unit", "kg/yr")
         self._to_wgs = Transformer.from_crs(str(self.domain["crs"]), "EPSG:4326", always_xy=True)
         self._cache: dict[tuple, pd.DataFrame] = {}
@@ -203,13 +208,17 @@ class RunContext:
             return {"area": True, "point": False}
         mode = sector_mode(sector_id)
         sub = self.output_dir / sector_id
-        area = _grid_path(sub, "area_emission_grid", self.fmt) is not None
         has_match = self.has_facility_points(sector_id)
+        if self.point_matching["procedure"] == "merged":
+            has_merged = _grid_path(sub, "merged_emission_grid", self.fmt) is not None
+            return {
+                "area": has_merged and mode in ("both", "area_only"),
+                "point": has_match and mode in ("both", "point_only"),
+            }
+        area = _grid_path(sub, "area_emission_grid", self.fmt) is not None
         has_grid = _grid_path(sub, "point_emission_grid", self.fmt) is not None
         if mode not in ("both", "point_only"):
             point = False
-        elif self.layer_mode == "merged":
-            point = has_match
         else:
             point = has_match or has_grid
         return {
@@ -247,6 +256,11 @@ class RunContext:
                     "emission": mass,
                     "match_status": str(getattr(rec, "match_status", path.stem)),
                     "cams_point_id": int(getattr(rec, "cams_point_id", -1)),
+                    "point_shape": (
+                        "sphere" if path.name == "point_matched_appointed.csv"
+                        else "diamond" if path.name == "point_matched_not_appointed.csv"
+                        else "box"
+                    ),
                 })
         out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["lon", "lat", "emission"])
         if not out.empty:
@@ -254,6 +268,7 @@ class RunContext:
                 "emission": "sum",
                 "match_status": "first",
                 "cams_point_id": "first",
+                "point_shape": "first",
             })
         self._cache[key] = out
         return out
@@ -318,10 +333,13 @@ class RunContext:
         out = {
             "sector_id": sector_id,
             "match_status": str(_cell("match_status") or "matched_appointed"),
+            "mass_outcome": self.mass_outcome_line(str(_cell("match_status") or "matched_appointed")),
             "dataset": _cell("match_dataset"),
             "facility_name": _cell("facility_name"),
             "facility_id": _cell("facility_id"),
             "cams_point_id": int(_cell("cams_point_id") or -1),
+            "cams_lon": float(_cell("cams_lon")) if _cell("cams_lon") is not None else None,
+            "cams_lat": float(_cell("cams_lat")) if _cell("cams_lat") is not None else None,
             "pollutants": pollutants,
             "details": details,
         }
@@ -329,24 +347,48 @@ class RunContext:
             link = self._sector_link_path(sector_id)
             if link:
                 from UrbEm_Visualizer.downscaling.point_meta import (
+                    appointed_meta,
+                    facility_links,
                     flatten_meta_to_row,
                     load_match_sidecar,
                     meta_for_cams,
+                    sidecar_pollutant_mass,
                 )
 
-                meta = meta_for_cams(load_match_sidecar(link), out["cams_point_id"])
+                raw = meta_for_cams(load_match_sidecar(link), out["cams_point_id"])
+                link_hit = None
+                for lk in facility_links(raw):
+                    if lk.get("facility_lon") is None or lk.get("facility_lat") is None:
+                        continue
+                    if (
+                        round(float(lk["facility_lon"]), 5) == lon_k
+                        and round(float(lk["facility_lat"]), 5) == lat_k
+                    ):
+                        link_hit = lk
+                        break
+                meta = appointed_meta(raw, link_hit)
                 flat = flatten_meta_to_row(meta)
                 out["dataset"] = meta.get("dataset") or flat.get("match_dataset")
                 out["facility_name"] = out["facility_name"] or meta.get("facility_name") or flat.get("facility_name")
                 out["facility_id"] = out["facility_id"] or meta.get("facility_id") or flat.get("facility_id")
                 if meta.get("match_distance_km") is not None:
                     out["match_distance_km"] = float(meta["match_distance_km"])
+                if meta.get("n_facility_links"):
+                    details.append({
+                        "label": "Facility links",
+                        "value": str(meta["n_facility_links"]),
+                    })
                 for d in meta.get("details") or []:
                     if isinstance(d, dict) and d.get("label"):
                         details.append({
                             "label": str(d["label"]),
                             "value": str(d.get("value", "")),
                         })
+                if link_hit and isinstance(link_hit.get("attributed_pollutants"), dict):
+                    for row in out["pollutants"]:
+                        val = sidecar_pollutant_mass(link_hit["attributed_pollutants"], row["pollutant"])
+                        row["emission"] = val
+                        row["emission_label"] = _fmt_sci(val) if val > 0 else "—"
                 for k, v in flat.items():
                     if k.startswith("meta_") and v:
                         details.append({
@@ -361,6 +403,93 @@ class RunContext:
                 pass
         self._cache[cache_key] = out
         return out
+
+    def mass_outcome_line(self, match_status: str) -> str:
+        pm = self.point_matching
+        proc = pm["procedure"]
+        status = str(match_status or "")
+        handling = (self.config.get("output") or {}).get("partial_match_handling")
+        if status == "matched_not_appointed" and handling == "facility_or_drop":
+            return (
+                f"{procedure_label(pm)}: partial match — mass attributed to the facility when "
+                "it falls inside the domain; otherwise disregarded."
+            )
+        if proc == "merged":
+            if status == "matched_appointed":
+                return (
+                    f"{procedure_label(pm)}: matched emission burned onto the facility pixel "
+                    "in the merged emission grid (single output layer)."
+                )
+            if status == "unmatched":
+                return (
+                    f"{procedure_label(pm)}: unmatched mass added to the CAMS cell area budget, "
+                    "downscaled with area weights, and included in the merged emission grid."
+                )
+            if status == "matched_not_appointed":
+                return (
+                    f"{procedure_label(pm)}: partial match outside domain — mass downscaled with "
+                    "area weights in the merged emission grid."
+                )
+            return f"{procedure_label(pm)}: emission in the merged emission grid."
+        if pm["unmatched"] == "burn_to_area":
+            if status == "matched_appointed":
+                return (
+                    f"{procedure_label(pm)}: matched emission in point_emission_grid; "
+                    "area sources in area_emission_grid."
+                )
+            if status == "unmatched":
+                return (
+                    f"{procedure_label(pm)}: unmatched mass added to the area grid and "
+                    "downscaled with area weights (not in point_emission_grid)."
+                )
+            return f"{procedure_label(pm)}: see area_emission_grid and point_emission_grid."
+        if status == "matched_appointed":
+            return (
+                f"{procedure_label(pm)}: matched emission at facility location in point_emission_grid."
+            )
+        if status == "unmatched":
+            return (
+                f"{procedure_label(pm)}: unmatched emission kept at CAMS location in point_emission_grid."
+            )
+        return f"{procedure_label(pm)}: emission in point_emission_grid."
+
+    def facility_in_domain(self, lon: float, lat: float) -> bool:
+        west, south, east, north = domain_wgs84(self.domain)
+        return _in_wgs84_bbox(lon, lat, west, south, east, north)
+
+    def partial_match_notice(
+        self,
+        match_status: str,
+        *,
+        facility_in_domain: bool | None = None,
+    ) -> str | None:
+        if str(match_status or "") != "matched_not_appointed":
+            return None
+        handling = (self.config.get("output") or {}).get("partial_match_handling")
+        intro = (
+            "This point is matched but either the CAMS point or the facility location "
+            "does not fall inside your domain."
+        )
+        if handling == "facility_or_drop":
+            if facility_in_domain is False:
+                return (
+                    intro + " Mass is disregarded because the facility falls outside your domain."
+                )
+            if facility_in_domain is True:
+                return intro + " Mass is attributed to the facility pixel inside your domain."
+            return (
+                intro + " Mass is attributed to the facility when inside the domain; "
+                "otherwise it is disregarded."
+            )
+        pm = self.point_matching
+        if pm["procedure"] == "merged":
+            mass = (
+                " With merged layers, its mass is downscaled with area weights on the "
+                "CAMS grid rather than at the facility pixel."
+            )
+        else:
+            mass = " Therefore mass is kept at the CAMS original point in the point output."
+        return intro + mass + " We strongly advise adjusting your bounding box."
 
     def _read_csv_grid(self, path: Path, pollutant: str) -> pd.DataFrame:
         if path.stat().st_size < 10:
@@ -405,8 +534,18 @@ class RunContext:
         key = (sector_id, layer, pollutant)
         if key in self._cache:
             return self._cache[key]
-        stem = "area_emission_grid" if layer == "area" else "point_emission_grid"
-        path = _grid_path(self.output_dir / sector_id, stem, self.fmt)
+        if layer == "point" and self.point_matching["procedure"] == "merged":
+            empty = pd.DataFrame(columns=["x", "y", "emission"])
+            self._cache[key] = empty
+            return empty
+        if self.point_matching["procedure"] == "merged":
+            if sector_id == "TOTAL":
+                path = _grid_path(self.output_dir, "merged_emission_grid", self.fmt)
+            else:
+                path = _grid_path(self.output_dir / sector_id, "merged_emission_grid", self.fmt)
+        else:
+            stem = "area_emission_grid" if layer == "area" else "point_emission_grid"
+            path = _grid_path(self.output_dir / sector_id, stem, self.fmt)
         if path is None:
             empty = pd.DataFrame(columns=["x", "y", "emission"])
             self._cache[key] = empty
