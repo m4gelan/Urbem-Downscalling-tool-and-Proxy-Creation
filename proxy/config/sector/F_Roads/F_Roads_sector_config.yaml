@@ -27,7 +27,12 @@ model:
   vehicle_classes: [pc, ldv, hdv, l-cat]
   fuels: [gasoline, diesel, lpg, cng]
 
-cams_area_sources:
+cams_sector_cells:
+  year: 2019
+  emission_category_indices: [6, 7, 8, 9]
+  source_type_indices: [1]
+
+cams_area_emissions:
   year: 2019
   emission_category_indices: [6, 7, 8, 9]
   source_type_indices: [1]

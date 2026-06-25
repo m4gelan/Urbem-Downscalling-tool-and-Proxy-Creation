@@ -187,23 +187,24 @@ def load_cams_cells_mask(
     crs: str,
     resolution_m: float,
     pad_m: float,
+    mass_source_type_indices: list[int] | None = None,
 ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
     """
-    Aggregate CAMS area-source rows for one country into unique grid cells.
+    Build CAMS cell mask for proxy rasters.
 
-    Each row's (longitude_index, latitude_index) maps to a cell; emissions are
-    summed per pollutant over all rows in the same cell.
-
-    Parameters ``crs``, ``resolution_m``, ``pad_m`` are accepted for signature
-    parity with the raster pipeline but unused here.
-
-    Returns ``{cell_id: row}`` with ``cell_id = lat_idx * n_lon + lon_idx`` (0-based).
+    ``source_type_indices`` defines which cells belong to the sector (footprint).
+    ``mass_source_type_indices`` (default: same as footprint) sets which rows
+    contribute to ``pollutants_within_cell`` (area downscaling / alpha mass).
     """
     _ = (crs, resolution_m, pad_m)
 
     iso3 = country_iso3.strip().upper()
     ec_filter = np.asarray(emission_category_indices, dtype=np.int64)
-    st_filter = np.asarray(source_type_indices, dtype=np.int64)
+    st_footprint = np.asarray(source_type_indices, dtype=np.int64)
+    st_mass = np.asarray(
+        mass_source_type_indices if mass_source_type_indices is not None else source_type_indices,
+        dtype=np.int64,
+    )
     pollutant_labels = [p.strip() for p in pollutants if p and p.strip()]
     if not pollutant_labels:
         raise ValueError("`pollutants` must contain at least one label")
@@ -242,20 +243,20 @@ def load_cams_cells_mask(
         ])
 
     # --- Source filter ------------------------------------------------------
-    mask = (
+    footprint_mask = (
         np.isfinite(lon_src)
         & np.isfinite(lat_src)
         & np.isin(emis_cat, ec_filter)
-        & np.isin(src_type, st_filter)
+        & np.isin(src_type, st_footprint)
         & (country_index == int(country_idx))
         & (pollutant_matrix.max(axis=1) > 0.0)
     )
-    sel = np.flatnonzero(mask)
-    if sel.size == 0:
+    fp_sel = np.flatnonzero(footprint_mask)
+    if fp_sel.size == 0:
         log.warning(
             f"No CAMS sources after filters "
             f"(country={iso3}, emis_cat={ec_filter.tolist()}, "
-            f"source_type={st_filter.tolist()})."
+            f"source_type={st_footprint.tolist()})."
         )
         return {}, {
             "lon_bounds": np.asarray(lon_bounds, dtype=np.float64),
@@ -264,16 +265,40 @@ def load_cams_cells_mask(
             "n_latitude": nlat,
         }
 
-    # --- Aggregate per cell with bincount (vectorised) ----------------------
-    cell_ids = lat_idx[sel] * nlon + lon_idx[sel]
-    unique_cells, inverse = np.unique(cell_ids, return_inverse=True)
-    n_cells = unique_cells.size
+    footprint_cells = np.unique(lat_idx[fp_sel] * nlon + lon_idx[fp_sel])
 
-    sums = np.empty((n_cells, len(pollutant_labels)), dtype=np.float64)
-    for j in range(len(pollutant_labels)):
-        sums[:, j] = np.bincount(
-            inverse, weights=pollutant_matrix[sel, j], minlength=n_cells
-        )
+    mass_mask = (
+        np.isfinite(lon_src)
+        & np.isfinite(lat_src)
+        & np.isin(emis_cat, ec_filter)
+        & np.isin(src_type, st_mass)
+        & (country_index == int(country_idx))
+    )
+    mass_sel = np.flatnonzero(mass_mask)
+    if mass_sel.size == 0:
+        unique_cells = footprint_cells
+        sums = np.zeros((unique_cells.size, len(pollutant_labels)), dtype=np.float64)
+    else:
+        cell_ids = lat_idx[mass_sel] * nlon + lon_idx[mass_sel]
+        in_footprint = np.isin(cell_ids, footprint_cells)
+        if not np.any(in_footprint):
+            unique_cells = footprint_cells
+            sums = np.zeros((unique_cells.size, len(pollutant_labels)), dtype=np.float64)
+        else:
+            mass_sel = mass_sel[in_footprint]
+            cell_ids = cell_ids[in_footprint]
+            unique_cells, inverse = np.unique(cell_ids, return_inverse=True)
+            n_cells = unique_cells.size
+            sums = np.empty((n_cells, len(pollutant_labels)), dtype=np.float64)
+            for j in range(len(pollutant_labels)):
+                sums[:, j] = np.bincount(
+                    inverse, weights=pollutant_matrix[mass_sel, j], minlength=n_cells
+                )
+            missing = np.setdiff1d(footprint_cells, unique_cells)
+            if missing.size:
+                unique_cells = np.concatenate([unique_cells, missing])
+                pad = np.zeros((missing.size, len(pollutant_labels)), dtype=np.float64)
+                sums = np.vstack([sums, pad])
 
     # --- Build output dict --------------------------------------------------
     out: dict[int, dict[str, Any]] = {}

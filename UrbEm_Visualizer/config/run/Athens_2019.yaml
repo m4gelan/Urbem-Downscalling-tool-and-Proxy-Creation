@@ -70,5 +70,5 @@ output:
   format: csv
   point_matching:
     procedure: separate
-    unmatched: keep_location
+    unmatched: burn_to_area
   grid_resolution_m: 1000

@@ -31,11 +31,15 @@ pollutants:
   - SOx
 
 
-cams_area_sources:
+cams_sector_cells:
   year: 2019
   emission_category_indices: [14, 15]
-  # to get the full grid we add point source type as well (important for downscaling)
   source_type_indices: [1, 2]
+
+cams_area_emissions:
+  year: 2019
+  emission_category_indices: [14, 15]
+  source_type_indices: [1]
 
 cams_point_sources:
   year: 2019

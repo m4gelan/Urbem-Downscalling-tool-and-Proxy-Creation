@@ -21,10 +21,13 @@ pollutants:
   - PM2.5
   - SOx
 
-# CAMS area grid (source_type_index 1 = area); used for area weights only
-cams_area_sources:
+cams_sector_cells:
   year: 2019
-  # CAMS emission_category_index: GNFR G = 10 (see PROXY/core/cams/gnfr.py GNFR_ORDER).
+  emission_category_indices: [10]
+  source_type_indices: [1]
+
+cams_area_emissions:
+  year: 2019
   emission_category_indices: [10]
   source_type_indices: [1]
 # L3 CLC codes (three-digit); see PROXY/config/corine/eea44_index_to_l3.yaml

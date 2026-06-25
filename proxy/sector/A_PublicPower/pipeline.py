@@ -13,7 +13,8 @@ from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points_energy
 from proxy.dataset_loaders.load_jrc_point import load_jrc_points
 from proxy.core.raster_helpers import warp_raster_to_grid
-from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
+from proxy.core.cams_sector_config import load_sector_cells_mask
+from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_population import load_population
 from proxy.core.point_matching.sector_flow import run_sector_point_matching
@@ -163,24 +164,16 @@ def build(
             log.error("area_weights needs country_profile from entry")
             raise ValueError("area_weights needs country_profile from entry")
 
-        cps_area = cfg.get("cams_area_sources")
-        year = int(cps_area.get("year", 2019))
-        ec = list(cps_area.get("emission_category_indices"))
-        st = list(cps_area.get("source_type_indices"))
-
         corine_cfg = cfg.get("corine") or {}
         corine_l3_codes = [int(x) for x in (corine_cfg.get("l3_codes") or [])]
         corine_band = int(corine_cfg.get("band", 1))
         if not corine_l3_codes:
             raise ValueError("sector config: under 'corine', set non-empty 'l3_codes' (CLC L3 integers)")
 
-        # 1 CAMS area cells + global lon/lat grid metadata (single bundle for downstream)
-        cams_cells_mask, cams_grid = load_cams_cells_mask(
+        cams_cells_mask, cams_grid = load_sector_cells_mask(
             repo_root / cams_filepath.replace("\\", "/"),
-            year=year,
+            cfg,
             country_iso3=country_profile["ISO3"],
-            emission_category_indices=ec,
-            source_type_indices=st,
             pollutants=[str(x).strip() for x in pols if str(x).strip()],
             crs=crs,
             resolution_m=resolution_m,

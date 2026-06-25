@@ -43,7 +43,7 @@ def downscale_roads_sector(
 ) -> tuple[xr.DataArray, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     sec_yaml = load_sector_yaml("F_Roads")
     f_cats = sec_yaml.get("cams_f_categories") or {}
-    cps = sec_yaml["cams_area_sources"]
+    cps = sec_yaml["cams_area_emissions"]
     cams_year = int(cps["year"])
     st = list(cps["source_type_indices"])
     iso3 = country_iso3(country)

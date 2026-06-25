@@ -7,6 +7,7 @@ import numpy as np
 from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var
+from proxy.core.cams_sector_config import cams_area_emissions
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.sector.C_Othercombustion.M_matrix import MODEL_CLASSES, build_m_matrix, write_area_weights_debug
 from proxy.sector.C_Othercombustion.U_matrix import stationary_weight_band
@@ -75,10 +76,8 @@ def build(
         if not country_profile:
             raise ValueError("area_weights needs country_profile from entry")
 
-        cps_area = cfg.get("cams_area_sources")
-        year = int(cps_area.get("year", 2019))
-        ec = list(cps_area.get("emission_category_indices"))
-        st = list(cps_area.get("source_type_indices"))
+        cps_area = cams_area_emissions(cfg)
+        year = int(cps_area["year"])
         pol_list = [str(p).strip() for p in pols if str(p).strip()]
 
         gains, enduse, m = build_m_matrix(
@@ -115,9 +114,6 @@ def build(
             hotmaps_residential_filepath=hotmaps_residential_filepath,
             hotmaps_non_residential_filepath=hotmaps_non_residential_filepath,
             hdd_filepath=hdd_filepath,
-            year=year,
-            emission_category_indices=ec,
-            source_type_indices=st,
             pollutants=pols,
         )
         log.info(f"C_OtherCombustion M matrix shape=({m.shape[0]}, {m.shape[1]})")

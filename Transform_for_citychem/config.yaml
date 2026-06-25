@@ -10,19 +10,19 @@ domain: # Athens
   xmax: 761397
   ymax: 4236261
 
-#domain: #Ioannina
+# domain: #Ioannina
 #  xmin: 468000
 #  ymin: 4375000
 #  xmax: 499000
 #  ymax: 4406000
 
-#domain: # Kozani
-#  xmin: 551000
-#  ymin: 4453000
-#  xmax: 582000
-#  ymax: 4484000
+# domain: # Kozani
+#   xmin: 551000
+#   ymin: 4453000
+#   xmax: 582000
+#   ymax: 4484000
 
-#domain : Athens
+
 Grid_step_m: 1000
 Roads_lines:
   path: INPUT/Proxy/ProxySpecific/Roads/spatial_distribution_transport_cams_reg_v8.1_files/em_vkm_vector_dataset.gpkg

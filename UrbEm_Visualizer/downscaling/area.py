@@ -52,7 +52,10 @@ def renormalize_weights_per_cams_cell(weights: np.ndarray, cell_id: np.ndarray) 
     cid = cell_id[ok].astype(np.int64)
     s = sums[cid]
     good = s > 0.0
-    out[ok] = np.where(good, (weights[ok].astype(np.float64) / s[good]).astype(np.float32), np.float32(0.0))
+    flat = np.zeros(int(ok.sum()), dtype=np.float32)
+    if np.any(good):
+        flat[good] = (weights[ok][good].astype(np.float64) / s[good]).astype(np.float32)
+    out[ok] = flat
     return out
 
 
@@ -191,7 +194,7 @@ def prepare_sector_cams(
     pollutants: list[str],
 ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
     sec_yaml = load_sector_yaml(sector_id)
-    cps = sec_yaml.get("cams_area_sources")
+    cps = sec_yaml.get("cams_area_emissions")
     if cps:
         return load_cams_area_cells(
             cams_nc,

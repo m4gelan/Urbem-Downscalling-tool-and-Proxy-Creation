@@ -56,6 +56,7 @@ def _disk_radius_m(
     *,
     uniform_m: float | None,
     fallback_radius_m: float,
+    size_radius_scale: float,
 ) -> float:
     if uniform_m is not None and float(uniform_m) > 0:
         return float(uniform_m)
@@ -67,7 +68,7 @@ def _disk_radius_m(
         return float(fallback_radius_m)
     if not np.isfinite(km2) or km2 <= 0:
         return float(fallback_radius_m)
-    return float(np.sqrt(km2 * 1_000_000.0 / np.pi))
+    return float(np.sqrt(km2 * 1_000_000.0 / np.pi) * size_radius_scale)
 
 
 def _burn_mask(
@@ -117,6 +118,7 @@ def load_coal_mine_tracker_mask(
     uniform_disk_m = cfg["uniform_disk_m"]
     apply_status_gate = bool(cfg["apply_status_gate"])
     fallback_radius_m = float(cfg["fallback_radius_m"])
+    size_radius_scale = float(cfg["size_radius_scale"])
 
     non = pd.read_excel(xlsx_path, sheet_name=non_name)
     closed = pd.read_excel(xlsx_path, sheet_name=closed_name)
@@ -156,7 +158,13 @@ def load_coal_mine_tracker_mask(
             g["geometry"] = g.geometry.buffer(r)
         else:
             radii = [
-                _disk_radius_m(g.iloc[i], size_n, uniform_m=um, fallback_radius_m=fallback_radius_m)
+                _disk_radius_m(
+                    g.iloc[i],
+                    size_n,
+                    uniform_m=um,
+                    fallback_radius_m=fallback_radius_m,
+                    size_radius_scale=size_radius_scale,
+                )
                 for i in range(len(g))
             ]
             g["geometry"] = [g.geometry.iloc[i].buffer(radii[i]) for i in range(len(g))]

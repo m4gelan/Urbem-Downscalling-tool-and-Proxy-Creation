@@ -40,11 +40,15 @@ cams_point_sources:
 ri_urbans_point_sources:
   gnfr_sector: D
 
-cams_area_sources:
+cams_sector_cells:
   year: 2019
   emission_category_indices: [4]
-  # to get the full grid we add point source type as well (important for downscaling)
   source_type_indices: [1, 2]
+
+cams_area_emissions:
+  year: 2019
+  emission_category_indices: [4]
+  source_type_indices: [1]
 
 eprtr_point_sources:
   reportingYears:
@@ -210,9 +214,10 @@ gem_coal:
   non_closed_sheet: GCMT Non-closed Mines
   closed_sheet: GCMT Closed Mines
   country_column: Country / Area
-  closed_disk_m: 300
+  closed_disk_m: 200
   uniform_disk_m: null
   fallback_radius_m: 120
+  size_radius_scale: 0.6
   apply_status_gate: true
 
 gem_oil_gas:
@@ -226,9 +231,9 @@ gem_oil_gas:
     - in-development
     - discovered
   onshore_column: Onshore/Offshore
-  point_buffer_m: 1500
-  point_buffer_onshore_m: 1500
-  point_buffer_offshore_m: 5000
+  point_buffer_m: 200
+  point_buffer_onshore_m: 300
+  point_buffer_offshore_m: 500
 
 vnf:
   lat_column: Lat_GMTCO

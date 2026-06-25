@@ -8,6 +8,7 @@ import yaml
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var
 from proxy.dataset_loaders import require_filepaths_exist
+from proxy.core.cams_sector_config import cams_area_emissions, load_sector_cells_mask
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_otm import load_otm_rasters
@@ -80,7 +81,7 @@ def build(
     corine_filepath = filepaths.get("CORINE", {}).get("path")
     otm_filepath = filepaths.get("OTM", {}).get("path")
     emep_filepath = filepaths.get("EMEP", {}).get("path")
-    cps_area = cfg.get("cams_area_sources")
+    cps_area = cams_area_emissions(cfg)
     f_cats = cfg.get("cams_f_categories")
     year = int(cps_area["year"])
     ec_all = list(cps_area["emission_category_indices"])
@@ -89,12 +90,10 @@ def build(
     otm_cfg = cfg.get("otm")
     pol_list = [str(p).strip() for p in pols if str(p).strip()]
 
-    cams_cells, cams_grid = load_cams_cells_mask(
+    cams_cells, cams_grid = load_sector_cells_mask(
         repo_root / str(cams_filepath).replace("\\", "/"),
-        year=year,
+        cfg,
         country_iso3=country_profile["ISO3"],
-        emission_category_indices=ec_all,
-        source_type_indices=st,
         pollutants=pol_list,
         crs=crs,
         resolution_m=resolution_m,

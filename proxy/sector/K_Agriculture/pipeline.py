@@ -9,6 +9,7 @@ from proxy.core.area_weights import fuse_alpha_weighted_W_planes, normalize_W_pe
 from proxy.dataset_loaders import require_filepaths_exist
 from proxy.core.point_matching.sector_flow import run_sector_point_matching
 from proxy.dataset_loaders.load_cams_points import load_cams_points
+from proxy.core.cams_sector_config import cams_area_emissions, load_sector_cells_mask
 from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask
 from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
@@ -126,17 +127,12 @@ def build(
     log.info("AREA WEIGHTS (K_Agriculture)")
     log.info("--------------------------------")
 
-    cps_area = cfg.get("cams_area_sources") or {}
-    year = int(cps_area.get("year", 2019))
-    ec = list(cps_area.get("emission_category_indices") or [])
-    st = list(cps_area.get("source_type_indices") or [])
+    year = int(cams_area_emissions(cfg)["year"])
 
-    cams_cells, cams_grid = load_cams_cells_mask(
+    cams_cells, cams_grid = load_sector_cells_mask(
         repo_root / str(filepaths.get("CAMS", {}).get("path")).replace("\\", "/"),
-        year=year,
+        cfg,
         country_iso3=country_profile["ISO3"],
-        emission_category_indices=ec,
-        source_type_indices=st,
         pollutants=[str(p).strip() for p in pols if str(p).strip()],
         crs=crs,
         resolution_m=resolution_m,

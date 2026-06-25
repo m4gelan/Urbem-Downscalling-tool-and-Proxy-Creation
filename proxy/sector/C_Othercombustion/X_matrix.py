@@ -10,7 +10,8 @@ from rasterio.enums import Resampling
 from proxy.core import log
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.core.z_score import z_score_inside
-from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
+from proxy.core.cams_sector_config import load_sector_cells_mask
+from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_hotmaps import (
     load_hotmaps_hdd,
@@ -127,9 +128,6 @@ def build_x_matrix(
     hotmaps_residential_filepath: str | Path,
     hotmaps_non_residential_filepath: str | Path,
     hdd_filepath: str | Path,
-    year: int,
-    emission_category_indices: list[int],
-    source_type_indices: list[int],
     pollutants: list[str],
 ) -> XBuildResult:
     """Build X (H, W, 7) with X[:,:,k] = S_k * L_k on the CORINE reference grid."""
@@ -144,12 +142,10 @@ def build_x_matrix(
     l3_112 = [int(x) for x in corine_cfg.get("l3_code_112", [112])]
     l3_121 = [int(x) for x in corine_cfg.get("l3_code_121", [121])]
 
-    cams_cells, cams_grid = load_cams_cells_mask(
+    cams_cells, cams_grid = load_sector_cells_mask(
         repo_root / str(cams_filepath).replace("\\", "/"),
-        year=year,
+        cfg,
         country_iso3=country_profile["ISO3"],
-        emission_category_indices=emission_category_indices,
-        source_type_indices=source_type_indices,
         pollutants=[str(p).strip() for p in pollutants if str(p).strip()],
         crs=crs,
         resolution_m=resolution_m,

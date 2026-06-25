@@ -20,7 +20,8 @@ from proxy.core.area_weights import (
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.core.z_score import z_score_inside
 from proxy.dataset_loaders import require_filepaths_exist
-from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
+from proxy.core.cams_sector_config import cams_area_emissions, load_sector_cells_mask
+from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_osm import load_osm_filtered, rasterize_osm
 from proxy.dataset_loaders.load_population import load_population
@@ -127,20 +128,16 @@ def build(
             log.error("area_weights needs country_profile from entry")
             raise ValueError("area_weights needs country_profile from entry")
 
-        cps_area = cfg.get("cams_area_sources") or {}
-        year = int(cps_area.get("year", 2019))
-        ec = list(cps_area.get("emission_category_indices") or [])
-        st = list(cps_area.get("source_type_indices") or [])
+        cps_area = cams_area_emissions(cfg)
+        year = int(cps_area["year"])
 
         corine_cfg = cfg.get("corine") or {}
         corine_band = int(corine_cfg.get("band", 1))
 
-        cams_cells_mask, cams_grid = load_cams_cells_mask(
+        cams_cells_mask, cams_grid = load_sector_cells_mask(
             repo_root / str(cams_filepath).replace("\\", "/"),
-            year=year,
+            cfg,
             country_iso3=country_profile["ISO3"],
-            emission_category_indices=ec,
-            source_type_indices=st,
             pollutants=[str(x).strip() for x in pols if str(x).strip()],
             crs=crs,
             resolution_m=resolution_m,

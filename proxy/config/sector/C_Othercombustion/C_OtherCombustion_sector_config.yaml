@@ -37,7 +37,12 @@ pollutants:
 - PM2.5
 - SOx
 
-cams_area_sources:
+cams_sector_cells:
+  year: 2019
+  emission_category_indices: [3]
+  source_type_indices: [1]
+
+cams_area_emissions:
   year: 2019
   emission_category_indices: [3]
   source_type_indices: [1]

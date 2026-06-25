@@ -21,7 +21,7 @@ filepaths:
   UWWTD_Agglomerations:
     path: INPUT/Proxy/ProxySpecific/Waste/UWWTD_Agglomerations.gpkg
   Imperviousness:
-    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_NET.tif
+    path: INPUT/Proxy/ProxySpecific/Waste/imperviousness_density_2021_ISO3.tif
   RI-URBANS:
     path: INPUT/Proxy/Emissions_RI-URBANS_2018_main_v1_0.csv
 
@@ -47,11 +47,15 @@ cams_point_sources:
 ri_urbans_point_sources:
   gnfr_sector: J
 
-cams_area_sources:
+cams_sector_cells:
   year: 2019
   emission_category_indices: [13]
-  # to get the full grid we add point source type as well (important for downscaling)
   source_type_indices: [1, 2]
+
+cams_area_emissions:
+  year: 2019
+  emission_category_indices: [13]
+  source_type_indices: [1]
 
   
 eprtr_point_sources:
@@ -84,7 +88,7 @@ corine:
 
 weights:
   solid_waste:
-    w1: 0.65 # CLC 132
+    w1: 0.55 # CLC 132
     w2: 0.15 # CLC 121
     w3: 0.3 # OSM
   wastewater:
@@ -94,7 +98,7 @@ weights:
     w4: 0.25 # Imperviousness
   residual:
     w1: 0.4 # Population
-    w2: 0.45 # GHSL SMOD rural classes
+    w2: 0.5 # GHSL SMOD rural classes
     w3: 0.1 # Imperviousness
 
 osm:

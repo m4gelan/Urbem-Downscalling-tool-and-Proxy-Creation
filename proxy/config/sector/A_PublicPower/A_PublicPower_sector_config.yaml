@@ -33,12 +33,15 @@ cams_point_sources:
 ri_urbans_point_sources:
   gnfr_sector: A
 
-# CAMS area grid (source_type_index 1 = area); used for area weights only
-cams_area_sources:
+cams_sector_cells:
   year: 2019
   emission_category_indices: [1]
-  # to get the full grid we add point source type as well (important for downscaling)
   source_type_indices: [1, 2]
+
+cams_area_emissions:
+  year: 2019
+  emission_category_indices: [1]
+  source_type_indices: [1]
 
 eprtr_point_sources:
   reportingYears: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]

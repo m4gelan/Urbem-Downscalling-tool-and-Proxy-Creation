@@ -125,9 +125,17 @@ def _split_by_domain(
 def _emis_from_sidecar(rec: dict[str, Any], link: dict[str, Any] | None, pollutants: list[str]) -> dict[str, float]:
     attributed = (link or {}).get("attributed_pollutants") or {}
     cams_pols = rec.get("pollutants") or {}
+    use_cams = False
+    if attributed:
+        if not any(sidecar_pollutant_mass(attributed, p) > 0 for p in pollutants):
+            n_links = len(facility_links(rec))
+            if n_links <= 1 and any(sidecar_pollutant_mass(cams_pols, p) > 0 for p in pollutants):
+                use_cams = True
     out: dict[str, float] = {}
     for pol in pollutants:
-        if attributed:
+        if use_cams:
+            out[f"emis_{pol}"] = sidecar_pollutant_mass(cams_pols, pol)
+        elif attributed:
             out[f"emis_{pol}"] = sidecar_pollutant_mass(attributed, pol)
         else:
             out[f"emis_{pol}"] = sidecar_pollutant_mass(cams_pols, pol)

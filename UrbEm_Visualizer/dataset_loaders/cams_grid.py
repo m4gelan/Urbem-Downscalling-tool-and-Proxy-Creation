@@ -37,7 +37,11 @@ def _collect_cams_filters(root: Path) -> list[dict[str, Any]]:
             continue
         with open(cfg_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        for block, role in (("cams_area_sources", "area"), ("cams_point_sources", "point")):
+        for block, role in (
+            ("cams_sector_cells", "cells"),
+            ("cams_area_emissions", "area"),
+            ("cams_point_sources", "point"),
+        ):
             block_cfg = cfg.get(block)
             if not isinstance(block_cfg, dict):
                 continue

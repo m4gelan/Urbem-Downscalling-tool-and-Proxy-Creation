@@ -55,8 +55,11 @@ def allocate_cams_to_facilities(
                     continue
                 denom = totals[lab]
                 if denom <= 0.0:
-                    flags.append(f"zero_facility_total_{lab}")
-                    attributed[lab] = 0.0
+                    if len(facilities) == 1 and cams_val > 0.0:
+                        attributed[lab] = cams_val
+                    else:
+                        flags.append(f"zero_facility_total_{lab}")
+                        attributed[lab] = 0.0
                     continue
                 attributed[lab] = cams_val * fac_pols[lab] / denom
             dist = float(

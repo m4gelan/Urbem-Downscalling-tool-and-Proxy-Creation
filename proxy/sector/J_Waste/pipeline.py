@@ -18,7 +18,8 @@ from proxy.core.area_weights import (
 from proxy.core.point_matching.sector_flow import run_sector_point_matching
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.dataset_loaders import require_filepaths_exist
-from proxy.dataset_loaders.load_cams_cells_mask import load_cams_cells_mask, pixels_inside_cams_cells
+from proxy.core.cams_sector_config import cams_area_emissions, load_sector_cells_mask
+from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_eprtr_points import load_eprtr_points
@@ -29,7 +30,7 @@ from proxy.dataset_loaders.load_uwwtd_treatment_plants import (
     load_uwwtd_treatment_plants,
     load_uwwtd_treatment_plants_raster,
 )
-from proxy.dataset_loaders.load_waste_rasters import load_ghsl_smod, load_imperviousness
+from proxy.dataset_loaders.load_waste_rasters import load_ghsl_smod, load_imperviousness, resolve_imperviousness_filepath
 from proxy.visualizers.area_weights_map import (
     write_j_waste_area_weights_debug_map,
     w_pollutant_for_viz,
@@ -78,7 +79,7 @@ def build(
     population_filepath = filepaths.get("Population", {}).get("path")
     uwwtd_treatment_plants_filepath = filepaths.get("UWWTD_TreatmentPlants", {}).get("path")
     uwwtd_agglomerations_filepath = filepaths.get("UWWTD_Agglomerations", {}).get("path")
-    imperviousness_filepath = filepaths.get("Imperviousness", {}).get("path")
+    imperviousness_cfg_path = filepaths.get("Imperviousness", {}).get("path")
     ghsl_smod_filepath = filepaths.get("GHSL_SMOD", {}).get("path")
 
     if point_matching:
@@ -185,10 +186,8 @@ def build(
             log.error("area_weights needs country_profile from entry")
             raise ValueError("area_weights needs country_profile from entry")
 
-        cps_area = cfg.get("cams_area_sources")
-        year = int(cps_area.get("year", 2019))
-        ec = list(cps_area.get("emission_category_indices"))
-        st = list(cps_area.get("source_type_indices"))
+        cps_area = cams_area_emissions(cfg)
+        year = int(cps_area["year"])
 
         corine_cfg = cfg.get("corine") or {}
         sw1 = corine_cfg.get("solid_waste_w1") or {}
@@ -210,12 +209,10 @@ def build(
         if not rural_codes:
             raise ValueError("sector config: ghsl_smod.rural_codes must be a non-empty list of class codes")
 
-        cams_cells_mask, cams_grid = load_cams_cells_mask(
+        cams_cells_mask, cams_grid = load_sector_cells_mask(
             repo_root / str(cams_filepath).replace("\\", "/"),
-            year=year,
+            cfg,
             country_iso3=country_profile["ISO3"],
-            emission_category_indices=ec,
-            source_type_indices=st,
             pollutants=[str(x).strip() for x in pols if str(x).strip()],
             crs=crs,
             resolution_m=resolution_m,
@@ -299,7 +296,7 @@ def build(
             )
 
             imperviousness, imp_tr, imp_crs, imp_nodata = load_imperviousness(
-                repo_root / str(imperviousness_filepath).replace("\\", "/"),
+                repo_root / resolve_imperviousness_filepath(imperviousness_cfg_path, country_profile),
                 cams_cells_mask,
                 band=imp_band,
             )
@@ -322,6 +319,7 @@ def build(
                 upper_quantile=0.99,
                 rescale_to_01=True,
             )
+            population_z_inverse = np.nanmax(population_z) - population_z
 
             rural_mask, ghsl_tr, ghsl_crs = load_ghsl_smod(
                 repo_root / str(ghsl_smod_filepath).replace("\\", "/"),
@@ -368,6 +366,7 @@ def build(
                 imperviousness_z,
                 rural_mask,
                 population_z,
+                population_z_inverse,
                 solid_waste_w1,
                 solid_waste_w2,
                 solid_waste_w3,
@@ -467,7 +466,7 @@ def build(
                         "w3": residual_w3,
                     },
                     "terms": {
-                        "population": np.asarray(population_z, dtype=np.float32),
+                        "population": np.asarray(population_z_inverse, dtype=np.float32),
                         "rural": np.asarray(rural_mask, dtype=np.float32),
                         "imperviousness": np.asarray(imperviousness_z, dtype=np.float32),
                     },
@@ -523,6 +522,7 @@ def build(
                         uwwtd_agg_raster=uwwtd_agg_raster.astype(np.float32),
                         rural_mask=rural_mask.astype(np.float32),
                         population_z=population_z.astype(np.float64),
+                        population_z_inverse=population_z_inverse.astype(np.float64),
                         W_solid=W_solid_waste.astype(np.float64),
                         W_wastewater=W_wastewater.astype(np.float64),
                         W_residual=W_residual.astype(np.float64),

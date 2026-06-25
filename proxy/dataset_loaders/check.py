@@ -4,6 +4,7 @@ from pathlib import Path
 
 from proxy.core import log
 from proxy.core.alias import resolve_osm_filepath
+from proxy.dataset_loaders.load_waste_rasters import resolve_imperviousness_filepath
 
 def require_filepaths_exist(
     repo_root: Path,
@@ -50,6 +51,10 @@ def require_filepaths_exist(
                 if country_profile is None:
                     raise ValueError(_msg(f"{disp}: needs country_profile to resolve Country in path"))
                 rel = resolve_osm_filepath(rel, country_profile)
+            elif disp.upper() == "IMPERVIOUSNESS":
+                if country_profile is None:
+                    raise ValueError(_msg(f"{disp}: needs country_profile to resolve ISO3 in path"))
+                rel = resolve_imperviousness_filepath(rel, country_profile)
             p = (repo_root / rel.replace("\\", "/")).resolve()
             if p.is_file():
                 log.info(f"{disp} : OK")

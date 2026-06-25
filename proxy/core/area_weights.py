@@ -81,6 +81,7 @@ def combined_S_waste(
     imperviousness_raster: np.ndarray,
     rural_mask: np.ndarray,
     population_raster: np.ndarray,
+    population_raster_residual: np.ndarray,
     solid_waste_w1: float   ,
     solid_waste_w2: float,
     solid_waste_w3: float,
@@ -97,7 +98,7 @@ def combined_S_waste(
     """
     S_solid_waste = solid_waste_w1 * corine_map_w1 + solid_waste_w2 * corine_map_w2 + solid_waste_w3 * osm_raster
     S_wastewater = wastewater_w1 * uwwtd_agg_raster + wastewater_w2 * uwwtd_plants_raster + wastewater_w3 * population_raster + wastewater_w4 * imperviousness_raster
-    S_residual = residual_w1 * population_raster + residual_w2 * rural_mask + residual_w3 * imperviousness_raster
+    S_residual = residual_w1 * population_raster_residual + residual_w2 * rural_mask + residual_w3 * imperviousness_raster
 
     return S_solid_waste, S_wastewater, S_residual
 

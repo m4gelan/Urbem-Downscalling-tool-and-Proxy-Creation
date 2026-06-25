@@ -9,6 +9,17 @@ from proxy.core import log
 from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells, read_raster_window_for_cams
 
 
+def resolve_imperviousness_filepath(rel_path: str | Path, country_profile: dict[str, str]) -> str:
+    """Replace ``ISO3`` in the config path with ``country_profile['ISO3']``."""
+    iso3 = str(country_profile["ISO3"]).strip().upper()
+    if not iso3:
+        raise ValueError("country_profile['ISO3'] is empty")
+    p = str(rel_path).replace("\\", "/")
+    if "ISO3" not in p:
+        raise ValueError(f"Imperviousness path must contain ISO3 placeholder: {p!r}")
+    return p.replace("ISO3", iso3)
+
+
 def load_imperviousness(
     imperviousness_filepath: Path,
     cams_cells: dict[int, dict[str, Any]],

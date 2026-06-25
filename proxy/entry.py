@@ -29,7 +29,7 @@ SECTORS = [
     "K_Agriculture",
 ]
 
-SECTORS_ENABLED = ["J_Waste"]
+SECTORS_ENABLED = ["B_Industry","D_Fugitive", "E_Solvents","J_Waste"]
 #SECTORS_ENABLED = SECTORS
 
 # Select area and or point matching
@@ -49,13 +49,17 @@ W_GROUPS_EXPORT_ROOT = "OUTPUT/Proxy_diagnostics/W_groups"
 PRONG_A_SECTORS = "multi_group"
 PRONG_A_W_SECTORS = "mix_export"
 
-# Select country to build the weitghs and city for debug maps
-COUNTRY = "Netherlands"
+# Select countries to build — processed one by one
+COUNTRIES = [
+    "Germany",
+    "Spain",
+    "Switzerland"
+]
 CITY = "Athens" # City for debug maps
 
 # Info skips all, debug creates maps and other logs
 LOG_LEVEL = "INFO" # INFO | DEBUG option
-MAP_TYPE = 'INTERACTIVE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
+MAP_TYPE = 'FIXED_IMAGE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
 
 EPSG_CRS = "EPSG:3035"
 RESOLUTION_M = 100.0
@@ -93,7 +97,7 @@ def _release_python_memory(module_name: str | None = None) -> None:
         sys.modules.pop(module_name, None)
     gc.collect()
 
-def _run_build_loop(root: Path, table: dict, *, export_w_groups: bool) -> int:
+def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: bool) -> int:
     allowed = set(SECTORS)
     export_root = root / W_GROUPS_EXPORT_ROOT.replace("\\", "/")
     total_time = 0
@@ -134,7 +138,7 @@ def _run_build_loop(root: Path, table: dict, *, export_w_groups: bool) -> int:
                 cfg_path,
                 area_weights=AREA_WEIGHTS,
                 point_matching=POINT_MATCHING,
-                country_profile=resolve_country_profile(COUNTRY),
+                country_profile=resolve_country_profile(country),
                 crs=EPSG_CRS,
                 resolution_m=RESOLUTION_M,
                 pad_m=PAD_M,
@@ -163,13 +167,13 @@ def _run_build_loop(root: Path, table: dict, *, export_w_groups: bool) -> int:
         log.info(f"--------------------------------")
     return 0
 
-def _run_prong_a(root: Path) -> int:
+def _run_prong_a(root: Path, country: str) -> int:
     from proxy.diagnostics.weight_sensitivity.run import load_prong_a_settings, run_prong_a
     cfg = load_prong_a_settings(root)
     year = int(cfg["year"])
     run_prong_a(
         root,
-        country=COUNTRY,
+        country=country,
         year=year,
         sector_keys=PRONG_A_SECTORS,
         active_eps=float(cfg["active_eps"]),
@@ -178,19 +182,43 @@ def _run_prong_a(root: Path) -> int:
     return 0
 
 
-def _run_prong_a_w(root: Path) -> int:
+def _run_prong_a_w(root: Path, country: str) -> int:
     from proxy.diagnostics.weight_sensitivity.run import load_prong_a_w_settings, run_prong_a_w
     cfg = load_prong_a_w_settings(root)
     year = int(cfg["year"])
     run_prong_a_w(
         root,
-        country=COUNTRY,
+        country=country,
         year=year,
         sector_keys=cfg.get("sector_keys", PRONG_A_W_SECTORS),
         active_eps=float(cfg["active_eps"]),
         similarity_threshold=float(cfg["similarity_threshold"]),
     )
     return 0
+
+def _run_mode(root: Path, table: dict, country: str) -> int:
+    mode = str(RUN_MODE).strip().lower()
+    if mode == "build":
+        return _run_build_loop(root, table, country=country, export_w_groups=EXPORT_W_GROUPS)
+    if mode == "prong_a":
+        return _run_prong_a(root, country)
+    if mode == "prong_a_w":
+        return _run_prong_a_w(root, country)
+    if mode == "build_and_export":
+        return _run_build_loop(root, table, country=country, export_w_groups=True)
+    if mode == "export_and_prong_a":
+        rc = _run_build_loop(root, table, country=country, export_w_groups=True)
+        if rc != 0:
+            return rc
+        return _run_prong_a(root, country)
+    if mode == "export_and_prong_a_w":
+        rc = _run_build_loop(root, table, country=country, export_w_groups=True)
+        if rc != 0:
+            return rc
+        return _run_prong_a_w(root, country)
+    log.error(f"unknown RUN_MODE {RUN_MODE!r}")
+    return 1
+
 
 def main() -> int:
     log.configure(LOG_LEVEL)
@@ -201,27 +229,20 @@ def main() -> int:
     if not isinstance(table, dict):
         log.error("filepaths.yaml: missing Sector_specific")
         return 1
-    mode = str(RUN_MODE).strip().lower()
-    if mode == "build":
-        return _run_build_loop(root, table, export_w_groups=EXPORT_W_GROUPS)
-    if mode == "prong_a":
-        return _run_prong_a(root)
-    if mode == "prong_a_w":
-        return _run_prong_a_w(root)
-    if mode == "build_and_export":
-        return _run_build_loop(root, table, export_w_groups=True)
-    if mode == "export_and_prong_a":
-        rc = _run_build_loop(root, table, export_w_groups=True)
+    if not COUNTRIES:
+        log.error("COUNTRIES must be a non-empty list")
+        return 1
+    for country in COUNTRIES:
+        log.info("================================")
+        log.info(f"Country: {country}")
+        log.info("================================")
+        rc = _run_mode(root, table, str(country).strip())
         if rc != 0:
+            log.error(f"Stopped after failure for country {country!r}")
             return rc
-        return _run_prong_a(root)
-    if mode == "export_and_prong_a_w":
-        rc = _run_build_loop(root, table, export_w_groups=True)
-        if rc != 0:
-            return rc
-        return _run_prong_a_w(root)
-    log.error(f"unknown RUN_MODE {RUN_MODE!r}")
-    return 1
+    if len(COUNTRIES) > 1:
+        log.info(f"All {len(COUNTRIES)} countries processed successfully")
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
