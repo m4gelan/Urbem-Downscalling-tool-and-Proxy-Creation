@@ -36,13 +36,13 @@ from proxy.visualizers.area_weights_map import (
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
-from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -50,15 +50,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR D fugitive: optional CAMS↔E-PRTR point links; area weights = OSM+CORINE+pop per group, alpha-fused GeoTIFF."""
 
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -380,74 +381,6 @@ def build(
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
             country_tag = country_profile["full_name"].replace(" ", "_")
-            w1 = weights_cfg.get("coal_and_solid_fuels") or {}
-            w2 = weights_cfg.get("oil_upstream_and_transport") or {}
-            w3 = weights_cfg.get("storage_refining_distribution") or {}
-            w4 = weights_cfg.get("gas_flaring_and_residual_losses") or {}
-            osg = osm_rasters_by_subgroup
-            mix_by_group = {
-                "coal_and_solid_fuels": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm", "w_clc_131", "w_clc_121", "w_gem_coal"],
-                    "weights": {k: float(w1[k]) for k in ("w_osm", "w_clc_131", "w_clc_121", "w_gem_coal")},
-                    "terms": {
-                        "quarry_coal_mine": np.asarray(osg["coal_and_solid_fuels"]["quarry_coal_mine"], dtype=np.float32),
-                        "clc_131": np.asarray(corine_map_131, dtype=np.float32),
-                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
-                        "gem_coal": np.asarray(coal_m, dtype=np.float32),
-                    },
-                },
-                "oil_upstream_and_transport": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm_pipeline", "w_osm_port", "w_clc_121", "w_clc_123", "w_gem_oil"],
-                    "weights": {k: float(w2[k]) for k in ("w_osm_pipeline", "w_osm_port", "w_clc_121", "w_clc_123", "w_gem_oil")},
-                    "terms": {
-                        "pipeline_well": np.asarray(osg["oil_upstream_and_transport"]["pipeline_well"], dtype=np.float32),
-                        "port_oil_depot": np.asarray(osg["oil_upstream_and_transport"]["port_oil_depot"], dtype=np.float32),
-                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
-                        "clc_123": np.asarray(corine_map_123, dtype=np.float32),
-                        "gem_oil": np.asarray(og_m, dtype=np.float32),
-                    },
-                },
-                "storage_refining_distribution": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm_refinery", "w_osm_tank", "w_osm_fuel", "w_clc_121", "w_pop"],
-                    "weights": {k: float(w3[k]) for k in ("w_osm_refinery", "w_osm_tank", "w_osm_fuel", "w_clc_121", "w_pop")},
-                    "terms": {
-                        "refinery": np.asarray(osg["storage_refining_distribution"]["refinery"], dtype=np.float32),
-                        "tank_storage": np.asarray(osg["storage_refining_distribution"]["tank_storage"], dtype=np.float32),
-                        "fuel_depot": np.asarray(osg["storage_refining_distribution"]["fuel_depot"], dtype=np.float32),
-                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
-                        "pop_z": np.asarray(population_z, dtype=np.float32),
-                    },
-                },
-                "gas_flaring_and_residual_losses": {
-                    "mixer": "linear",
-                    "weight_keys": ["w_osm_flaring", "w_osm_power", "w_viirs", "w_clc_121", "w_clc_123"],
-                    "weights": {k: float(w4[k]) for k in ("w_osm_flaring", "w_osm_power", "w_viirs", "w_clc_121", "w_clc_123")},
-                    "terms": {
-                        "flare_chimney": np.asarray(osg["gas_flaring_and_residual_losses"]["flare_chimney"], dtype=np.float32),
-                        "power_gen": np.asarray(osg["gas_flaring_and_residual_losses"]["power_gen"], dtype=np.float32),
-                        "vnf": np.asarray(vnf_m, dtype=np.float32),
-                        "clc_121": np.asarray(corine_map_121, dtype=np.float32),
-                        "clc_123": np.asarray(corine_map_123, dtype=np.float32),
-                    },
-                },
-            }
-            maybe_export_w_groups(
-                export_w_groups,
-                w_groups_export_root,
-                sector_key="D_Fugitive",
-                country_tag=country_tag,
-                year=year,
-                W_by_group=W_by_subgroup,
-                cell_id=cell_id,
-                transform=cor_tr,
-                crs=cor_crs,
-                alpha_result=alpha_result,
-                cams_cells=cams_cells_mask,
-                mix_by_group=mix_by_group,
-            )
 
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
             for j in range(n_poll):

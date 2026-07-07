@@ -17,7 +17,12 @@ from UrbEm_Visualizer.dataset_loaders.cams_grid import (
     start_cams_grid_job,
     transform_bbox,
 )
-from UrbEm_Visualizer.dataset_loaders.check import check_input, list_countries, load_expected
+from UrbEm_Visualizer.dataset_loaders.check import (
+    check_input,
+    list_countries,
+    list_emissions_years,
+    load_expected,
+)
 from UrbEm_Visualizer.paths import config_dir, project_root, runs_dir
 from UrbEm_Visualizer.pollutants import AVAILABLE_POLLUTANTS
 from UrbEm_Visualizer.ui import dialogs
@@ -92,7 +97,9 @@ def api_expected_sectors():
             "sectors": required + optional,
             "required": required,
             "optional": optional,
-            "year": spec["year"],
+            "emissions_years": list_emissions_years(spec),
+            "default_emissions_year": int(spec["cams"]["default_year"]),
+            "cams_files": {str(k): v for k, v in spec["cams"]["files"].items()},
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -108,7 +115,8 @@ def api_check_input():
         absent = data.get("absent_sources")
         if absent is None:
             absent = _session_absent()
-        result = check_input(country, absent_sources=absent)
+        emissions_year = data.get("emissions_year")
+        result = check_input(country, absent_sources=absent, emissions_year=emissions_year)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -129,7 +137,9 @@ def api_waiver_mark():
     country = data.get("country") or _SESSION.get("country")
     check = None
     if country:
-        check = check_input(country, absent_sources=absent)
+        cfg = _SESSION.get("config") or {}
+        emis_year = data.get("emissions_year") or cfg.get("emissions_year")
+        check = check_input(country, absent_sources=absent, emissions_year=emis_year)
     return jsonify({"absent_sources": absent, "check": check})
 
 
@@ -146,7 +156,11 @@ def api_dialog_open_yaml():
         return jsonify({"cancelled": True})
     try:
         cfg = load_yaml(Path(path))
-        check = check_input(cfg.get("country", ""), absent_sources=list(cfg.get("absent_sources") or []))
+        check = check_input(
+            cfg.get("country", ""),
+            absent_sources=list(cfg.get("absent_sources") or []),
+            emissions_year=cfg.get("emissions_year"),
+        )
         cfg = merge_check_paths(cfg, check)
         _SESSION["config"] = cfg
         _SESSION["config_path"] = path
@@ -178,7 +192,7 @@ def api_writer_new():
     try:
         _SESSION["country"] = country
         _SESSION["absent_sources"] = []
-        cfg = new_writer_config(country)
+        cfg = new_writer_config(country, emissions_year=data.get("emissions_year"))
         _SESSION["config"] = cfg
         _SESSION["config_path"] = None
         return jsonify({"config": cfg})
@@ -202,10 +216,10 @@ def api_writer_from_check():
     else:
         _SESSION["absent_sources"] = list(absent)
     try:
-        result = check_input(country, absent_sources=absent)
+        result = check_input(country, absent_sources=absent, emissions_year=data.get("emissions_year"))
         if not result["ok"]:
             return jsonify({"ok": False, "check": result, "absent_sources": absent}), 400
-        cfg = config_from_check(country, absent_sources=absent)
+        cfg = config_from_check(country, absent_sources=absent, emissions_year=data.get("emissions_year"))
         cfg["pollutants"] = list(pollutants)
         _SESSION["config"] = cfg
         _SESSION["config_path"] = None
@@ -270,8 +284,9 @@ def api_cams_grid_start():
     if not cams_path.is_file():
         return jsonify({"error": f"CAMS file not found: {cams_path}"}), 404
     try:
+        emis_year = int(cfg.get("emissions_year") or cfg["year"])
         job_id = start_cams_grid_job(
-            cams_path, country, int(cfg["year"]), list(pollutants), config=cfg
+            cams_path, country, emis_year, list(pollutants), config=cfg
         )
         return jsonify({"job_id": job_id})
     except Exception as e:
@@ -346,7 +361,7 @@ def api_config_output():
     output = data.get("output")
     if not isinstance(output, dict):
         return jsonify({"error": "output object required"}), 400
-    for k in ("format", "grid_resolution_m", "point_matching"):
+    for k in ("format", "grid_resolution_m", "point_matching", "roads_export"):
         if k not in output:
             return jsonify({"error": f"output.{k} required"}), 400
     pm = output["point_matching"]
@@ -369,6 +384,9 @@ def api_config_output():
         return jsonify({"error": "output.grid_resolution_m must be an integer"}), 400
     if grid_res not in (100, 1000):
         return jsonify({"error": "output.grid_resolution_m must be 100 or 1000"}), 400
+    roads_export = output["roads_export"]
+    if roads_export not in ("aggregated", "by_category"):
+        return jsonify({"error": "output.roads_export must be aggregated or by_category"}), 400
     if _SESSION.get("config") is None:
         return jsonify({"error": "no active configuration"}), 400
     stored_pm = {"procedure": procedure}
@@ -378,6 +396,7 @@ def api_config_output():
         "format": output["format"],
         "point_matching": stored_pm,
         "grid_resolution_m": grid_res,
+        "roads_export": roads_export,
     }
     return _config_response()
 
@@ -603,10 +622,11 @@ def api_viz_cams_grid():
     if not cams_path.is_file():
         return jsonify({"error": f"CAMS file not found: {cams_path}"}), 404
     try:
+        emis_year = int(cfg.get("emissions_year") or cfg["year"])
         gj = load_domain_cams_geojson(
             cams_path,
             str(cfg["country"]),
-            int(cfg["year"]),
+            emis_year,
             list(cfg["pollutants"]),
             ctx.domain,
         )

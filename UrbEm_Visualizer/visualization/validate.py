@@ -78,12 +78,17 @@ def validate_output_folder(output_dir: Path) -> dict:
     if out_fmt not in ("csv", "netcdf4"):
         errors.append(f"unsupported output.format: {out_fmt!r}")
 
-    from UrbEm_Visualizer.downscaling.output_config import parse_point_matching
+    from UrbEm_Visualizer.downscaling.output_config import parse_point_matching, parse_roads_export
 
     try:
         pm = parse_point_matching(config.get("output") or {})
     except KeyError:
         pm = {"procedure": "separate", "unmatched": "keep_location"}
+    try:
+        roads_export = parse_roads_export(config.get("output") or {})
+    except ValueError as exc:
+        errors.append(str(exc))
+        roads_export = "aggregated"
     is_merged = pm["procedure"] == "merged"
     grid_names = ("merged_emission_grid",) if is_merged else _GRID_NAMES
 
@@ -130,6 +135,26 @@ def validate_output_folder(output_dir: Path) -> dict:
                 warnings.append(f"{sid}: point_emission_grid.csv is empty")
         if has_area or has_point:
             found_sectors.append(sid)
+        if roads_export == "by_category" and sid == "F_Roads" and mode in ("both", "area_only"):
+            from UrbEm_Visualizer.downscaling.sector_meta import roads_category_names
+
+            aw = (sectors_cfg.get(sid) or {}).get("area_weights") or {}
+            cats = list((aw.get("categories") or {}).keys()) or roads_category_names()
+            for cat in cats:
+                cat_sub = sub / cat
+                stem = "area_emission_grid"
+                csv_p = cat_sub / f"{stem}.csv"
+                nc_p = cat_sub / f"{stem}.nc"
+                path = csv_p if csv_p.is_file() else (nc_p if nc_p.is_file() else None)
+                if path is None:
+                    errors.append(f"F_Roads/{cat}: {stem} missing (roads_export=by_category)")
+                    continue
+                try:
+                    pols = _pollutants_in_csv(path) if path.suffix == ".csv" else _pollutants_in_nc(path)
+                except Exception as exc:
+                    errors.append(f"F_Roads/{cat}/{path.name}: {exc}")
+                    continue
+                pollutants_found |= pols
 
     if pollutants:
         for p in pollutants:

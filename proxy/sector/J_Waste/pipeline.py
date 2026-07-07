@@ -38,7 +38,6 @@ from proxy.visualizers.area_weights_map import (
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
-from proxy.writers.w_groups_export import maybe_export_w_groups
 from proxy.core.z_score import z_score_inside
 
 
@@ -46,6 +45,7 @@ def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -53,16 +53,17 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
     _ = area_weights_viz_bbox_wgs84
 
     # 1. FIRST STEP: CHECKING EVERYTHING IS OK WITH THE FILEPATHS
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -429,63 +430,6 @@ def build(
             }
             W_per_group = [W_by_branch[g] for g in alpha_result.group_names]
             country_tag = country_profile["full_name"].replace(" ", "_")
-            mix_by_group = {
-                "solid_waste": {
-                    "mixer": "linear3",
-                    "weights": {
-                        "w1": solid_waste_w1,
-                        "w2": solid_waste_w2,
-                        "w3": solid_waste_w3,
-                    },
-                    "terms": {
-                        "corine_w1": np.asarray(corine_map_w1, dtype=np.float32),
-                        "corine_w2": np.asarray(corine_map_w2, dtype=np.float32),
-                        "osm": np.asarray(osm_raster, dtype=np.float32),
-                    },
-                },
-                "wastewater": {
-                    "mixer": "linear4",
-                    "weights": {
-                        "w1": wastewater_w1,
-                        "w2": wastewater_w2,
-                        "w3": wastewater_w3,
-                        "w4": wastewater_w4,
-                    },
-                    "terms": {
-                        "uwwtd_agg": np.asarray(uwwtd_agg_raster, dtype=np.float32),
-                        "uwwtd_plants": np.asarray(uwwtd_plants_raster, dtype=np.float32),
-                        "population": np.asarray(population_z, dtype=np.float32),
-                        "imperviousness": np.asarray(imperviousness_z, dtype=np.float32),
-                    },
-                },
-                "residual": {
-                    "mixer": "linear3",
-                    "weights": {
-                        "w1": residual_w1,
-                        "w2": residual_w2,
-                        "w3": residual_w3,
-                    },
-                    "terms": {
-                        "population": np.asarray(population_z_inverse, dtype=np.float32),
-                        "rural": np.asarray(rural_mask, dtype=np.float32),
-                        "imperviousness": np.asarray(imperviousness_z, dtype=np.float32),
-                    },
-                },
-            }
-            maybe_export_w_groups(
-                export_w_groups,
-                w_groups_export_root,
-                sector_key="J_Waste",
-                country_tag=country_tag,
-                year=year,
-                W_by_group=W_by_branch,
-                cell_id=cell_id,
-                transform=cor_tr,
-                crs=cor_crs,
-                alpha_result=alpha_result,
-                cams_cells=cams_cells_mask,
-                mix_by_group=mix_by_group,
-            )
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
             for j in range(n_poll):
                 W_poll_stack[j] = fuse_alpha_weighted_W_planes(

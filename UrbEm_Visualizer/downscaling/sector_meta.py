@@ -64,6 +64,22 @@ def sector_order(config: dict) -> list[str]:
     return order
 
 
+def resolve_sector_id(name: str, config: dict) -> str:
+    raw = str(name).strip()
+    sectors_cfg = config.get("sectors") or {}
+    if raw in sectors_cfg:
+        return raw
+    by_lower = {k.lower(): k for k in sectors_cfg}
+    hit = by_lower.get(raw.lower())
+    if hit:
+        return hit
+    for sid in sectors_cfg:
+        if sector_folder(sid).lower() == raw.lower():
+            return sid
+    known = ", ".join(sorted(sectors_cfg))
+    raise ValueError(f"sector {name!r} not in config (available: {known})")
+
+
 def sector_mode(sector_id: str) -> str:
     spec = load_expected()
     if sector_id in spec["sectors"]:

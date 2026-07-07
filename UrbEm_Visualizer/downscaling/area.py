@@ -195,10 +195,31 @@ def prepare_sector_cams(
 ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
     sec_yaml = load_sector_yaml(sector_id)
     cps = sec_yaml.get("cams_area_emissions")
+    if sector_id == "G_Shipping":
+        from proxy.core.alias import resolve_country_profile
+        from proxy.core.cams_sector_config import load_shipping_sector_cells_mask
+        from UrbEm_Visualizer.paths import project_root
+
+        prof = resolve_country_profile(country)
+        fp = sec_yaml.get("filepaths") or {}
+        nuts_rel = (fp.get("NUTS REGIONS") or {}).get("path")
+        if not nuts_rel:
+            raise ValueError("G_Shipping sector config: filepaths.NUTS REGIONS.path required")
+        return load_shipping_sector_cells_mask(
+            cams_nc,
+            sec_yaml,
+            country_profile=prof,
+            country_iso3=prof["ISO3"],
+            pollutants=pollutants,
+            nuts_path=project_root() / str(nuts_rel).replace("\\", "/"),
+            crs="EPSG:3035",
+            resolution_m=100.0,
+            pad_m=10.0,
+        )
     if cps:
         return load_cams_area_cells(
             cams_nc,
-            year=int(cps["year"]),
+            year=int(year),
             country_iso3=country_iso3(country),
             emission_category_indices=list(cps["emission_category_indices"]),
             source_type_indices=list(cps["source_type_indices"]),
@@ -208,7 +229,7 @@ def prepare_sector_cams(
     grid = load_cams_grid_meta(cams_nc)
     pts = load_cams_points(
         cams_nc,
-        year=int(cpt["year"]),
+        year=int(year),
         country_iso3=country_iso3(country),
         emission_category_indices=list(cpt["emission_category_indices"]),
         source_type_indices=list(cpt["source_type_indices"]),

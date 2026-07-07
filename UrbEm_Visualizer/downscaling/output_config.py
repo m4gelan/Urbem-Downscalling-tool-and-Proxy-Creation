@@ -22,6 +22,13 @@ def parse_point_matching(output_cfg: dict) -> dict[str, str | None]:
     raise KeyError("run config missing output.point_matching")
 
 
+def parse_roads_export(output_cfg: dict) -> str:
+    mode = (output_cfg.get("roads_export") or "aggregated").strip()
+    if mode not in ("aggregated", "by_category"):
+        raise ValueError("output.roads_export must be aggregated or by_category")
+    return mode
+
+
 def procedure_label(pm: dict[str, str | None]) -> str:
     if pm["procedure"] == "merged":
         return "Merged layers"

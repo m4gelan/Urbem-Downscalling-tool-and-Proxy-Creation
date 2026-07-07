@@ -1,8 +1,0 @@
-reference_pollutants:
-  - PM10
-  - NOx
-  - SOx
-  - NMVOC
-similarity_threshold: 0.7
-active_eps: 1.0e-9
-year: 2019

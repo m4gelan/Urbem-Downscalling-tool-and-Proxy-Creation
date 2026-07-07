@@ -20,10 +20,40 @@ def load_expected() -> dict:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise ValueError(f"{path}: root must be a mapping")
-    for key in ("year", "input_root", "cams", "proxy_weights_root", "sectors"):
+    for key in ("input_root", "cams", "proxy_weights_root", "sectors"):
         if key not in data:
             raise KeyError(f"{path}: missing required key {key!r}")
+    cams = data["cams"]
+    if "files" not in cams or "default_year" not in cams:
+        raise KeyError(f"{path}: cams must define files and default_year")
     return data
+
+
+def list_emissions_years(spec: dict | None = None) -> list[int]:
+    spec = spec or load_expected()
+    return sorted(int(y) for y in spec["cams"]["files"])
+
+
+def cams_path_for_emissions_year(emissions_year: int, spec: dict | None = None) -> str:
+    spec = spec or load_expected()
+    files = spec["cams"]["files"]
+    key = int(emissions_year)
+    if key in files:
+        return str(files[key])
+    skey = str(key)
+    if skey in files:
+        return str(files[skey])
+    raise KeyError(f"no CAMS file configured for emissions year {key}")
+
+
+def default_emissions_year(spec: dict | None = None) -> int:
+    spec = spec or load_expected()
+    return int(spec["cams"]["default_year"])
+
+
+def infer_emissions_year_from_path(path_str: str) -> int | None:
+    m = re.search(r"emissions_year(\d{4})", str(path_str), re.I)
+    return int(m.group(1)) if m else None
 
 
 def _resolve(root: Path, rel: str) -> Path:
@@ -101,11 +131,11 @@ def _all_sector_defs(spec: dict) -> list[tuple[str, dict, bool]]:
     return out
 
 
-def list_countries(root: Path | None = None) -> list[str]:
+def list_countries(root: Path | None = None, emissions_year: int | None = None) -> list[str]:
     root = root or project_root()
     spec = load_expected()
     pw = _resolve(root, spec["proxy_weights_root"])
-    year = int(spec["year"])
+    year = int(emissions_year) if emissions_year is not None else default_emissions_year(spec)
     found: set[str] = set()
     tag_re = re.compile(r"^(.+)_([A-Za-z_]+)_(?:point_source|area_weights)_(\d{4})\.tif$")
     for sector_id, _, _ in _all_sector_defs(spec):
@@ -221,6 +251,7 @@ def check_input(
     country: str,
     root: Path | None = None,
     absent_sources: list[dict] | None = None,
+    emissions_year: int | None = None,
 ) -> dict:
     root = root or project_root()
     country = str(country).strip()
@@ -228,9 +259,10 @@ def check_input(
         raise ValueError("country is required")
 
     spec = load_expected()
-    year = int(spec["year"])
+    proxy_year = int(emissions_year) if emissions_year is not None else default_emissions_year(spec)
+    emissions_year = proxy_year
     input_root = _resolve(root, spec["input_root"])
-    cams_path = _resolve(root, spec["cams"]["path"])
+    cams_path = _resolve(root, cams_path_for_emissions_year(emissions_year, spec))
     pw_root = _resolve(root, spec["proxy_weights_root"])
     waived = _absent_set(absent_sources)
 
@@ -249,7 +281,7 @@ def check_input(
         }
 
     if not cams_path.is_file():
-        wrong = input_root / "emissions" / Path(spec["cams"]["path"]).name
+        wrong = input_root / "emissions" / cams_path.name
         hint = None
         if wrong.is_file():
             hint = "CAMS must live under INPUT/Emissions (capital E), not INPUT/emissions."
@@ -299,7 +331,7 @@ def check_input(
             sec=sec,
             is_optional=is_optional,
             country=country,
-            year=year,
+            year=proxy_year,
             folder=folder,
             waived=waived,
             missing=missing,
@@ -317,6 +349,8 @@ def check_input(
     return {
         "ok": ok,
         "country": country,
+        "emissions_year": emissions_year,
+        "proxy_year": proxy_year,
         "message": msg,
         "missing": missing,
         "ok_items": ok_items,

@@ -334,7 +334,7 @@ def compute_i_mobile_S_by_subgroup(
     ref_transform: Any,
     ref_crs: Any,
     pop_z: np.ndarray,
-) -> tuple[dict[str, np.ndarray], dict[str, dict[str, Any]]]:
+) -> dict[str, np.ndarray]:
     """GNFR I mobile (1A4*): weighted CORINE masks + population blend per ``mobile_masks`` in sector YAML."""
     from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 
@@ -348,7 +348,6 @@ def compute_i_mobile_S_by_subgroup(
     )
     p = np.maximum(np.asarray(pop_z, dtype=np.float32), 0.0)
     out: dict[str, np.ndarray] = {}
-    mix: dict[str, dict[str, Any]] = {}
 
     ag_cfg = mobile_cfg.get("agriculture_forestry_mobile")
     if not isinstance(ag_cfg, dict):
@@ -372,12 +371,6 @@ def compute_i_mobile_S_by_subgroup(
     agri = _clip_01(S_agri)
     forest = _clip_01(S_forest)
     out["agriculture_forestry_mobile"] = (w_agri * agri + w_forest * forest).astype(f32)
-    mix["agriculture_forestry_mobile"] = {
-        "mixer": "linear",
-        "weight_keys": ["w_agri", "w_forest"],
-        "weights": {"w_agri": w_agri, "w_forest": w_forest},
-        "terms": {"agri": agri, "forest": forest},
-    }
     log.info(
         "I_Offroad agriculture_forestry_mobile S_sum=%.6g w_agri=%s w_forest=%s",
         float(out["agriculture_forestry_mobile"].sum()),
@@ -399,12 +392,6 @@ def compute_i_mobile_S_by_subgroup(
     w_blend = float(res_cfg["w_blend"])
     c_res = _clip_01(S_cor_res)
     out["residential_mobile"] = (w_pop * p + w_blend * c_res * p).astype(f32)
-    mix["residential_mobile"] = {
-        "mixer": "linear",
-        "weight_keys": ["w_pop", "w_blend"],
-        "weights": {"w_pop": w_pop, "w_blend": w_blend},
-        "terms": {"pop": p, "corine_pop": (c_res * p).astype(f32)},
-    }
     log.info(
         "I_Offroad residential_mobile S_sum=%.6g w_pop=%s w_blend=%s",
         float(out["residential_mobile"].sum()),
@@ -426,104 +413,13 @@ def compute_i_mobile_S_by_subgroup(
     w_cor_pop = float(com_cfg["w_corine_pop"])
     c_com = _clip_01(S_cor_com)
     out["commercial_mobile"] = (w_cor * c_com + w_cor_pop * c_com * p).astype(f32)
-    mix["commercial_mobile"] = {
-        "mixer": "linear",
-        "weight_keys": ["w_corine", "w_corine_pop"],
-        "weights": {"w_corine": w_cor, "w_corine_pop": w_cor_pop},
-        "terms": {"corine": c_com, "corine_pop": (c_com * p).astype(f32)},
-    }
     log.info(
         "I_Offroad commercial_mobile S_sum=%.6g w_corine=%s w_corine_pop=%s",
         float(out["commercial_mobile"].sum()),
         w_cor,
         w_cor_pop,
     )
-    return out, mix
-
-
-def build_i_offroad_mix_by_group(
-    *,
-    osm_rasters_by_subgroup: dict[str, dict[str, np.ndarray]],
-    weights_cfg: dict[str, Any],
-    mobile_mix: dict[str, dict[str, Any]],
-    corine_121: np.ndarray,
-    corine_123: np.ndarray,
-    corine_124: np.ndarray,
-    corine_131: np.ndarray,
-    corine_132: np.ndarray,
-    corine_133: np.ndarray,
-) -> dict[str, dict[str, Any]]:
-    """Mix terms for W_groups export / prong A(w) and B(w); must match ``compute_i_*_S_by_subgroup``."""
-    f32 = np.float32
-    osg = osm_rasters_by_subgroup
-
-    wr = _strip_weight_row(weights_cfg.get("rail_transport"))
-    wp = _strip_weight_row(weights_cfg.get("pipeline_transport"))
-    wm = _strip_weight_row(weights_cfg.get("non_road_machinery"))
-    wmf = _strip_weight_row(weights_cfg.get("manufacturing_mobile"))
-    wom = _strip_weight_row(weights_cfg.get("other_mobile"))
-
-    c121 = _clip_01(corine_121)
-    c123 = _clip_01(corine_123)
-    c124 = _clip_01(corine_124)
-    c131 = _clip_01(corine_131)
-    c132 = _clip_01(corine_132)
-    c133 = _clip_01(corine_133)
-
-    mix: dict[str, dict[str, Any]] = {
-        "rail_transport": {
-            "mixer": "linear",
-            "weight_keys": ["w_osm_diesel", "w_osm_electric", "w_osm_yard"],
-            "weights": {k: float(wr[k]) for k in ("w_osm_diesel", "w_osm_electric", "w_osm_yard")},
-            "terms": {
-                "rail_diesel": np.asarray(osg["rail_transport"]["rail_diesel"], dtype=f32),
-                "rail_electric": np.asarray(osg["rail_transport"]["rail_electric"], dtype=f32),
-                "rail_yards": np.asarray(osg["rail_transport"]["rail_yards"], dtype=f32),
-            },
-        },
-        "pipeline_transport": {
-            "mixer": "linear",
-            "weight_keys": ["w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon"],
-            "weights": {
-                k: float(wp[k]) for k in ("w_osm_oil_gas_facilities", "w_osm_pipeline_hydrocarbon")
-            },
-            "terms": {
-                "oil_gas_facilities": np.asarray(osg["pipeline_transport"]["oil_gas_facilities"], dtype=f32),
-                "pipeline_hydrocarbon": np.asarray(osg["pipeline_transport"]["pipeline_hydrocarbon"], dtype=f32),
-            },
-        },
-        "non_road_machinery": {
-            "mixer": "linear",
-            "weight_keys": ["w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131"],
-            "weights": {k: float(wm[k]) for k in ("w_clc_121", "w_clc_123", "w_clc_124", "w_clc_131")},
-            "terms": {
-                "clc_121": c121,
-                "clc_123": c123,
-                "clc_124": c124,
-                "clc_131": c131,
-            },
-        },
-        "manufacturing_mobile": {
-            "mixer": "linear",
-            "weight_keys": ["w_osm", "w_corine"],
-            "weights": {"w_osm": float(wmf["w_osm"]), "w_corine": float(wmf["w_corine"])},
-            "terms": {
-                "osm_industrial": _clip_01(osg["manufacturing_mobile"]["industrial_sites"]),
-                "corine_industrial": _clip_01(c121 + c131 + c132 + c133),
-            },
-        },
-        "other_mobile": {
-            "mixer": "linear",
-            "weight_keys": ["w_osm", "w_corine"],
-            "weights": {"w_osm": float(wom["w_osm"]), "w_corine": float(wom["w_corine"])},
-            "terms": {
-                "osm_military": _clip_01(osg["other_mobile"]["military"]),
-                "corine_port_air": _clip_01(c123 + c124),
-            },
-        },
-    }
-    mix.update(mobile_mix)
-    return mix
+    return out
 
 
 def combined_S_industry_group(

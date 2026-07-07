@@ -49,6 +49,9 @@ sectors:
   K_Agriculture:
     area_weights:
       path: INPUT/Proxy_weights/K_Agriculture/K_Agriculture_Greece_area_weights_2019.tif
+  G_Shipping:
+    area_weights:
+      path: INPUT/Proxy_weights/G_Shipping/G_Shipping_Greece_area_weights_2019.tif
 absent_sources:
 - sector: G_Shipping
   role: area_weights
@@ -72,3 +75,4 @@ output:
     procedure: separate
     unmatched: burn_to_area
   grid_resolution_m: 1000
+emissions_year: 2019

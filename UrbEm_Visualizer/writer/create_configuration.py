@@ -4,7 +4,13 @@ from pathlib import Path
 
 import yaml
 
-from UrbEm_Visualizer.dataset_loaders.check import check_input, load_expected
+from UrbEm_Visualizer.dataset_loaders.check import (
+    cams_path_for_emissions_year,
+    check_input,
+    default_emissions_year,
+    infer_emissions_year_from_path,
+    load_expected,
+)
 from UrbEm_Visualizer.paths import project_root
 
 
@@ -21,14 +27,16 @@ def _optional_sector_ids() -> set[str]:
     return set((spec.get("optional_sectors") or {}).keys())
 
 
-def new_writer_config(country: str) -> dict:
+def new_writer_config(country: str, emissions_year: int | None = None) -> dict:
     spec = load_expected()
+    emis_year = int(emissions_year) if emissions_year is not None else default_emissions_year(spec)
     return {
         "country": country,
-        "year": int(spec["year"]),
+        "year": emis_year,
+        "emissions_year": emis_year,
         "input_root": str(spec["input_root"]),
         "paths": {
-            "cams": spec["cams"]["path"],
+            "cams": cams_path_for_emissions_year(emis_year, spec),
             "proxy_weights_root": spec["proxy_weights_root"],
         },
         "sectors": {},
@@ -81,8 +89,18 @@ def merge_check_paths(config: dict, check: dict | None = None, root: Path | None
         country = cfg.get("country")
         if not country:
             return cfg
-        check = check_input(country, absent_sources=cfg.get("absent_sources"), root=root)
+        emis_year = cfg.get("emissions_year")
+        if emis_year is None and (cfg.get("paths") or {}).get("cams"):
+            emis_year = infer_emissions_year_from_path(cfg["paths"]["cams"])
+        check = check_input(country, absent_sources=cfg.get("absent_sources"), emissions_year=emis_year)
     _apply_ok_items(cfg, check.get("ok_items") or [], root)
+    if cfg.get("emissions_year") is None:
+        cams_rel = (cfg.get("paths") or {}).get("cams")
+        if cams_rel:
+            inferred = infer_emissions_year_from_path(cams_rel)
+            if inferred is not None:
+                cfg["emissions_year"] = inferred
+                cfg["year"] = inferred
     return cfg
 
 
@@ -90,13 +108,14 @@ def config_from_check(
     country: str,
     root: Path | None = None,
     absent_sources: list[dict] | None = None,
+    emissions_year: int | None = None,
 ) -> dict:
-    result = check_input(country, root=root, absent_sources=absent_sources)
+    result = check_input(country, root=root, absent_sources=absent_sources, emissions_year=emissions_year)
     if not result["ok"]:
         raise ValueError(result["message"])
 
     root = root or project_root()
-    cfg = new_writer_config(country)
+    cfg = new_writer_config(country, emissions_year=result["emissions_year"])
     cfg["absent_sources"] = list(absent_sources or [])
     optional_ids = _optional_sector_ids()
     _apply_ok_items(cfg, result["ok_items"], root)
@@ -116,6 +135,19 @@ def apply_manual_paths(config: dict, manual: dict) -> dict:
     paths = dict(out.get("paths") or {})
     if manual.get("cams"):
         paths["cams"] = manual["cams"]
+        inferred = infer_emissions_year_from_path(manual["cams"])
+        if inferred is not None:
+            out["emissions_year"] = inferred
+            out["year"] = inferred
+        elif manual.get("emissions_year") is not None:
+            emis_year = int(manual["emissions_year"])
+            out["emissions_year"] = emis_year
+            out["year"] = emis_year
+    elif manual.get("emissions_year") is not None:
+        emis_year = int(manual["emissions_year"])
+        out["emissions_year"] = emis_year
+        out["year"] = emis_year
+        paths["cams"] = cams_path_for_emissions_year(emis_year)
     out["paths"] = paths
 
     optional_ids = _optional_sector_ids()

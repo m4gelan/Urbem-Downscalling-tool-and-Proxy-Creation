@@ -14,12 +14,8 @@ matplotlib>=3.5
 contextily>=1.4
 Pillow>=9.0
 folium>=0.14
-
-# --- OSM preprocess (INPUT/Preprocess/OSM/create_osm_sector_packages.py) ---
-# Also needs osmium-tool on PATH for bbox extract on large PBFs (https://osmcode.org/osmium-tool/)
 osmium>=3.6
 tqdm>=4.60
-
-# --- UrbEm Visualizer (Flask UI + downscaling) ---
 flask>=2.0
 pywebview>=4.0
+affine>=2.3

@@ -37,18 +37,32 @@ def export_run(
     config: dict,
     fmt: str,
     procedure: str,
+    roads_export: str = "aggregated",
     sector_results: dict[str, dict[str, Any]],
     merged: xr.DataArray | None,
     weight_check_log: dict[str, Any],
     clip_log: list[dict],
     grid_transform,
     crs: str,
+    grid_height: int,
+    grid_width: int,
 ) -> None:
     _ = crs
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "manifest.yaml", "w", encoding="utf-8") as f:
         yaml.dump(
-            {"config": config, "crs": crs, "domain": config.get("domain")},
+            {
+                "config": config,
+                "crs": crs,
+                "domain": config.get("domain"),
+                "grid": {
+                    "crs": crs,
+                    "height": int(grid_height),
+                    "width": int(grid_width),
+                    "transform": [float(grid_transform.a), float(grid_transform.b), float(grid_transform.c),
+                                  float(grid_transform.d), float(grid_transform.e), float(grid_transform.f)],
+                },
+            },
             f,
             default_flow_style=False,
             sort_keys=False,
@@ -88,6 +102,14 @@ def export_run(
                 _write_csv_grid(sub / "area_emission_grid.csv", res["area_emission"], grid_transform)
             if res.get("point_emission") is not None:
                 _write_csv_grid(sub / "point_emission_grid.csv", res["point_emission"], grid_transform)
+        if roads_export == "by_category" and sid == "F_Roads":
+            for cat, da in (res.get("roads_categories") or {}).items():
+                cat_dir = sub / cat
+                cat_dir.mkdir(exist_ok=True)
+                if fmt == "netcdf4":
+                    _write_netcdf(cat_dir / "area_emission_grid.nc", da, f"F_Roads/{cat}", "area")
+                else:
+                    _write_csv_grid(cat_dir / "area_emission_grid.csv", da, grid_transform)
 
     if procedure == "merged" and merged is not None:
         if fmt == "netcdf4":

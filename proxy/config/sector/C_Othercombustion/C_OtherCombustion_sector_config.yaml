@@ -19,8 +19,6 @@ filepaths:
     path: INPUT/Proxy/ProxySpecific/OtherCombustion/Hotmaps/heat_res_curr_density.tif
   HOTMAPS_NON_RESIDENTIAL:
     path: INPUT/Proxy/ProxySpecific/OtherCombustion/Hotmaps/heat_nonres_curr_density.tif
-  HDD : 
-    path: INPUT/Proxy/ProxySpecific/OtherCombustion/Hotmaps/HDD_curr.tif
   Alpha:
     path: INPUT/Proxy/Alpha/Reported_Emissions_EU27_2018_2023.xlsx
     config: proxy/config/alpha_methods.yaml
@@ -58,6 +56,8 @@ corine:
     - 112
   l3_code_121:
     - 121
+  l3_code_221:
+    - 221
 
 ghsl_smod:
   rural_codes: [11, 12, 13, 21, 22]
@@ -67,44 +67,69 @@ ghsl_smod:
 
 
 stock_support:
-  residential: 
+  residential:
     fireplace:
-      weight_corine_111: 0.2
-      weight_corine_112: 1.0
+      use_population: false
+      population_only: false
+      weight_corine_111: 0.0
+      weight_corine_112: 0.4
+      weight_corine_121: 0.0
+      weight_corine_221: 0.0
       weight_ghsl_smod: 0.6
     heating_stove:
-      weight_corine_111: 0.2
-      weight_corine_112: 1.0
-      weight_ghsl_smod: 0.6   
+      use_population: false
+      population_only: false
+      weight_corine_111: 0.45
+      weight_corine_112: 0.45
+      weight_corine_121: 0.0
+      weight_corine_221: 0.1
+      weight_ghsl_smod: 0.1
     cooking_stove:
-      weight_corine_111: 1.0
-      weight_corine_112: 1.0
-      weight_ghsl_smod: 0.8
+      use_population: true
+      population_only: true
+      weight_corine_111: 0.0
+      weight_corine_112: 0.0
+      weight_corine_121: 0.0
+      weight_corine_221: 0.0
+      weight_ghsl_smod: 0.0
     boiler_aut:
-      weight_corine_111: 1.0
-      weight_corine_112: 1.1
-      weight_ghsl_smod: 0.4
+      use_population: false
+      population_only: false
+      weight_corine_111: 0.75
+      weight_corine_112: 0.25
+      weight_corine_121: 0.0
+      weight_corine_221: 0.0
+      weight_ghsl_smod: 0.0
     boiler_man:
-      weight_corine_111: 0.3
-      weight_corine_112: 1.0
-      weight_ghsl_smod: 0.9
+      use_population: false
+      population_only: false
+      weight_corine_111: 0.0
+      weight_corine_112: 0.25
+      weight_corine_121: 0.0
+      weight_corine_221: 0.0
+      weight_ghsl_smod: 0.75
   commercial:
-    boiler_aut:
-      weight_corine_111: 1.0
-      weight_corine_112: 0.7
-      weight_corine_121: 1.5
-      weight_ghsl_smod: 0.3
-    boiler_man:
-      weight_corine_111: 1.0
-      weight_corine_112: 0.7
-      weight_corine_121: 1.5
-      weight_ghsl_smod: 0.3
-    
-    
+    boiler:
+      use_population: false
+      population_only: false
+      weight_corine_111: 0.2
+      weight_corine_112: 0.2
+      weight_corine_121: 0.8
+      weight_corine_221: 0.0
+      weight_ghsl_smod: 0.0
 
 load_support:
-  exponent_heat: 0.6
-  exponent_hdd: 0.4
+  R_FIREPLACE: pop
+  R_HEATING_STOVE: pop
+  R_COOKING_STOVE: constant
+  R_BOILER_MAN:
+    pop: 0.7
+    h_res: 0.3
+  R_BOILER_AUT:
+    pop: 0.7
+    h_res: 0.3
+  C_BOILER_MAN: h_nres
+  C_BOILER_AUT: h_nres
 
 buckets:
   - name: space_heating

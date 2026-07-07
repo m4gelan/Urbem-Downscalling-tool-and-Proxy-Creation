@@ -13,6 +13,35 @@ from shapely.geometry import mapping
 from proxy.core import log
 
 
+def load_nuts0_country_polygon(
+    nuts_path: Path,
+    country_profile: dict[str, str],
+) -> gpd.GeoDataFrame:
+    """Single country outline (NUTS0); falls back to dissolved NUTS2 if level-0 is missing."""
+    cntr = str(country_profile["other"]).strip().upper()
+    nuts = gpd.read_file(nuts_path)
+    if nuts.crs is None:
+        raise ValueError(f"NUTS GeoPackage has no CRS: {nuts_path}")
+    for col in ("LEVL_CODE", "CNTR_CODE"):
+        if col not in nuts.columns:
+            raise ValueError(f"NUTS GeoPackage missing column {col!r}")
+    cc = nuts["CNTR_CODE"].astype(str).str.strip().str.upper()
+    n0 = nuts[(nuts["LEVL_CODE"].astype(int) == 0) & (cc == cntr)]
+    if not n0.empty:
+        geom = n0.geometry.unary_union
+        log.info(f"NUTS0 country outline for CNTR_CODE={cntr}")
+    else:
+        for col in ("NUTS_ID",):
+            if col not in nuts.columns:
+                raise ValueError(f"NUTS GeoPackage missing column {col!r}")
+        n2 = nuts[(nuts["LEVL_CODE"].astype(int) == 2) & (cc == cntr)]
+        if n2.empty:
+            raise ValueError(f"No NUTS0/NUTS2 rows for CNTR_CODE={cntr!r} in {nuts_path}")
+        geom = n2.geometry.unary_union
+        log.info(f"NUTS0 missing; dissolved {len(n2)} NUTS2 regions for CNTR_CODE={cntr}")
+    return gpd.GeoDataFrame(geometry=[geom], crs=nuts.crs)
+
+
 def load_nuts2_polygons(
     nuts_path: Path,
     country_profile: dict[str, str],

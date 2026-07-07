@@ -9,6 +9,7 @@ from shapely.geometry import box
 
 POLLUTANTS = ["NOx", "NMVOC", "CO", "SO2", "NH3", "PM2.5", "PM10"]
 LINE_COLS = ["snap", "xcor_start", "ycor_start", "xcor_end", "ycor_end", "elevation", "width", *POLLUTANTS]
+LINE_COLS_WITH_CATEGORY = ["snap", "f_category", *LINE_COLS[1:]]
 ROAD_GROUPS = ("motorway", "trunk", "primary", "secondary")
 ROAD_WEIGHTS = {"motorway": 10, "trunk": 5, "primary": 2, "secondary": 2}
 WIDTH_BY_TYPE = {
@@ -82,22 +83,27 @@ def distribute_roads_to_lines(
     highway_column: str,
     dst_epsg: int,
     domain: tuple[float, float, float, float],
+    snap: int = 7,
+    f_category: str | None = None,
 ) -> pd.DataFrame:
+    cols = LINE_COLS_WITH_CATEGORY if f_category is not None else LINE_COLS
     gdf = distribute_roads_gdf(
         cells, roads_path, layer=layer, highway_column=highway_column,
-        dst_epsg=dst_epsg, domain=domain,
+        dst_epsg=dst_epsg, domain=domain, snap=snap,
     )
     if gdf.empty:
-        return pd.DataFrame(columns=LINE_COLS)
+        return pd.DataFrame(columns=cols)
     out = gdf.copy()
     seg_bounds = out.geometry.bounds
     out["xcor_start"] = seg_bounds["minx"].astype(int)
     out["ycor_start"] = seg_bounds["miny"].astype(int)
     out["xcor_end"] = seg_bounds["maxx"].astype(int)
     out["ycor_end"] = seg_bounds["maxy"].astype(int)
+    if f_category is not None:
+        out["f_category"] = f_category
     for pol in POLLUTANTS:
         out[pol] = out[pol] * KG_YR_TO_G_S
-    return out.loc[out[POLLUTANTS].sum(axis=1) > 0, LINE_COLS].reset_index(drop=True)
+    return out.loc[out[POLLUTANTS].sum(axis=1) > 0, cols].reset_index(drop=True)
 
 
 def distribute_roads_gdf(
@@ -108,6 +114,7 @@ def distribute_roads_gdf(
     highway_column: str,
     dst_epsg: int,
     domain: tuple[float, float, float, float],
+    snap: int = 7,
 ) -> gpd.GeoDataFrame:
     """Return road segments with pollutant columns in kg/yr and real line geometry."""
     cols = ["snap", "elevation", "width", *POLLUTANTS, "geometry"]
@@ -167,7 +174,7 @@ def distribute_roads_gdf(
             out[pol] = out[pol] * (totals[pol] / s)
 
     out["width"] = out[highway_column].map(_assign_width)
-    out["snap"] = 7
+    out["snap"] = int(snap)
     out["elevation"] = 0
     out = gpd.GeoDataFrame(out, geometry="geometry", crs=grid.crs)
     return _clip_lines_to_domain(out, domain)

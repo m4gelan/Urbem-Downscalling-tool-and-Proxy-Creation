@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import geopandas as gpd
 import rasterio
 import xarray as xr
 from pyproj import Transformer
@@ -341,6 +342,204 @@ def load_cams_cells_mask(
         f"covered area ~ {covered_km2:,.0f} km2"
     )
     
+    grid = {
+        "lon_bounds": np.asarray(lon_bounds, dtype=np.float64),
+        "lat_bounds": np.asarray(lat_bounds, dtype=np.float64),
+        "n_longitude": nlon,
+        "n_latitude": nlat,
+    }
+    return out, grid
+
+
+def _cams_cell_centroids_wgs84(
+    lon_bounds: np.ndarray,
+    lat_bounds: np.ndarray,
+    nlon: int,
+    nlat: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Flat cell_id, lon, lat for every CAMS grid cell centre."""
+    lo = np.arange(nlon, dtype=np.int64)
+    la = np.arange(nlat, dtype=np.int64)
+    lo2, la2 = np.meshgrid(lo, la, indexing="xy")
+    cell_ids = (la2 * nlon + lo2).ravel()
+    lon = (lon_bounds[lo2, 0] + lon_bounds[lo2, 1]) * 0.5
+    lat = (lat_bounds[la2, 0] + lat_bounds[la2, 1]) * 0.5
+    return cell_ids.ravel(), lon.ravel(), lat.ravel()
+
+
+def _cells_centroid_in_maritime_domain(
+    lon_bounds: np.ndarray,
+    lat_bounds: np.ndarray,
+    nlon: int,
+    nlat: int,
+    maritime_wgs84,
+) -> np.ndarray:
+    cell_ids, lons, lats = _cams_cell_centroids_wgs84(lon_bounds, lat_bounds, nlon, nlat)
+    gdf = gpd.GeoDataFrame(
+        {"cell_id": cell_ids},
+        geometry=gpd.points_from_xy(lons, lats),
+        crs="EPSG:4326",
+    )
+    maritime_gdf = gpd.GeoDataFrame(geometry=[maritime_wgs84], crs="EPSG:4326")
+    joined = gpd.sjoin(gdf, maritime_gdf, predicate="within", how="inner")
+    return joined["cell_id"].to_numpy(dtype=np.int64)
+
+
+def load_cams_shipping_cells_mask(
+    cams_nc: Path,
+    *,
+    year: int,
+    country_iso3: str,
+    country_profile: dict[str, str],
+    nuts_path: Path,
+    maritime_buffer_m: float,
+    maritime_metric_crs: str,
+    emission_category_indices: list[int],
+    source_type_indices: list[int],
+    pollutants: list[str],
+    crs: str,
+    resolution_m: float,
+    pad_m: float,
+) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
+    """
+    G_Shipping footprint: country-attributed cells union maritime-buffer cells.
+    Cell mass sums all sector sources in the cell (any CAMS country/domain).
+    """
+    from proxy.dataset_loaders.load_nuts2 import load_nuts0_country_polygon
+
+    _ = (crs, resolution_m, pad_m)
+    iso3 = country_iso3.strip().upper()
+    ec_filter = np.asarray(emission_category_indices, dtype=np.int64)
+    st_filter = np.asarray(source_type_indices, dtype=np.int64)
+    pollutant_labels = [p.strip() for p in pollutants if p and p.strip()]
+    if not pollutant_labels:
+        raise ValueError("`pollutants` must contain at least one label")
+
+    country_outline = load_nuts0_country_polygon(nuts_path, country_profile)
+    maritime_geom = (
+        country_outline.to_crs(maritime_metric_crs)
+        .geometry.iloc[0]
+        .buffer(float(maritime_buffer_m))
+    )
+    maritime_wgs84 = (
+        gpd.GeoDataFrame(geometry=[maritime_geom], crs=maritime_metric_crs)
+        .to_crs("EPSG:4326")
+        .geometry.iloc[0]
+    )
+    log.info(
+        f"G_Shipping maritime domain: NUTS0 + {float(maritime_buffer_m):g} m buffer "
+        f"({maritime_metric_crs})"
+    )
+
+    with xr.open_dataset(cams_nc, engine="netcdf4") as ds:
+        country_idx = cams_country_index_from_iso3(ds, iso3)
+        lon_src = np.asarray(ds["longitude_source"].values, dtype=np.float64).ravel()
+        lat_src = np.asarray(ds["latitude_source"].values, dtype=np.float64).ravel()
+        src_type = np.asarray(ds["source_type_index"].values, dtype=np.int64).ravel()
+        emis_cat = np.asarray(ds["emission_category_index"].values, dtype=np.int64).ravel()
+        country_index = np.asarray(ds["country_index"].values, dtype=np.int64).ravel()
+        lon_idx = np.asarray(ds["longitude_index"].values, dtype=np.int64).ravel()
+        lat_idx = np.asarray(ds["latitude_index"].values, dtype=np.int64).ravel()
+        nlon = int(ds.sizes["longitude"])
+        nlat = int(ds.sizes["latitude"])
+        lon_bounds = np.asarray(ds["longitude_bounds"].values, dtype=np.float64)
+        lat_bounds = np.asarray(ds["latitude_bounds"].values, dtype=np.float64)
+        if lon_idx.size and (lon_idx.max() >= nlon or lat_idx.max() >= nlat):
+            log.debug("CAMS indices look 1-based; shifting to 0-based")
+            lon_idx = lon_idx - 1
+            lat_idx = lat_idx - 1
+        np.clip(lon_idx, 0, nlon - 1, out=lon_idx)
+        np.clip(lat_idx, 0, nlat - 1, out=lat_idx)
+        pollutant_matrix = np.column_stack([
+            np.nan_to_num(
+                np.asarray(ds[cams_pollutant_var(lab)].values, dtype=np.float64).ravel(),
+                nan=0.0, posinf=0.0, neginf=0.0,
+            )
+            for lab in pollutant_labels
+        ])
+
+    sector_base = (
+        np.isfinite(lon_src)
+        & np.isfinite(lat_src)
+        & np.isin(emis_cat, ec_filter)
+        & np.isin(src_type, st_filter)
+    )
+    has_emis = pollutant_matrix.max(axis=1) > 0.0
+
+    country_sel = np.flatnonzero(sector_base & (country_index == int(country_idx)) & has_emis)
+    country_cells = (
+        np.unique(lat_idx[country_sel] * nlon + lon_idx[country_sel])
+        if country_sel.size
+        else np.array([], dtype=np.int64)
+    )
+
+    maritime_cells = _cells_centroid_in_maritime_domain(
+        lon_bounds, lat_bounds, nlon, nlat, maritime_wgs84,
+    )
+    any_emis_sel = np.flatnonzero(sector_base & has_emis)
+    cells_with_emis = np.unique(lat_idx[any_emis_sel] * nlon + lon_idx[any_emis_sel])
+    maritime_cells = np.intersect1d(maritime_cells, cells_with_emis, assume_unique=False)
+
+    footprint_cells = np.unique(np.concatenate([country_cells, maritime_cells]))
+    if footprint_cells.size == 0:
+        log.warning(
+            f"No G_Shipping CAMS cells (country={iso3}, maritime buffer "
+            f"{float(maritime_buffer_m):g} m)."
+        )
+        return {}, {
+            "lon_bounds": np.asarray(lon_bounds, dtype=np.float64),
+            "lat_bounds": np.asarray(lat_bounds, dtype=np.float64),
+            "n_longitude": nlon,
+            "n_latitude": nlat,
+        }
+
+    n_mar_only = int(np.setdiff1d(maritime_cells, country_cells).size)
+    log.info(
+        f"G_Shipping CAMS cells: {footprint_cells.size} total "
+        f"({country_cells.size} country, {n_mar_only} maritime-only)"
+    )
+
+    mass_sel = np.flatnonzero(sector_base)
+    cell_ids = lat_idx[mass_sel] * nlon + lon_idx[mass_sel]
+    in_footprint = np.isin(cell_ids, footprint_cells)
+    mass_sel = mass_sel[in_footprint]
+    cell_ids = cell_ids[in_footprint]
+    unique_cells, inverse = np.unique(cell_ids, return_inverse=True)
+    sums = np.empty((unique_cells.size, len(pollutant_labels)), dtype=np.float64)
+    for j in range(len(pollutant_labels)):
+        sums[:, j] = np.bincount(
+            inverse, weights=pollutant_matrix[mass_sel, j], minlength=unique_cells.size,
+        )
+    missing = np.setdiff1d(footprint_cells, unique_cells)
+    if missing.size:
+        unique_cells = np.concatenate([unique_cells, missing])
+        sums = np.vstack([sums, np.zeros((missing.size, len(pollutant_labels)), dtype=np.float64)])
+
+    out: dict[int, dict[str, Any]] = {}
+    for k, cell_id in enumerate(unique_cells.tolist()):
+        lo = int(cell_id % nlon)
+        la = int(cell_id // nlon)
+        west, east = float(lon_bounds[lo, 0]), float(lon_bounds[lo, 1])
+        south, north = float(lat_bounds[la, 0]), float(lat_bounds[la, 1])
+        out[int(cell_id)] = {
+            "pollutants_within_cell": {
+                lab: float(sums[k, j]) for j, lab in enumerate(pollutant_labels)
+            },
+            "longitude": 0.5 * (west + east),
+            "latitude": 0.5 * (south + north),
+            "width_deg": east - west,
+            "height_deg": north - south,
+            "cell_bounds_wgs84": {
+                "west": west, "south": south, "east": east, "north": north,
+            },
+            "longitude_index": lo,
+            "latitude_index": la,
+            "n_longitude": nlon,
+            "n_latitude": nlat,
+            "year": int(year),
+            "country_iso3": iso3,
+        }
+
     grid = {
         "lon_bounds": np.asarray(lon_bounds, dtype=np.float64),
         "lat_bounds": np.asarray(lat_bounds, dtype=np.float64),

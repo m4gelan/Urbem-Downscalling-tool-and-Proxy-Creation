@@ -72,3 +72,4 @@ output:
   point_matching:
     procedure: merged
   grid_resolution_m: 1000
+emissions_year: 2019

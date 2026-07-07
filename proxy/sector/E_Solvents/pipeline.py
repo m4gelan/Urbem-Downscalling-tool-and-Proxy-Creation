@@ -40,13 +40,13 @@ from proxy.writers.area_weight_stack import (
     write_area_weight_plane,
 )
 from proxy.writers.point_link import write_cams_facility_link_tif
-from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -54,15 +54,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR E Solvents: optional CAMS↔E-PRTR links; area weights = activity S, beta subsectors, alpha-fused GeoTIFF."""
 
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -345,19 +346,6 @@ def build(
         gc.collect()
 
         country_tag = country_profile["full_name"].replace(" ", "_")
-        maybe_export_w_groups(
-            export_w_groups,
-            w_groups_export_root,
-            sector_key="E_Solvents",
-            country_tag=country_tag,
-            year=year,
-            W_by_group=W_by_subsector,
-            cell_id=cell_id,
-            transform=cor_tr,
-            crs=cor_crs,
-            alpha_result=alpha_result,
-            cams_cells=cams_cells_mask,
-        )
 
         W_per_group = [W_by_subsector[g] for g in group_names]
 

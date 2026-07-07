@@ -212,7 +212,7 @@ def _load_cams_geojson(ctx: RunContext) -> dict[str, Any]:
     return load_domain_cams_geojson(
         cams_path,
         str(cfg["country"]),
-        int(cfg["year"]),
+        int(cfg.get("emissions_year") or cfg["year"]),
         list(cfg["pollutants"]),
         ctx.domain,
     )

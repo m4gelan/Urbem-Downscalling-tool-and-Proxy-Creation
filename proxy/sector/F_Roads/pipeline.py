@@ -24,6 +24,7 @@ def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -31,15 +32,15 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
-    _ = (export_w_groups, w_groups_export_root)
     _ = point_matching
 
     repo_root = Path(__file__).resolve().parents[3]
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 

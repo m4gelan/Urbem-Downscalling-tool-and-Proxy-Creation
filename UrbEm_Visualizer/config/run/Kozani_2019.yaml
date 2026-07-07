@@ -72,3 +72,4 @@ output:
     procedure: separate
     unmatched: burn_to_area
   grid_resolution_m: 100
+  roads_export: by_category

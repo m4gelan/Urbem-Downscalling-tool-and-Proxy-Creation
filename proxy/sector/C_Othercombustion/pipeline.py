@@ -23,6 +23,7 @@ def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -30,15 +31,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
-    _ = (point_matching, export_w_groups, w_groups_export_root)
+    _ = point_matching
 
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -60,7 +62,6 @@ def build(
     gains_mapping_filepath = filepaths.get("GAINS", {}).get("mapping_filepath")
     hotmaps_residential_filepath = filepaths.get("HOTMAPS_RESIDENTIAL", {}).get("path")
     hotmaps_non_residential_filepath = filepaths.get("HOTMAPS_NON_RESIDENTIAL", {}).get("path")
-    hdd_filepath = filepaths.get("HDD", {}).get("path")
     emep_yaml_filepath = filepaths.get("EMEP", {}).get("path")
 
     if point_matching:
@@ -113,7 +114,6 @@ def build(
             ghs_smod_filepath=ghs_smod_filepath,
             hotmaps_residential_filepath=hotmaps_residential_filepath,
             hotmaps_non_residential_filepath=hotmaps_non_residential_filepath,
-            hdd_filepath=hdd_filepath,
             pollutants=pols,
         )
         log.info(f"C_OtherCombustion M matrix shape=({m.shape[0]}, {m.shape[1]})")
@@ -155,10 +155,10 @@ def build(
             pop_z=np.empty(0, dtype=np.float32),
             H_res_z=np.empty(0, dtype=np.float32),
             H_nres_z=np.empty(0, dtype=np.float32),
-            Hdd_z=np.empty(0, dtype=np.float32),
             u111=np.empty((0, 0), dtype=np.uint8),
             u112=np.empty((0, 0), dtype=np.uint8),
             u121=np.empty((0, 0), dtype=np.uint8),
+            u221=np.empty((0, 0), dtype=np.uint8),
         )
         gc.collect()
 

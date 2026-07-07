@@ -1,0 +1,76 @@
+country: Italy
+year: 2021
+emissions_year: 2021
+input_root: INPUT
+paths:
+  cams: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2021.nc
+  proxy_weights_root: INPUT/Proxy_weights
+sectors:
+  A_PublicPower:
+    area_weights:
+      path: INPUT/Proxy_weights/A_PublicPower/A_PublicPower_Italy_area_weights_2021.tif
+    point_source:
+      path: INPUT/Proxy_weights/A_PublicPower/A_PublicPower_Italy_point_source_2021.tif
+  B_Industry:
+    area_weights:
+      path: INPUT/Proxy_weights/B_Industry/B_Industry_Italy_area_weights_2021.tif
+    point_source:
+      path: INPUT/Proxy_weights/B_Industry/B_Industry_Italy_point_source_2021.tif
+  C_OtherCombustion:
+    area_weights:
+      path: INPUT/Proxy_weights/C_OtherCombustion/C_OtherCombustion_Italy_area_weights_2021.tif
+  D_Fugitive:
+    area_weights:
+      path: INPUT/Proxy_weights/D_Fugitive/D_Fugitive_Italy_area_weights_2021.tif
+    point_source:
+      path: INPUT/Proxy_weights/D_Fugitive/D_Fugitive_Italy_point_source_2021.tif
+  E_Solvents:
+    area_weights:
+      path: INPUT/Proxy_weights/E_Solvents/E_Solvents_Italy_area_weights_2021.tif
+    point_source:
+      path: INPUT/Proxy_weights/E_Solvents/E_Solvents_Italy_point_source_2021.tif
+  F_Roads:
+    area_weights:
+      categories:
+        F1: INPUT/Proxy_weights/F_Roads/F_Roads_Italy_F1_2021.tif
+        F2: INPUT/Proxy_weights/F_Roads/F_Roads_Italy_F2_2021.tif
+        F3: INPUT/Proxy_weights/F_Roads/F_Roads_Italy_F3_2021.tif
+        F4: INPUT/Proxy_weights/F_Roads/F_Roads_Italy_F4_2021.tif
+  H_Aviation:
+    point_source:
+      path: INPUT/Proxy_weights/H_Aviation/H_Aviation_Italy_point_source_2021.tif
+  I_Offroad:
+    area_weights:
+      path: INPUT/Proxy_weights/I_Offroad/I_Offroad_Italy_area_weights_2021.tif
+  J_Waste:
+    area_weights:
+      path: INPUT/Proxy_weights/J_Waste/J_Waste_Italy_area_weights_2021.tif
+    point_source:
+      path: INPUT/Proxy_weights/J_Waste/J_Waste_Italy_point_source_2021.tif
+  K_Agriculture:
+    area_weights:
+      path: INPUT/Proxy_weights/K_Agriculture/K_Agriculture_Italy_area_weights_2021.tif
+  G_Shipping:
+    area_weights:
+      path: INPUT/Proxy_weights/G_Shipping/G_Shipping_Italy_area_weights_2021.tif
+absent_sources: []
+pollutants:
+- NOx
+- NMVOC
+- CO
+- SO2
+- NH3
+- PM10
+- PM2.5
+domain:
+  crs: EPSG:3035
+  xmin: 4299555.626
+  ymin: 2424830.934
+  xmax: 4344184.944
+  ymax: 2469311.407
+output:
+  format: csv
+  point_matching:
+    procedure: separate
+    unmatched: burn_to_area
+  grid_resolution_m: 1000

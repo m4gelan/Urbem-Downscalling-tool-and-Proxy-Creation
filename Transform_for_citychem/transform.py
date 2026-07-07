@@ -9,6 +9,8 @@ from pyproj import Transformer
 from lines_osm import POLLUTANTS, distribute_roads_to_lines
 
 ROADS_SNAP = 7
+ROAD_CATEGORIES = ("F1", "F2", "F3", "F4")
+ROADS_SECTOR = "F_Roads"
 AREA_COLS = ["snap", "xcor_sw", "ycor_sw", "zcor_sw", "xcor_ne", "ycor_ne", "zcor_ne", *POLLUTANTS]
 POINT_COLS = ["snap", "xcor", "ycor", "Hi", "Vi", "Ti", "radi", *POLLUTANTS]
 
@@ -224,6 +226,85 @@ def merge_point_rows(parts: list[pd.DataFrame]) -> pd.DataFrame:
     return all_rows.groupby(keys, as_index=False)[POLLUTANTS].sum()
 
 
+def road_category_grid_paths(sector_dir: Path) -> dict[str, Path] | None:
+    paths: dict[str, Path] = {}
+    for cat in ROAD_CATEGORIES:
+        p = sector_dir / cat / "area_emission_grid.csv"
+        if not p.is_file():
+            return None
+        paths[cat] = p
+    return paths
+
+
+def road_cells_from_csv(
+    path: Path,
+    cfg: dict,
+    src_crs: str,
+    dst_epsg: int,
+    step: int,
+) -> pd.DataFrame:
+    df = reproject_xy(read_grid_csv(path), src_crs, dst_epsg)
+    return clip_area_rows(to_area_rows(df, cfg, ROADS_SNAP, step), cfg)
+
+
+def load_road_cell_grids(
+    sector_dir: Path,
+    cfg: dict,
+    src_crs: str,
+    dst_epsg: int,
+    step: int,
+) -> dict[str, pd.DataFrame] | None:
+    """Per-category grids if F1–F4 subfolders exist; else one aggregated grid under key ''."""
+    if not sector_dir.is_dir():
+        return None
+    cat_paths = road_category_grid_paths(sector_dir)
+    if cat_paths:
+        return {
+            cat: road_cells_from_csv(cat_paths[cat], cfg, src_crs, dst_epsg, step)
+            for cat in ROAD_CATEGORIES
+        }
+    agg = sector_dir / "area_emission_grid.csv"
+    if not agg.is_file():
+        return None
+    return {"": road_cells_from_csv(agg, cfg, src_crs, dst_epsg, step)}
+
+
+def write_line_sources(
+    road_grids: dict[str, pd.DataFrame],
+    *,
+    cfg: dict,
+    roads_path: Path,
+    roads_cfg: dict,
+    dst_epsg: int,
+    city: str,
+    output_dir: Path,
+) -> list[tuple[Path, int]]:
+    snap, _, _ = snap_tags(cfg, ROADS_SNAP)
+    domain = domain_box(cfg)
+    dist_kw = {
+        "roads_path": roads_path,
+        "layer": str(roads_cfg["layer"]),
+        "highway_column": str(roads_cfg["highway_column"]),
+        "dst_epsg": dst_epsg,
+        "domain": domain,
+        "snap": snap,
+    }
+    written: list[tuple[Path, int]] = []
+    if len(road_grids) == 1 and "" in road_grids:
+        lines = distribute_roads_to_lines(road_grids[""], **dist_kw)
+        path = output_dir / f"line_source_{city}.csv"
+        lines.to_csv(path, index=False)
+        written.append((path, len(lines)))
+        return written
+    for cat in ROAD_CATEGORIES:
+        cells = road_grids[cat]
+        lines = distribute_roads_to_lines(cells, **dist_kw, f_category=cat)
+        path = output_dir / f"line_source_{city}_{cat}.csv"
+        lines.to_csv(path, index=False)
+        written.append((path, len(lines)))
+    return written
+
+
 def run(cfg_path: Path | None = None) -> None:
     root = _repo_root()
     cfg = load_config(cfg_path or Path(__file__).resolve().parent / "config.yaml")
@@ -241,7 +322,6 @@ def run(cfg_path: Path | None = None) -> None:
     src_crs = source_crs(input_dir)
 
     area_parts: list[pd.DataFrame] = []
-    road_cell_parts: list[pd.DataFrame] = []
     point_parts: list[pd.DataFrame] = []
 
     for internal_snap, sector in sector_snaps:
@@ -250,38 +330,41 @@ def run(cfg_path: Path | None = None) -> None:
             print(f"skip missing sector folder: {sector_dir}")
             continue
 
+        if internal_snap == ROADS_SNAP:
+            point_df = reproject_xy(read_grid_csv(sector_dir / "point_emission_grid.csv"), src_crs, dst_epsg)
+            point_parts.append(to_point_rows(point_df, cfg, internal_snap))
+            continue
+
         area_df = reproject_xy(read_grid_csv(sector_dir / "area_emission_grid.csv"), src_crs, dst_epsg)
         point_df = reproject_xy(read_grid_csv(sector_dir / "point_emission_grid.csv"), src_crs, dst_epsg)
-
-        if internal_snap == ROADS_SNAP:
-            road_cell_parts.append(to_area_rows(area_df, cfg, internal_snap, step))
-        else:
-            area_parts.append(to_area_rows(area_df, cfg, internal_snap, step))
+        area_parts.append(to_area_rows(area_df, cfg, internal_snap, step))
         point_parts.append(to_point_rows(point_df, cfg, internal_snap))
 
     areas = clip_area_rows(merge_area_rows(area_parts), cfg)
-    road_cells = clip_area_rows(merge_area_rows(road_cell_parts), cfg)
     points = clip_point_rows(merge_point_rows(point_parts), cfg)
-    lines = distribute_roads_to_lines(
-        road_cells,
-        roads_path,
-        layer=str(roads_cfg["layer"]),
-        highway_column=str(roads_cfg["highway_column"]),
-        dst_epsg=dst_epsg,
-        domain=domain_box(cfg),
-    )
+    road_grids = load_road_cell_grids(input_dir / ROADS_SECTOR, cfg, src_crs, dst_epsg, step)
+    if road_grids is None:
+        raise FileNotFoundError(f"missing {ROADS_SECTOR} area grid under {input_dir / ROADS_SECTOR}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     areas_path = output_dir / f"area_source_{city}.csv"
-    lines_path = output_dir / f"line_source_{city}.csv"
     points_path = output_dir / f"point_source_{city}.csv"
 
     areas.to_csv(areas_path, index=False)
-    lines.to_csv(lines_path, index=False)
     points.to_csv(points_path, index=False)
+    line_writes = write_line_sources(
+        road_grids,
+        cfg=cfg,
+        roads_path=roads_path,
+        roads_cfg=roads_cfg,
+        dst_epsg=dst_epsg,
+        city=city,
+        output_dir=output_dir,
+    )
 
     print(f"areas:  {len(areas)} rows -> {areas_path}")
-    print(f"lines:  {len(lines)} rows -> {lines_path}")
+    for path, n in line_writes:
+        print(f"lines:  {n} rows -> {path}")
     print(f"points: {len(points)} rows -> {points_path}")
 
 

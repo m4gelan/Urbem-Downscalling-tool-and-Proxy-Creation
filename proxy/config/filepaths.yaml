@@ -1,3 +1,9 @@
+cams:
+  default_year: 2019
+  files:
+    2019: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+    2021: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2021.nc
+
 Sector_specific : 
     A_PublicPower:
         config: proxy/config/sector/A_PublicPower/A_PublicPower_sector_config.yaml

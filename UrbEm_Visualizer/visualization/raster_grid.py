@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from affine import Affine
 from rasterio.transform import array_bounds
 
@@ -35,7 +37,78 @@ class GridTemplate:
         return len(self.ys), len(self.xs)
 
 
-def build_template(domain: dict, frames: list[pd.DataFrame]) -> GridTemplate:
+def _template_from_fine_grid(fine) -> GridTemplate:
+    xs = fine.transform.c + (np.arange(fine.width, dtype=np.float64) + 0.5) * fine.transform.a
+    ys = fine.transform.f + (np.arange(fine.height, dtype=np.float64) + 0.5) * fine.transform.e
+    x_index = {float(v): i for i, v in enumerate(xs)}
+    y_index = {float(v): i for i, v in enumerate(ys)}
+    return GridTemplate(
+        xs=xs,
+        ys=ys,
+        transform=fine.transform,
+        crs=fine.crs,
+        x_index=x_index,
+        y_index=y_index,
+    )
+
+
+def grid_from_manifest(output_dir: Path) -> GridTemplate | None:
+    path = output_dir / "manifest.yaml"
+    if not path.is_file():
+        return None
+    with open(path, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    grid = raw.get("grid") if isinstance(raw, dict) else None
+    if not isinstance(grid, dict):
+        return None
+    tr = grid.get("transform")
+    height = grid.get("height")
+    width = grid.get("width")
+    crs = grid.get("crs")
+    if not (isinstance(tr, list) and len(tr) == 6 and height and width and crs):
+        return None
+    transform = Affine(*[float(v) for v in tr])
+    h, w = int(height), int(width)
+    xs = transform.c + (np.arange(w, dtype=np.float64) + 0.5) * transform.a
+    ys = transform.f + (np.arange(h, dtype=np.float64) + 0.5) * transform.e
+    return GridTemplate(
+        xs=xs,
+        ys=ys,
+        transform=transform,
+        crs=str(crs),
+        x_index={float(v): i for i, v in enumerate(xs)},
+        y_index={float(v): i for i, v in enumerate(ys)},
+    )
+
+
+def build_template(
+    domain: dict,
+    frames: list[pd.DataFrame],
+    *,
+    config: dict | None = None,
+    output_dir: Path | None = None,
+) -> GridTemplate:
+    if output_dir is not None:
+        from_manifest = grid_from_manifest(output_dir)
+        if from_manifest is not None:
+            return from_manifest
+
+    if config is not None:
+        output_cfg = config.get("output") or {}
+        if "grid_resolution_m" in output_cfg:
+            from UrbEm_Visualizer.downscaling.sector_meta import sector_order
+            from UrbEm_Visualizer.downscaling.spatial import (
+                build_output_grid,
+                find_reference_tif,
+                native_grid_metadata,
+            )
+
+            ref = find_reference_tif(config, sector_order(config))
+            if ref is not None:
+                resolution_m = int(output_cfg["grid_resolution_m"])
+                fine = build_output_grid(domain, resolution_m, native_grid_metadata(ref))
+                return _template_from_fine_grid(fine)
+
     xs_set: set[float] = set()
     ys_set: set[float] = set()
     for df in frames:
@@ -79,12 +152,16 @@ def build_template(domain: dict, frames: list[pd.DataFrame]) -> GridTemplate:
 
 def df_to_raster(df: pd.DataFrame, template: GridTemplate) -> AreaRaster:
     arr = np.zeros(template.shape, dtype=np.float32)
-    if not df.empty:
-        for rec in df.itertuples(index=False):
-            xi = template.x_index.get(float(rec.x))
-            yi = template.y_index.get(float(rec.y))
-            if xi is not None and yi is not None:
-                arr[yi, xi] += np.float32(rec.emission)
+    if df.empty:
+        return AreaRaster(data=arr, transform=template.transform, crs=template.crs)
+    inv = ~template.transform
+    h, w = template.shape
+    for rec in df.itertuples(index=False):
+        col_f, row_f = inv * (float(rec.x), float(rec.y))
+        col = int(np.floor(col_f))
+        row = int(np.floor(row_f))
+        if 0 <= row < h and 0 <= col < w:
+            arr[row, col] += np.float32(rec.emission)
     return AreaRaster(data=arr, transform=template.transform, crs=template.crs)
 
 

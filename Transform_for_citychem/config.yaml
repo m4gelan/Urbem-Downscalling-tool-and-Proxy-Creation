@@ -1,14 +1,14 @@
-Input_folder: Output/UrbEm/Athens_2019
-Output_folder: Output/CityChem/Athens_2019
-City: Athens
+Input_folder: Output/UrbEm/Kozani_2019
+Output_folder: Output/CityChem/Kozani_2019
+City: Kozani
 Year: 2019
 EPSG: 32634
 
-domain: # Athens
-  xmin: 716397
-  ymin: 4191261
-  xmax: 761397
-  ymax: 4236261
+# domain: # Athens
+#   xmin: 716397
+#   ymin: 4191261
+#   xmax: 761397
+#   ymax: 4236261
 
 # domain: #Ioannina
 #  xmin: 468000
@@ -16,11 +16,11 @@ domain: # Athens
 #  xmax: 499000
 #  ymax: 4406000
 
-# domain: # Kozani
-#   xmin: 551000
-#   ymin: 4453000
-#   xmax: 582000
-#   ymax: 4484000
+domain: # Kozani
+  xmin: 551000
+  ymin: 4453000
+  xmax: 582000
+  ymax: 4484000
 
 
 Grid_step_m: 1000

@@ -15,7 +15,6 @@ from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.dataset_loaders.load_corine import load_corine_weighted_l3
 from proxy.writers.debug_dump import KAgAreaWeightsDebug, write_k_agriculture_area_weights_debug
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
-from proxy.writers.w_groups_export import maybe_export_w_groups
 from proxy.visualizers.area_weights_map import (
     alpha_legend_html,
     write_k_agriculture_area_weights_debug_map,
@@ -43,6 +42,7 @@ def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -50,8 +50,6 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> (
     tuple[
         LivestockHousingPastureResult,
@@ -65,8 +63,11 @@ def build(
     ] | None
 ):
     repo_root = Path(__file__).resolve().parents[3]
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -274,19 +275,6 @@ def build(
         log.info(f"  {plab}: " + " ".join(parts) + f" (method {int(alpha_result.methods[j])})")
 
     country_tag = country_profile["full_name"].replace(" ", "_")
-    maybe_export_w_groups(
-        export_w_groups,
-        w_groups_export_root,
-        sector_key="K_Agriculture",
-        country_tag=country_tag,
-        year=year,
-        W_by_group=W_by_group,
-        cell_id=cell_id,
-        transform=cor_tr,
-        crs=cor_crs,
-        alpha_result=alpha_result,
-        cams_cells=cams_cells,
-    )
 
     a_alpha = alpha_result.alpha.astype(np.float32)
     n_poll = a_alpha.shape[0]

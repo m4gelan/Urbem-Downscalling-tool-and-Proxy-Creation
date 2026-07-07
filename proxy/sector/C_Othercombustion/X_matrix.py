@@ -13,11 +13,7 @@ from proxy.core.z_score import z_score_inside
 from proxy.core.cams_sector_config import load_sector_cells_mask
 from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
-from proxy.dataset_loaders.load_hotmaps import (
-    load_hotmaps_hdd,
-    load_hotmaps_heat_nres,
-    load_hotmaps_heat_res,
-)
+from proxy.dataset_loaders.load_hotmaps import load_hotmaps_heat_nres, load_hotmaps_heat_res
 from proxy.dataset_loaders.load_population import load_population
 from proxy.dataset_loaders.load_waste_rasters import load_ghsl_smod
 from proxy.sector.C_Othercombustion.M_matrix import MODEL_CLASSES
@@ -33,10 +29,10 @@ class XBuildResult:
     pop_z: np.ndarray
     H_res_z: np.ndarray
     H_nres_z: np.ndarray
-    Hdd_z: np.ndarray
     u111: np.ndarray
     u112: np.ndarray
     u121: np.ndarray
+    u221: np.ndarray
     stock_by_class: dict[str, np.ndarray]
     load_by_class: dict[str, np.ndarray]
 
@@ -47,8 +43,8 @@ _CLASS_STOCK_KEY: dict[str, tuple[str, str]] = {
     "R_COOKING_STOVE": ("residential", "cooking_stove"),
     "R_BOILER_MAN": ("residential", "boiler_man"),
     "R_BOILER_AUT": ("residential", "boiler_aut"),
-    "C_BOILER_MAN": ("commercial", "boiler_man"),
-    "C_BOILER_AUT": ("commercial", "boiler_aut"),
+    "C_BOILER_MAN": ("commercial", "boiler"),
+    "C_BOILER_AUT": ("commercial", "boiler"),
 }
 
 
@@ -57,14 +53,10 @@ def _u_rural(
     u111: np.ndarray,
     u112: np.ndarray,
     u121: np.ndarray,
+    u221: np.ndarray,
 ) -> np.ndarray:
-    not_urb = (u111 < 0.5) & (u112 < 0.5) & (u121 < 0.5)
+    not_urb = (u111 < 0.5) & (u112 < 0.5) & (u121 < 0.5) & (u221 < 0.5)
     return ((ghsl_rural > 0.5) & not_urb).astype(np.float32)
-
-
-def _u_other(u111: np.ndarray, u112: np.ndarray, u121: np.ndarray) -> np.ndarray:
-    u = np.asarray(u111, dtype=np.float32)
-    return np.clip(1.0 - u - np.asarray(u112, dtype=np.float32) - np.asarray(u121, dtype=np.float32), 0.0, 1.0)
 
 
 def stock_support(
@@ -75,42 +67,56 @@ def stock_support(
     u111: np.ndarray,
     u112: np.ndarray,
     u121: np.ndarray,
+    u221: np.ndarray,
     u_rural: np.ndarray,
-    u_other: np.ndarray,
 ) -> np.ndarray:
     sector, key = _CLASS_STOCK_KEY[class_name]
     w = stock_cfg[sector][key]
-    w111 = float(w["weight_corine_111"])
-    w112 = float(w["weight_corine_112"])
-    wr = float(w["weight_ghsl_smod"])
-    acc = w111 * u111 + w112 * u112 + wr * u_rural
-    if sector == "commercial":
-        w121 = float(w["weight_corine_121"])
-        acc = acc + w121 * u121 + wr * u_other
-        return acc.astype(np.float32)
-    return (pop_z * acc).astype(np.float32)
+    if w["population_only"]:
+        return pop_z.astype(np.float32, copy=False)
+    acc = (
+        float(w["weight_corine_111"]) * u111
+        + float(w["weight_corine_112"]) * u112
+        + float(w["weight_corine_121"]) * u121
+        + float(w["weight_corine_221"]) * u221
+        + float(w["weight_ghsl_smod"]) * u_rural
+    )
+    if w["use_population"]:
+        return (pop_z * acc).astype(np.float32)
+    return acc.astype(np.float32)
 
 
 def load_support(
     class_name: str,
     load_cfg: dict[str, Any],
     *,
+    pop_z: np.ndarray,
     H_res_z: np.ndarray,
     H_nres_z: np.ndarray,
-    Hdd_z: np.ndarray,
     shape: tuple[int, int],
 ) -> np.ndarray:
-    e_heat = float(load_cfg["exponent_heat"])
-    e_hdd = float(load_cfg["exponent_hdd"])
-    if class_name in ("R_FIREPLACE", "R_HEATING_STOVE"):
-        return (np.power(H_res_z, e_heat) * np.power(Hdd_z, e_hdd)).astype(np.float32)
-    if class_name == "R_COOKING_STOVE":
+    spec = load_cfg[class_name]
+    if isinstance(spec, dict):
+        out = np.zeros(shape, dtype=np.float32)
+        if "pop" in spec:
+            out += float(spec["pop"]) * pop_z.astype(np.float32, copy=False)
+        if "h_res" in spec:
+            out += float(spec["h_res"]) * H_res_z.astype(np.float32, copy=False)
+        if "h_nres" in spec:
+            out += float(spec["h_nres"]) * H_nres_z.astype(np.float32, copy=False)
+        if "constant" in spec:
+            out += float(spec["constant"]) * np.ones(shape, dtype=np.float32)
+        return out
+    kind = str(spec)
+    if kind == "pop":
+        return pop_z.astype(np.float32, copy=False)
+    if kind == "constant":
         return np.ones(shape, dtype=np.float32)
-    if class_name in ("R_BOILER_MAN", "R_BOILER_AUT"):
+    if kind == "h_res":
         return H_res_z.astype(np.float32, copy=False)
-    if class_name in ("C_BOILER_MAN", "C_BOILER_AUT"):
+    if kind == "h_nres":
         return H_nres_z.astype(np.float32, copy=False)
-    raise ValueError(f"unknown class for load_support: {class_name!r}")
+    raise ValueError(f"unknown load_support kind for {class_name!r}: {kind!r}")
 
 
 def build_x_matrix(
@@ -127,7 +133,6 @@ def build_x_matrix(
     ghs_smod_filepath: str | Path,
     hotmaps_residential_filepath: str | Path,
     hotmaps_non_residential_filepath: str | Path,
-    hdd_filepath: str | Path,
     pollutants: list[str],
 ) -> XBuildResult:
     """Build X (H, W, 7) with X[:,:,k] = S_k * L_k on the CORINE reference grid."""
@@ -141,6 +146,7 @@ def build_x_matrix(
     l3_111 = [int(x) for x in corine_cfg.get("l3_code_111", [111])]
     l3_112 = [int(x) for x in corine_cfg.get("l3_code_112", [112])]
     l3_121 = [int(x) for x in corine_cfg.get("l3_code_121", [121])]
+    l3_221 = [int(x) for x in corine_cfg["l3_code_221"]]
 
     cams_cells, cams_grid = load_sector_cells_mask(
         repo_root / str(cams_filepath).replace("\\", "/"),
@@ -154,28 +160,18 @@ def build_x_matrix(
     if not cams_cells:
         raise ValueError("C_OtherCombustion X: no CAMS cells for country")
 
+    corine_path = repo_root / str(corine_filepath).replace("\\", "/")
     u111, cor_tr, cor_crs, _ = load_corine(
-        repo_root / str(corine_filepath).replace("\\", "/"),
-        l3_111,
-        corine_band,
-        cams_cells,
-        cams_grid,
-        need_cell_id=False,
+        corine_path, l3_111, corine_band, cams_cells, cams_grid, need_cell_id=False,
     )
     u112, _, _, _ = load_corine(
-        repo_root / str(corine_filepath).replace("\\", "/"),
-        l3_112,
-        corine_band,
-        cams_cells,
-        cams_grid,
-        need_cell_id=False,
+        corine_path, l3_112, corine_band, cams_cells, cams_grid, need_cell_id=False,
     )
-    u121, _, _, cell_id = load_corine(
-        repo_root / str(corine_filepath).replace("\\", "/"),
-        l3_121,
-        corine_band,
-        cams_cells,
-        cams_grid,
+    u121, _, _, _ = load_corine(
+        corine_path, l3_121, corine_band, cams_cells, cams_grid, need_cell_id=False,
+    )
+    u221, _, _, cell_id = load_corine(
+        corine_path, l3_221, corine_band, cams_cells, cams_grid,
     )
     ch, cw = u111.shape
 
@@ -196,10 +192,6 @@ def build_x_matrix(
         repo_root / str(hotmaps_non_residential_filepath).replace("\\", "/"),
         cams_cells,
     )
-    Hdd, hdd_tr, hdd_crs, hdd_nd = load_hotmaps_hdd(
-        repo_root / str(hdd_filepath).replace("\\", "/"),
-        cams_cells,
-    )
     ghsl_rural, ghsl_tr, ghsl_crs = load_ghsl_smod(
         repo_root / str(ghs_smod_filepath).replace("\\", "/"),
         cams_cells,
@@ -217,9 +209,6 @@ def build_x_matrix(
     H_nres = warp_raster_to_grid(
         H_nres, hnres_tr, hnres_crs, ch, cw, cor_tr, cor_crs, src_nodata=hnres_nd,
     )
-    Hdd = warp_raster_to_grid(
-        Hdd, hdd_tr, hdd_crs, ch, cw, cor_tr, cor_crs, src_nodata=hdd_nd,
-    )
 
     inside = pixels_inside_cams_cells(ch, cw, cor_tr, cor_crs, cams_cells)
     pop_z = z_score_inside(np.asarray(pop, dtype=np.float32), inside, upper_quantile=0.99, rescale_to_01=True)
@@ -228,20 +217,20 @@ def build_x_matrix(
     del H_res
     H_nres_z = z_score_inside(np.asarray(H_nres, dtype=np.float32), inside, upper_quantile=0.99, rescale_to_01=True)
     del H_nres
-    Hdd_z = z_score_inside(np.asarray(Hdd, dtype=np.float32), inside, upper_quantile=0.99, rescale_to_01=True)
-    del Hdd
 
-    u_rural = _u_rural(ghsl_rural, u111, u112, u121)
-    u_other = _u_other(u111, u112, u121)
+    u_rural = _u_rural(ghsl_rural, u111, u112, u121, u221)
 
     X = np.zeros((ch, cw, len(MODEL_CLASSES)), dtype=np.float32)
     stock_by_class: dict[str, np.ndarray] = {}
     load_by_class: dict[str, np.ndarray] = {}
     for ki, cls in enumerate(MODEL_CLASSES):
         S = stock_support(
-            cls, stock_cfg, pop_z=pop_z, u111=u111, u112=u112, u121=u121, u_rural=u_rural, u_other=u_other
+            cls, stock_cfg,
+            pop_z=pop_z, u111=u111, u112=u112, u121=u121, u221=u221, u_rural=u_rural,
         )
-        L = load_support(cls, load_cfg, H_res_z=H_res_z, H_nres_z=H_nres_z, Hdd_z=Hdd_z, shape=(ch, cw))
+        L = load_support(
+            cls, load_cfg, pop_z=pop_z, H_res_z=H_res_z, H_nres_z=H_nres_z, shape=(ch, cw),
+        )
         stock_by_class[cls] = S
         load_by_class[cls] = L
         X[:, :, ki] = (S * L).astype(np.float32)
@@ -258,10 +247,10 @@ def build_x_matrix(
         pop_z=pop_z,
         H_res_z=H_res_z,
         H_nres_z=H_nres_z,
-        Hdd_z=Hdd_z,
         u111=u111,
         u112=u112,
         u121=u121,
+        u221=u221,
         stock_by_class=stock_by_class,
         load_by_class=load_by_class,
     )

@@ -10,7 +10,7 @@ from UrbEm_Visualizer.downscaling.area import downscale_area, prepare_sector_cam
 from UrbEm_Visualizer.downscaling.roads import downscale_roads_sector
 from UrbEm_Visualizer.dataset_loaders.tif_grid import cell_id_plane
 from UrbEm_Visualizer.downscaling.merge import merge_grids
-from UrbEm_Visualizer.downscaling.output_config import parse_point_matching
+from UrbEm_Visualizer.downscaling.output_config import parse_point_matching, parse_roads_export
 from UrbEm_Visualizer.downscaling.point import (
     add_unmatched_to_cams_cells,
     load_point_records,
@@ -18,7 +18,7 @@ from UrbEm_Visualizer.downscaling.point import (
     run_point_sector,
 )
 from UrbEm_Visualizer.writer.downscale_export import export_run
-from UrbEm_Visualizer.downscaling.sector_meta import sector_label, sector_mode, sector_order
+from UrbEm_Visualizer.downscaling.sector_meta import resolve_sector_id, sector_label, sector_mode, sector_order
 from UrbEm_Visualizer.downscaling.spatial import (
     build_output_grid,
     find_reference_tif,
@@ -89,6 +89,7 @@ def run_downscaling(
     on_progress: Callable[[dict], None] | None = None,
     cancel_flag: Callable[[], bool] | None = None,
     partial_match_handling: str | None = None,
+    sectors: list[str] | None = None,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     if partial_match_handling:
@@ -106,6 +107,7 @@ def run_downscaling(
     if "grid_resolution_m" not in output_cfg:
         raise KeyError("run config missing output.grid_resolution_m")
     pm_cfg = parse_point_matching(output_cfg)
+    roads_export = parse_roads_export(output_cfg)
     procedure = pm_cfg["procedure"]
     burn_unmatched_to_area = procedure == "merged" or (
         procedure == "separate" and pm_cfg["unmatched"] == "burn_to_area"
@@ -115,13 +117,16 @@ def run_downscaling(
     fmt = output_cfg["format"]
     grid_resolution_m = int(output_cfg["grid_resolution_m"])
     order = sector_order(config)
-    ref = find_reference_tif(config, order)
+    if sectors is not None:
+        order = [resolve_sector_id(s, config) for s in sectors]
+    ref = find_reference_tif(config, sector_order(config))
     if ref is None:
         raise ValueError("no area_weights or point_source path in configuration")
 
     native_meta = native_grid_metadata(ref)
     grid = build_output_grid(domain, grid_resolution_m, native_meta)
     cams_nc = resolve_path(config["paths"]["cams"], root)
+    emis_year = int(config.get("emissions_year") or config["year"])
     out_dir = output_dir_for_run(config_path, config)
 
     sectors_state = [
@@ -195,7 +200,7 @@ def run_downscaling(
             step = 0
             _set_progress(step, 0.0)
             cams_cells, cams_grid_meta = prepare_sector_cams(
-                cams_nc, sid, config["country"], int(config["year"]), pollutants,
+                cams_nc, sid, config["country"], emis_year, pollutants,
             )
             _set_progress(step, 1.0)
             step += 1
@@ -248,7 +253,7 @@ def run_downscaling(
                     def _roads_prog(label: str, sub: float) -> None:
                         _set_progress(step, sub, label)
 
-                    area_da, wlog, fails, sector_clip = downscale_roads_sector(
+                    area_da, roads_by_cat, wlog, fails, sector_clip = downscale_roads_sector(
                         grid=grid,
                         category_paths=cat_paths,
                         country=config["country"],
@@ -259,6 +264,8 @@ def run_downscaling(
                         native_meta=native_meta,
                         on_progress=_roads_prog,
                     )
+                    if roads_export == "by_category" and roads_by_cat:
+                        res["roads_categories"] = roads_by_cat
                 else:
                     aw_path = resolve_path(aw["path"], root)
                     n_pol = len(pollutants) or 1
@@ -309,7 +316,7 @@ def run_downscaling(
                     cams_nc=cams_nc,
                     sector_id=sid,
                     country=config["country"],
-                    year=int(config["year"]),
+                    year=emis_year,
                     pollutants=pollutants,
                     domain=domain,
                     procedure=procedure,
@@ -351,12 +358,15 @@ def run_downscaling(
             config=config,
             fmt=fmt,
             procedure=procedure,
+            roads_export=roads_export,
             sector_results=sector_results,
             merged=merged_acc if procedure == "merged" else None,
             weight_check_log=weight_check_log,
             clip_log=clip_log,
             grid_transform=grid.transform,
             crs=grid.crs,
+            grid_height=grid.height,
+            grid_width=grid.width,
         )
         state["status"] = "done"
         push()

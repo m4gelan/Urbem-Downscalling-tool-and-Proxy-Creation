@@ -72,3 +72,4 @@ output:
     procedure: separate
     unmatched: keep_location
   grid_resolution_m: 100
+  roads_export: by_category

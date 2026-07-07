@@ -25,6 +25,43 @@ def _total_facility_emissions(
     return totals
 
 
+def _avg_facility_shares(
+    facilities: list[tuple[str, dict[str, Any]]],
+    totals: dict[str, float],
+    pollutant_labels: list[str],
+) -> tuple[list[str], dict[str, float]]:
+    working = [lab for lab in pollutant_labels if totals[lab] > 0.0]
+    shares = {fid: 0.0 for fid, _ in facilities}
+    if not working:
+        return working, shares
+    for fid, fac in facilities:
+        fac_pols = _facility_pollutants(fac, pollutant_labels)
+        shares[fid] = sum(fac_pols[lab] / totals[lab] for lab in working) / len(working)
+    return working, shares
+
+
+def _closest_facility_id(
+    facilities: list[tuple[str, dict[str, Any]]],
+    cam_lon: float,
+    cam_lat: float,
+) -> str:
+    best_fid = facilities[0][0]
+    best_d = float("inf")
+    for fid, fac in facilities:
+        d = float(
+            haversine_km(
+                np.array([cam_lon]),
+                np.array([cam_lat]),
+                np.array([float(fac["lon"])]),
+                np.array([float(fac["lat"])]),
+            )[0]
+        )
+        if d < best_d:
+            best_d = d
+            best_fid = fid
+    return best_fid
+
+
 def allocate_cams_to_facilities(
     cams_row: dict[str, Any],
     facilities: list[tuple[str, dict[str, Any]]],
@@ -44,6 +81,9 @@ def allocate_cams_to_facilities(
 
     if proportional:
         totals = _total_facility_emissions(facilities, pollutant_labels)
+        working, avg_shares = _avg_facility_shares(facilities, totals, pollutant_labels)
+        closest_fid = _closest_facility_id(facilities, cam_lon, cam_lat) if not working else None
+        zero_facility_labels: set[str] = set()
         links: list[dict[str, Any]] = []
         for fid, fac in facilities:
             fac_pols = _facility_pollutants(fac, pollutant_labels)
@@ -55,10 +95,12 @@ def allocate_cams_to_facilities(
                     continue
                 denom = totals[lab]
                 if denom <= 0.0:
-                    if len(facilities) == 1 and cams_val > 0.0:
+                    zero_facility_labels.add(lab)
+                    if working:
+                        attributed[lab] = cams_val * avg_shares[fid]
+                    elif fid == closest_fid:
                         attributed[lab] = cams_val
                     else:
-                        flags.append(f"zero_facility_total_{lab}")
                         attributed[lab] = 0.0
                     continue
                 attributed[lab] = cams_val * fac_pols[lab] / denom
@@ -76,6 +118,7 @@ def allocate_cams_to_facilities(
                 "attributed_pollutants": attributed,
                 "scoring_value": dist,
             })
+        flags.extend(f"zero_facility_total_{lab}" for lab in sorted(zero_facility_labels))
         return links, flags
 
     dists: list[tuple[float, str, dict[str, Any]]] = []

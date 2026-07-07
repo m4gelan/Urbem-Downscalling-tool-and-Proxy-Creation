@@ -142,5 +142,10 @@ area_weights:
   w2: 0.6
   w3: 0.1
 
+# NUTS0 outline + outward buffer for coastal shipping cells (any CAMS domain attribution).
+maritime_domain:
+  buffer_m: 22224
+  metric_crs: EPSG:3035
+
 
 

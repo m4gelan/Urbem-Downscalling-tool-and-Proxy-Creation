@@ -14,6 +14,7 @@ import yaml
 
 from proxy.core import log
 from proxy.core.alias import resolve_country_profile
+from proxy.core.cams_year import cams_path_for_year, load_cams_inventory, load_patched_sector_config
 
 SECTORS = [
     "A_PublicPower",
@@ -29,43 +30,31 @@ SECTORS = [
     "K_Agriculture",
 ]
 
-SECTORS_ENABLED = ["B_Industry","D_Fugitive", "E_Solvents","J_Waste"]
-#SECTORS_ENABLED = SECTORS
+SECTORS_ENABLED = ["K_Agriculture"]
+# SECTORS_ENABLED = SECTORS
 
 # Select area and or point matching
 AREA_WEIGHTS = True
 POINT_MATCHING = False
 
-# Select run mode
-# Options: build | prong_a | build_and_export | export_and_prong_a
-# build: only build the weights
-# prong_a: only run the prong_a analysis
-# build_and_export: build the weights and export the W_groups
-# D: export the W_groups and run the prong_a analysis
-RUN_MODE = "build" 
-
-EXPORT_W_GROUPS = True
-W_GROUPS_EXPORT_ROOT = "OUTPUT/Proxy_diagnostics/W_groups"
-PRONG_A_SECTORS = "multi_group"
-PRONG_A_W_SECTORS = "mix_export"
-
 # Select countries to build — processed one by one
 COUNTRIES = [
-    "Germany",
-    "Spain",
-    "Switzerland"
+    "Italy",
 ]
-CITY = "Athens" # City for debug maps
+
+CITY = "Cremona" # City for debug maps
 
 # Info skips all, debug creates maps and other logs
-LOG_LEVEL = "INFO" # INFO | DEBUG option
-MAP_TYPE = 'FIXED_IMAGE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
+LOG_LEVEL = "DEBUG" # INFO | DEBUG option
+MAP_TYPE = 'INTERACTIVE' # INTERACTIVE for html map, FIXED_IMAGE for png maps for debug maps
 
 EPSG_CRS = "EPSG:3035"
 RESOLUTION_M = 100.0
 PAD_M = 10.0
 
-# Paths to the config files and the export root for the W_groups
+# CAMS inventory year for proxy weights and point matching (2019 | 2021)
+CAMS_YEAR = 2021
+
 filepaths_path = "proxy/config/filepaths.yaml"
 
 
@@ -97,9 +86,8 @@ def _release_python_memory(module_name: str | None = None) -> None:
         sys.modules.pop(module_name, None)
     gc.collect()
 
-def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: bool) -> int:
+def _run_build_loop(root: Path, table: dict, *, country: str, cams: dict) -> int:
     allowed = set(SECTORS)
-    export_root = root / W_GROUPS_EXPORT_ROOT.replace("\\", "/")
     total_time = 0
     for sector_key in SECTORS_ENABLED:
         _release_python_memory()
@@ -124,6 +112,11 @@ def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: b
             continue
         cfg_path = root / config_rel.replace("\\", "/")
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        sector_cfg = load_patched_sector_config(
+            cfg_path,
+            int(CAMS_YEAR),
+            cams_path_for_year(cams, int(CAMS_YEAR)),
+        )
         out_dir = root / out_rel.replace("\\", "/")
         out_dir.mkdir(parents=True, exist_ok=True)
         script = root / pipeline_rel.replace("\\", "/")
@@ -136,6 +129,7 @@ def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: b
             mod.build(
                 out_dir,
                 cfg_path,
+                sector_config=sector_cfg,
                 area_weights=AREA_WEIGHTS,
                 point_matching=POINT_MATCHING,
                 country_profile=resolve_country_profile(country),
@@ -143,8 +137,6 @@ def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: b
                 resolution_m=RESOLUTION_M,
                 pad_m=PAD_M,
                 area_weights_viz_bbox_wgs84=BOUNDING_BOX if sk == "F_Roads" else viz_bbox,
-                export_w_groups=export_w_groups,
-                w_groups_export_root=export_root if export_w_groups else None,
             )
         except Exception:
             import traceback
@@ -167,59 +159,6 @@ def _run_build_loop(root: Path, table: dict, *, country: str, export_w_groups: b
         log.info(f"--------------------------------")
     return 0
 
-def _run_prong_a(root: Path, country: str) -> int:
-    from proxy.diagnostics.weight_sensitivity.run import load_prong_a_settings, run_prong_a
-    cfg = load_prong_a_settings(root)
-    year = int(cfg["year"])
-    run_prong_a(
-        root,
-        country=country,
-        year=year,
-        sector_keys=PRONG_A_SECTORS,
-        active_eps=float(cfg["active_eps"]),
-        similarity_threshold=float(cfg["similarity_threshold"]),
-    )
-    return 0
-
-
-def _run_prong_a_w(root: Path, country: str) -> int:
-    from proxy.diagnostics.weight_sensitivity.run import load_prong_a_w_settings, run_prong_a_w
-    cfg = load_prong_a_w_settings(root)
-    year = int(cfg["year"])
-    run_prong_a_w(
-        root,
-        country=country,
-        year=year,
-        sector_keys=cfg.get("sector_keys", PRONG_A_W_SECTORS),
-        active_eps=float(cfg["active_eps"]),
-        similarity_threshold=float(cfg["similarity_threshold"]),
-    )
-    return 0
-
-def _run_mode(root: Path, table: dict, country: str) -> int:
-    mode = str(RUN_MODE).strip().lower()
-    if mode == "build":
-        return _run_build_loop(root, table, country=country, export_w_groups=EXPORT_W_GROUPS)
-    if mode == "prong_a":
-        return _run_prong_a(root, country)
-    if mode == "prong_a_w":
-        return _run_prong_a_w(root, country)
-    if mode == "build_and_export":
-        return _run_build_loop(root, table, country=country, export_w_groups=True)
-    if mode == "export_and_prong_a":
-        rc = _run_build_loop(root, table, country=country, export_w_groups=True)
-        if rc != 0:
-            return rc
-        return _run_prong_a(root, country)
-    if mode == "export_and_prong_a_w":
-        rc = _run_build_loop(root, table, country=country, export_w_groups=True)
-        if rc != 0:
-            return rc
-        return _run_prong_a_w(root, country)
-    log.error(f"unknown RUN_MODE {RUN_MODE!r}")
-    return 1
-
-
 def main() -> int:
     log.configure(LOG_LEVEL)
     root = Path(__file__).resolve().parents[1]
@@ -232,11 +171,13 @@ def main() -> int:
     if not COUNTRIES:
         log.error("COUNTRIES must be a non-empty list")
         return 1
+    cams = load_cams_inventory(root / filepaths_path.replace("\\", "/"))
+    log.info(f"CAMS inventory year: {int(CAMS_YEAR)}")
     for country in COUNTRIES:
         log.info("================================")
         log.info(f"Country: {country}")
         log.info("================================")
-        rc = _run_mode(root, table, str(country).strip())
+        rc = _run_build_loop(root, table, country=str(country).strip(), cams=cams)
         if rc != 0:
             log.error(f"Stopped after failure for country {country!r}")
             return rc

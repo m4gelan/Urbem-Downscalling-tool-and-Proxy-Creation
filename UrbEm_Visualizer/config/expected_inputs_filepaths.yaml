@@ -1,12 +1,13 @@
 # Expected INPUT layout (paths relative to project root unless absolute).
-# Area weights: {Sector}_{Country}_area_weights_{year}.tif
-
-year: 2019
+# Proxy GeoTIFFs: {Sector}_{Country}_area_weights_{year}.tif (year = CAMS inventory year)
 
 input_root: INPUT
 
 cams:
-  path: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+  default_year: 2019
+  files:
+    2019: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2019.nc
+    2021: INPUT/Emissions/CAMS-REG-v8_1_emissions_year2021.nc
 
 proxy_weights_root: INPUT/Proxy_weights
 

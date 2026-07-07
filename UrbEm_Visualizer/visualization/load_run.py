@@ -110,7 +110,7 @@ class RunContext:
                 df = self.grid_df(sid, "area", pol)
                 if not df.empty:
                     frames.append(df)
-        self._template = build_template(self.domain, frames)
+        self._template = build_template(self.domain, frames, config=self.config, output_dir=self.output_dir)
 
         for pol in self.pollutants:
             combined = []
@@ -160,7 +160,7 @@ class RunContext:
             return self._raster_cache[key]
         template = self._template
         if template is None:
-            template = build_template(self.domain, [])
+            template = build_template(self.domain, [], config=self.config, output_dir=self.output_dir)
 
         if sector_id == "TOTAL":
             ids = active_sectors or self.sector_ids()

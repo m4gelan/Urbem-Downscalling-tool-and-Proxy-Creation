@@ -77,7 +77,6 @@ SECTOR_LAYER_STYLES: dict[str, dict[str, LayerStyle]] = {
         "popz": LayerStyle("Population z-score", cmap="viridis", show=True),
         "hres": LayerStyle("Hotmaps H_res z-score", cmap="viridis", show=False),
         "hnres": LayerStyle("Hotmaps H_nres z-score", cmap="viridis", show=False),
-        "hdd": LayerStyle("HDD z-score", cmap="viridis", show=False),
         "u111": LayerStyle("CORINE u111 continuous urban", kind="mask_rgb", rgb=(205, 92, 92), show=True),
         "u112": LayerStyle("CORINE u112 discontinuous urban", kind="mask_rgb", rgb=(210, 105, 30), show=False),
         "u121": LayerStyle("CORINE u121 industrial", kind="mask_rgb", rgb=(30, 144, 200), show=False),
@@ -1498,10 +1497,10 @@ def write_c_othercombustion_area_weights_debug_map(
         "popz": x_build.pop_z.astype(np.float32),
         "hres": x_build.H_res_z.astype(np.float32),
         "hnres": x_build.H_nres_z.astype(np.float32),
-        "hdd": x_build.Hdd_z.astype(np.float32),
         "u111": x_build.u111.astype(np.uint8),
         "u112": x_build.u112.astype(np.uint8),
         "u121": x_build.u121.astype(np.uint8),
+        "u221": x_build.u221.astype(np.uint8),
     }
     for cls in viz_classes:
         arrays[f"S_{cls}"] = np.asarray(x_build.stock_by_class[cls], dtype=np.float32)

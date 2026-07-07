@@ -3,6 +3,8 @@ const API = "";
 let activeConfig = null;
 let configPath = null;
 let expectedSectors = [];
+let camsFiles = {};
+let defaultEmissionsYear = 2019;
 let writerCountry = "";
 let lastCheck = null;
 let availablePollutants = [];
@@ -161,11 +163,44 @@ function collectSelectedPollutants(containerId) {
   return out;
 }
 
+function selectedEmissionsYear(selectId) {
+  const el = document.getElementById(selectId || "emissions-year-select");
+  if (!el || !el.value) return defaultEmissionsYear;
+  return parseInt(el.value, 10);
+}
+
+function syncCamsPathFromYear(year, pathInputId) {
+  const rel = camsFiles[String(year)];
+  if (rel) document.getElementById(pathInputId || "path-cams").value = rel;
+}
+
+function buildEmissionsYearSelect(selectId, selectedYear) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const years = Object.keys(camsFiles)
+    .map((y) => parseInt(y, 10))
+    .sort((a, b) => a - b);
+  const pick = selectedYear != null ? parseInt(selectedYear, 10) : defaultEmissionsYear;
+  sel.innerHTML = "";
+  years.forEach((y) => {
+    const opt = document.createElement("option");
+    opt.value = String(y);
+    opt.textContent = String(y);
+    if (y === pick) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function configLeadText(config) {
+  const country = config.country || "";
+  const y = config.emissions_year || config.year || defaultEmissionsYear;
+  return "Country: " + country + " — CAMS & proxy inventory " + y;
+}
+
 function showMenuB(config, tableRows) {
   activeConfig = config;
   showScreen("screen-menu-b");
-  document.getElementById("menu-b-lead").textContent =
-    "Country: " + (config.country || "") + " — year " + (config.year || "");
+  document.getElementById("menu-b-lead").textContent = configLeadText(config);
   renderInputsTable(tableRows || []);
   buildPollutantCheckboxes("pollutants-checkboxes", config.pollutants || []);
   updateDomainSummary();
@@ -176,7 +211,8 @@ function showMenuB(config, tableRows) {
     const base = configPath.replace(/\\/g, "/").split("/").pop() || "";
     nameEl.value = base.replace(/\.ya?ml$/i, "");
   } else if (config.country) {
-    nameEl.value = config.country + "_" + (config.year || "2019");
+    const y = config.emissions_year || config.year || defaultEmissionsYear;
+    nameEl.value = config.country + "_" + y;
   }
   if (config.output) {
     document.querySelector('input[name="out-format"][value="' + config.output.format + '"]').checked = true;
@@ -192,6 +228,10 @@ function showMenuB(config, tableRows) {
         'input[name="grid-resolution"][value="' + config.output.grid_resolution_m + '"]'
       );
       if (gridEl) gridEl.checked = true;
+    }
+    const roadsEl = document.getElementById("roads-export-by-category");
+    if (roadsEl) {
+      roadsEl.checked = config.output.roads_export === "by_category";
     }
   }
 }
@@ -356,7 +396,12 @@ async function markWaiver(sector, role) {
   const r = await fetch(API + "/api/waiver/mark", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sector, role, country }),
+    body: JSON.stringify({
+      sector,
+      role,
+      country,
+      emissions_year: selectedEmissionsYear(),
+    }),
   });
   const data = await r.json();
   if (data.error) {
@@ -392,7 +437,7 @@ async function runCheckInput() {
   const r = await fetch(API + "/api/check-input", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ country }),
+    body: JSON.stringify({ country, emissions_year: selectedEmissionsYear() }),
   });
   const check = await r.json();
   if (check.error) throw new Error(check.error);
@@ -719,7 +764,9 @@ function setPathAbsent(line, absent) {
 }
 
 function fillManualFromConfig(config) {
-  document.getElementById("path-cams").value = (config.paths || {}).cams || "";
+  const ey = config.emissions_year || defaultEmissionsYear;
+  buildEmissionsYearSelect("emissions-year-b1b", ey);
+  document.getElementById("path-cams").value = (config.paths || {}).cams || camsFiles[String(ey)] || "";
   const sectors = config.sectors || {};
   document.querySelectorAll(".sector-path-block").forEach((block) => {
     const sid = block.dataset.sector;
@@ -741,7 +788,11 @@ function fillManualFromConfig(config) {
 }
 
 function collectManual() {
-  const manual = { cams: document.getElementById("path-cams").value.trim(), sectors: {} };
+  const manual = {
+    cams: document.getElementById("path-cams").value.trim(),
+    emissions_year: selectedEmissionsYear("emissions-year-b1b"),
+    sectors: {},
+  };
   document.querySelectorAll(".sector-path-block").forEach((block) => {
     const sid = block.dataset.sector;
     const roles = {};
@@ -761,6 +812,10 @@ async function loadExpectedSectors() {
   const data = await r.json();
   if (data.error) throw new Error(data.error);
   expectedSectors = data.sectors || [];
+  camsFiles = data.cams_files || {};
+  defaultEmissionsYear = parseInt(data.default_emissions_year, 10) || 2019;
+  buildEmissionsYearSelect("emissions-year-select", defaultEmissionsYear);
+  buildEmissionsYearSelect("emissions-year-b1b", defaultEmissionsYear);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -836,7 +891,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const r = await fetch(API + "/api/writer/from-check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country, pollutants }),
+      body: JSON.stringify({
+        country,
+        pollutants,
+        emissions_year: selectedEmissionsYear(),
+      }),
     });
     const data = await r.json();
     if (!r.ok || !data.config) {
@@ -857,7 +916,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const r = await fetch(API + "/api/writer/new", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country }),
+      body: JSON.stringify({
+        country,
+        emissions_year: selectedEmissionsYear("emissions-year-b1b"),
+      }),
     });
     const data = await r.json();
     if (data.error) {
@@ -891,6 +953,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     line.querySelector("input").value = data.path;
   });
 
+  document.getElementById("emissions-year-select").addEventListener("change", () => {
+    if (lastCheck) runCheckInput().catch(console.error);
+  });
+
+  document.getElementById("emissions-year-b1b").addEventListener("change", () => {
+    syncCamsPathFromYear(selectedEmissionsYear("emissions-year-b1b"));
+  });
+
   document.getElementById("screen-writer-b1b").addEventListener("click", async (ev) => {
     const pick = ev.target.closest("[data-pick]");
     if (!pick || pick.dataset.pick !== "cams") return;
@@ -920,6 +990,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           country: writerCountry || document.getElementById("country-select").value,
+          emissions_year: selectedEmissionsYear("emissions-year-b1b"),
         }),
       });
       activeConfig = (await nr.json()).config;
@@ -1028,11 +1099,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const format = document.querySelector('input[name="out-format"]:checked').value;
     const pointMatching = readPointMatchingConfig();
     const gridResolutionM = parseInt(document.querySelector('input[name="grid-resolution"]:checked').value, 10);
+    const roadsExport = document.getElementById("roads-export-by-category").checked
+      ? "by_category"
+      : "aggregated";
     await fetch(API + "/api/config/output", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        output: { format, point_matching: pointMatching, grid_resolution_m: gridResolutionM },
+        output: {
+          format,
+          point_matching: pointMatching,
+          grid_resolution_m: gridResolutionM,
+          roads_export: roadsExport,
+        },
       }),
     });
     const pollutants = collectSelectedPollutants("pollutants-checkboxes");

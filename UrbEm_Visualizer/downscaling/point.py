@@ -142,6 +142,55 @@ def _emis_from_sidecar(rec: dict[str, Any], link: dict[str, Any] | None, polluta
     return out
 
 
+def _link_emissions_with_gap_fill(
+    rec: dict[str, Any],
+    links: list[dict[str, Any]],
+    pollutants: list[str],
+) -> list[dict[str, float]]:
+    """Keep proportional splits where attribution worked; fill zero-total pollutants from average share."""
+    cams_pols = rec.get("pollutants") or {}
+    n = len(links)
+    attributed = [lk.get("attributed_pollutants") or {} for lk in links]
+
+    working: list[str] = []
+    for pol in pollutants:
+        total = sum(sidecar_pollutant_mass(attributed[i], pol) for i in range(n))
+        if total > 0.0:
+            working.append(pol)
+
+    avg_shares = [0.0] * n
+    if working:
+        for i in range(n):
+            avg_shares[i] = sum(
+                sidecar_pollutant_mass(attributed[i], pol)
+                / sum(sidecar_pollutant_mass(attributed[j], pol) for j in range(n))
+                for pol in working
+            ) / len(working)
+    else:
+        closest_i = min(
+            range(n),
+            key=lambda i: float(links[i].get("match_distance_km") if links[i].get("match_distance_km") is not None else float("inf")),
+        )
+        for i in range(n):
+            avg_shares[i] = 1.0 if i == closest_i else 0.0
+
+    out: list[dict[str, float]] = []
+    for i in range(n):
+        emis: dict[str, float] = {}
+        for pol in pollutants:
+            attr_m = sidecar_pollutant_mass(attributed[i], pol)
+            cams_m = sidecar_pollutant_mass(cams_pols, pol)
+            total_attr = sum(sidecar_pollutant_mass(attributed[j], pol) for j in range(n))
+            if total_attr > 0.0:
+                emis[f"emis_{pol}"] = attr_m
+            elif cams_m > 0.0:
+                emis[f"emis_{pol}"] = cams_m * avg_shares[i]
+            else:
+                emis[f"emis_{pol}"] = 0.0
+        out.append(emis)
+    return out
+
+
 def _records_from_sidecar(
     sidecar: dict[str, dict[str, Any]],
     domain: dict,
@@ -160,11 +209,12 @@ def _records_from_sidecar(
         }
         links = facility_links(rec)
         if rec.get("matched") == "yes" and links:
-            for lk in links:
+            emis_rows = _link_emissions_with_gap_fill(rec, links, pollutants)
+            for lk, emis in zip(links, emis_rows):
                 flon, flat = lk.get("facility_lon"), lk.get("facility_lat")
                 if flon is None or flat is None:
                     continue
-                base = {**base_cams, **_emis_from_sidecar(rec, lk, pollutants)}
+                base = {**base_cams, **emis}
                 meta = appointed_meta(rec, lk)
                 _split_by_domain(
                     base,
@@ -456,7 +506,7 @@ def run_point_sector(
             on_progress("Loading CAMS emissions (legacy link)", 0.15)
         cams_points = load_cams_points(
             cams_nc,
-            year=int(cps["year"]),
+            year=int(year),
             country_iso3=country_iso3(country),
             emission_category_indices=list(cps["emission_category_indices"]),
             source_type_indices=list(cps["source_type_indices"]),

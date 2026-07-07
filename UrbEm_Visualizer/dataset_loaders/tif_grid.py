@@ -14,8 +14,8 @@ from UrbEm_Visualizer.pollutants import band_index_for_pollutant
 
 
 def pixel_centre_axes(transform: rasterio.Affine, height: int, width: int) -> tuple[np.ndarray, np.ndarray]:
-    x = transform.c + (np.arange(width, dtype=np.float32) + 0.5) * transform.a
-    y = transform.f + (np.arange(height, dtype=np.float32) + 0.5) * transform.e
+    x = transform.c + (np.arange(width, dtype=np.float64) + 0.5) * transform.a
+    y = transform.f + (np.arange(height, dtype=np.float64) + 0.5) * transform.e
     return x, y
 
 
@@ -44,8 +44,8 @@ def cell_id_on_raster(
         yy, xx = np.meshgrid(py[i0:i1], px, indexing="ij")
         lon, lat = tr.transform(xx, yy)
         cid = cell_id_from_lonlat(
-            np.asarray(lon, dtype=np.float32).ravel(),
-            np.asarray(lat, dtype=np.float32).ravel(),
+            np.asarray(lon, dtype=np.float64).ravel(),
+            np.asarray(lat, dtype=np.float64).ravel(),
             lon_bounds,
             lat_bounds,
             nlon,

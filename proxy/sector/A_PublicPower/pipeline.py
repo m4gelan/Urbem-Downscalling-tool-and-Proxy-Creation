@@ -24,13 +24,13 @@ from proxy.writers.point_link import write_cams_facility_link_tif
 from proxy.core.area_weights import combined_S_publicpower, normalize_W_per_cams_cell
 from proxy.core.z_score import z_score_inside
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_equal_multiband
-from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -38,15 +38,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
 
     # 1. FIRST STEP: CHECKING EVERYTHING IS OK WITH THE FILEPATHS
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -225,31 +226,6 @@ def build(
         W = normalize_W_per_cams_cell(S, cell_id, cams_cells_mask)
 
         country_tag = country_profile["full_name"].replace(" ", "_")
-        maybe_export_w_groups(
-            export_w_groups,
-            w_groups_export_root,
-            sector_key="A_PublicPower",
-            country_tag=country_tag,
-            year=year,
-            W_by_group={"public_power": W},
-            cell_id=cell_id,
-            transform=cor_tr,
-            crs=cor_crs,
-            alpha_result=None,
-            cams_cells=cams_cells_mask,
-            mix_by_group={
-                "public_power": {
-                    "mixer": "publicpower",
-                    "weights": {"w1": w1, "w2": w2},
-                    "terms": {
-                        "pop_z": np.asarray(population_z, dtype=np.float32),
-                        "corine": np.asarray(corine_01, dtype=np.float32),
-                    },
-                }
-            },
-        )
-
-        # 4 Multi-band GeoTIFF on CORINE reference grid
         band_vals = W
         out_tif = area_weights_tif_path(output_dir, "A_PublicPower", country_tag, year)
         write_area_weight_equal_multiband(

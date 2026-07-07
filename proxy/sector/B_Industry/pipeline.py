@@ -33,13 +33,13 @@ from proxy.visualizers.area_weights_map import (
 from proxy.visualizers.viz_map import write_point_match_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_stack_multiband
 from proxy.writers.point_link import write_cams_facility_link_tif
-from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -47,15 +47,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR B industry: optional CAMS↔E-PRTR point links; area weights = OSM+CORINE+pop per group, alpha-fused GeoTIFF."""
 
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -239,7 +240,6 @@ def build(
             cor131_map: np.ndarray | None = None
             osm_by_group: dict[str, np.ndarray] = {}
             W_by_group: dict[str, np.ndarray] = {}
-            mix_by_group: dict[str, dict] = {}
 
             W_per_group: list[np.ndarray] = []
 
@@ -341,15 +341,6 @@ def build(
                 W_g = normalize_W_per_cams_cell(S_g, cell_id, cams_cells_mask)
                 osm_by_group[g] = np.asarray(osm_r, dtype=np.float32, order="C", copy=True)
                 W_by_group[g] = np.asarray(W_g, dtype=np.float64, order="C", copy=True)
-                mix_by_group[g] = {
-                    "mixer": "industry_group",
-                    "weights": {"w_osm": w_osm, "w_clc": w_clc, "w_pop": w_pop},
-                    "terms": {
-                        "osm": np.asarray(osm_f, dtype=np.float32),
-                        "corine": np.asarray(cor_f, dtype=np.float32),
-                        "pop_z": np.asarray(population_z, dtype=np.float32),
-                    },
-                }
                 W_per_group.append(W_g)
                 log.info(
                     f"  group {g}: CORINE L3 {l3_codes} OSM layers={len(ids)} ids | "
@@ -363,20 +354,6 @@ def build(
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
             country_tag = country_profile["full_name"].replace(" ", "_")
-            maybe_export_w_groups(
-                export_w_groups,
-                w_groups_export_root,
-                sector_key="B_Industry",
-                country_tag=country_tag,
-                year=year,
-                W_by_group=W_by_group,
-                cell_id=cell_id,
-                transform=cor_tr,
-                crs=cor_crs,
-                alpha_result=alpha_result,
-                cams_cells=cams_cells_mask,
-                mix_by_group=mix_by_group,
-            )
 
             W_poll_stack = np.zeros((n_poll, ch, cw), dtype=np.float32)
             for j in range(n_poll):

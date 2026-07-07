@@ -11,7 +11,6 @@ from proxy.alpha.Compute_alpha_matrix import load_sector_alpha_from_config
 from proxy.core import log
 from proxy.core.alias import cams_pollutant_var, resolve_osm_filepath
 from proxy.core.area_weights import (
-    build_i_offroad_mix_by_group,
     compute_i_mobile_S_by_subgroup,
     compute_i_offroad_S_by_subgroup,
     fuse_alpha_weighted_W_planes,
@@ -32,7 +31,6 @@ from proxy.visualizers.area_weights_map import (
     write_i_offroad_area_weights_debug_map,
 )
 from proxy.writers.area_weight_stack import area_weights_tif_path, open_area_weight_stack, write_area_weight_plane
-from proxy.writers.w_groups_export import maybe_export_w_groups
 from proxy.core.point_matching.sector_flow import run_sector_point_matching
 from proxy.dataset_loaders.load_cams_points import load_cams_points
 from proxy.writers.point_link import write_cams_facility_link_tif
@@ -42,6 +40,7 @@ def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -49,15 +48,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
     """GNFR I offroad: area weights from OSM + CORINE per subgroup, alpha-fused multi-band GeoTIFF; optional debug map."""
 
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -225,7 +225,7 @@ def build(
         del population_map, inside_pop
 
         mobile_cfg = cfg.get("mobile_masks") or {}
-        S_mobile, mobile_mix = compute_i_mobile_S_by_subgroup(
+        S_mobile = compute_i_mobile_S_by_subgroup(
             repo_root,
             corine_filepath,
             mobile_cfg=mobile_cfg,
@@ -348,37 +348,6 @@ def build(
                 raise ValueError(f"alpha columns {a_alpha.shape[1]} != spatial groups {n_g}")
 
             country_tag = country_profile["full_name"].replace(" ", "_")
-            mix_by_group: dict[str, dict] | None = None
-            if osm_rasters_by_subgroup is not None:
-                mix_by_group = build_i_offroad_mix_by_group(
-                    osm_rasters_by_subgroup=osm_rasters_by_subgroup,
-                    weights_cfg=weights_cfg,
-                    mobile_mix=mobile_mix,
-                    corine_121=corine_map_121,
-                    corine_123=corine_map_123,
-                    corine_124=corine_map_124,
-                    corine_131=corine_map_131,
-                    corine_132=corine_map_132,
-                    corine_133=corine_map_133,
-                )
-            W_export = {g: W_by_subgroup[g] for g in group_names}
-            mix_export = {g: mix_by_group[g] for g in group_names} if mix_by_group else None
-            maybe_export_w_groups(
-                export_w_groups,
-                w_groups_export_root,
-                sector_key="I_Offroad",
-                country_tag=country_tag,
-                year=year,
-                W_by_group=W_export,
-                cell_id=cell_id,
-                transform=cor_tr,
-                crs=cor_crs,
-                alpha_result=alpha_result,
-                cams_cells=cams_cells_mask,
-                mix_by_group=mix_export,
-            )
-            del mix_by_group, mix_export, mobile_mix
-            gc.collect()
 
             band_names = [cams_pollutant_var(x) for x in alpha_result.pollutant_labels]
             out_w_tif = area_weights_tif_path(output_dir, "I_Offroad", country_tag, year)

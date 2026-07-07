@@ -52,8 +52,15 @@ def build_inputs_table(config: dict) -> list[dict]:
     config_sectors = config.get("sectors") or {}
 
     country = config.get("country")
+    emis_year = config.get("emissions_year")
+    if emis_year is None and (config.get("paths") or {}).get("cams"):
+        emis_year = infer_emissions_year_from_path(config["paths"]["cams"])
     check = (
-        check_input(country, absent_sources=config.get("absent_sources"))
+        check_input(
+            country,
+            absent_sources=config.get("absent_sources"),
+            emissions_year=emis_year,
+        )
         if country
         else {"ok_items": [], "accepted_absent": [], "missing": []}
     )

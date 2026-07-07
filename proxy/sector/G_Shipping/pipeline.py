@@ -12,20 +12,20 @@ from proxy.core.area_weights import combined_S_shipping, normalize_W_per_cams_ce
 from proxy.core.raster_helpers import warp_raster_to_grid
 from proxy.core.z_score import z_score_inside
 from proxy.dataset_loaders import require_filepaths_exist
-from proxy.core.cams_sector_config import cams_area_emissions, load_sector_cells_mask
+from proxy.core.cams_sector_config import cams_area_emissions, load_shipping_sector_cells_mask
 from proxy.dataset_loaders.load_cams_cells_mask import pixels_inside_cams_cells
 from proxy.dataset_loaders.load_corine import load_corine
 from proxy.dataset_loaders.load_emodnet import load_emodnet
 from proxy.dataset_loaders.load_osm import load_osm, rasterize_osm
 from proxy.visualizers.area_weights_map import write_shipping_area_weights_map
 from proxy.writers.area_weight_stack import area_weights_tif_path, write_area_weight_equal_multiband
-from proxy.writers.w_groups_export import maybe_export_w_groups
 
 
 def build(
     output_dir: Path,
     sector_config_path: Path,
     *,
+    sector_config: dict | None = None,
     area_weights: bool = True,
     point_matching: bool = False,
     country_profile: dict[str, str] | None = None,
@@ -33,15 +33,16 @@ def build(
     resolution_m: float,
     pad_m: float,
     area_weights_viz_bbox_wgs84: tuple[float, float, float, float] | None = None,
-    export_w_groups: bool = False,
-    w_groups_export_root: Path | None = None,
 ) -> None:
 
     # 1. FIRST STEP: CHECKING EVERYTHING IS OK WITH THE FILEPATHS
     repo_root = Path(__file__).resolve().parents[3]
 
-    with sector_config_path.open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    if sector_config is None:
+        with sector_config_path.open(encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+    else:
+        cfg = sector_config
     if not isinstance(cfg, dict):
         raise ValueError("sector config must be a YAML mapping")
 
@@ -55,6 +56,7 @@ def build(
     cams_filepath = filepaths.get("CAMS", {}).get("path")
     emodnet_filepath = filepaths.get("EMODNET", {}).get("path")
     corine_filepath = filepaths.get("CORINE", {}).get("path")
+    nuts_filepath = filepaths.get("NUTS REGIONS", {}).get("path")
 
     if point_matching:
         log.info("--------------------------------")
@@ -80,11 +82,13 @@ def build(
         if not corine_l3_codes:
             raise ValueError("sector config: under 'corine', set non-empty 'l3_codes' (CLC L3 integers)")
 
-        cams_cells, cams_grid = load_sector_cells_mask(
+        cams_cells, cams_grid = load_shipping_sector_cells_mask(
             repo_root / cams_filepath.replace("\\", "/"),
             cfg,
+            country_profile=country_profile,
             country_iso3=country_profile["ISO3"],
             pollutants=[str(x).strip() for x in pols if str(x).strip()],
+            nuts_path=repo_root / nuts_filepath.replace("\\", "/"),
             crs=crs,
             resolution_m=resolution_m,
             pad_m=pad_m,
@@ -164,32 +168,6 @@ def build(
         W = normalize_W_per_cams_cell(S, cell_id, cams_cells)
 
         country_tag = country_profile["full_name"].replace(" ", "_")
-        maybe_export_w_groups(
-            export_w_groups,
-            w_groups_export_root,
-            sector_key="G_Shipping",
-            country_tag=country_tag,
-            year=year,
-            W_by_group={"shipping": W},
-            cell_id=cell_id,
-            transform=cor_tr,
-            crs=cor_crs,
-            alpha_result=None,
-            cams_cells=cams_cells,
-            mix_by_group={
-                "shipping": {
-                    "mixer": "linear3",
-                    "weights": {"w1": w1, "w2": w2, "w3": w3},
-                    "terms": {
-                        "emodnet": np.asarray(emodnet_z, dtype=np.float32),
-                        "osm": np.asarray(osm_raster, dtype=np.float32),
-                        "corine": np.asarray(corine_01, dtype=np.float32),
-                    },
-                }
-            },
-        )
-
-        # 5 Multi-band GeoTIFF on CORINE reference grid
         band_vals = W
         out_tif = area_weights_tif_path(output_dir, "G_Shipping", country_tag, year)
         write_area_weight_equal_multiband(

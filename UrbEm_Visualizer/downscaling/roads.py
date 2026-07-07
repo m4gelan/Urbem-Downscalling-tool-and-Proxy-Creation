@@ -40,7 +40,7 @@ def downscale_roads_sector(
     output_resolution_m: int,
     native_meta: NativeGridMeta,
     on_progress: Callable[[str, float], None] | None = None,
-) -> tuple[xr.DataArray, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[xr.DataArray, dict[str, xr.DataArray], dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     sec_yaml = load_sector_yaml("F_Roads")
     f_cats = sec_yaml.get("cams_f_categories") or {}
     cps = sec_yaml["cams_area_emissions"]
@@ -49,6 +49,7 @@ def downscale_roads_sector(
     iso3 = country_iso3(country)
 
     combined: xr.DataArray | None = None
+    by_category: dict[str, xr.DataArray] = {}
     weight_log: dict[str, Any] = {"sector": "F_Roads", "categories": {}, "passed": True}
     clip_log: list[dict[str, Any]] = []
     order = [c for c in roads_category_names() if c in category_paths]
@@ -90,12 +91,13 @@ def downscale_roads_sector(
         if fails:
             weight_log["passed"] = False
             empty = da * 0.0
-            return empty, weight_log, fails, clip_log
+            return empty, {}, weight_log, fails, clip_log
         clip_log.extend(clips)
+        by_category[cat] = da
         combined = merge_grids(combined, da, pollutants, (grid.height, grid.width))
         if on_progress:
             on_progress(f"Area — {cat}", (i + 1) / n)
 
     if combined is None:
         raise ValueError("F_Roads: no category proxy paths")
-    return combined, weight_log, [], clip_log
+    return combined, by_category, weight_log, [], clip_log
